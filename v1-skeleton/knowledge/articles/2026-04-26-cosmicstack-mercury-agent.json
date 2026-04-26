@@ -1,0 +1,10 @@
+{
+  "id": "cosmicstack-labs-mercury-agent",
+  "title": "mercury-agent",
+  "source": "github-trending",
+  "url": "https://github.com/cosmicstack-labs/mercury-agent",
+  "collected_at": "2026-04-26T10:30:00Z",
+  "summary": "基于权限硬化的 AI agent 运行时，支持 token 预算控制和多渠道接入（CLI/Telegram）。强调"灵魂驱动"——通过持久化 session 和工具权限管理实现 24/7 自主运行。适合需要长时运行、受控 agent 的场景。",
+  "tags": ["ai-agent", "permission-hardening", "token-budget", "telegram-bot"],
+  "relevance_score": 0.84
+}

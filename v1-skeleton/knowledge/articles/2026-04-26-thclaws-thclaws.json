@@ -1,0 +1,10 @@
+{
+  "id": "thclaws-thclaws",
+  "title": "thClaws",
+  "source": "github-trending",
+  "url": "https://github.com/thClaws/thClaws",
+  "collected_at": "2026-04-26T10:30:00Z",
+  "summary": "Rust 原生的 agent harness 平台，多 provider 支持，本地运行，强调主权性（sovereign by design）。使用 Tauri 构建桌面应用，适合隐私敏感或需要本地部署 AI 应用的场景。",
+  "tags": ["agent-harness", "rust", "local-first", "multi-provider", "desktop-app"],
+  "relevance_score": 0.80
+}

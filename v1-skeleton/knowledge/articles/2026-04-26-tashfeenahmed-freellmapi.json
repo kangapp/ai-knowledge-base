@@ -1,0 +1,10 @@
+{
+  "id": "tashfeenahmed-freellmapi",
+  "title": "freellmapi",
+  "source": "github-trending",
+  "url": "https://github.com/tashfeenahmed/freellmapi",
+  "collected_at": "2026-04-26T10:30:00Z",
+  "summary": "OpenAI 兼容的代理网关，聚合 ~14 家 AI 提供商的免费额度密钥，支持自动故障转移。个人实验用途，不能用于生产。架构简单但思路清晰，适合学习 LLM 聚合代理原理。",
+  "tags": ["llm-proxy", "multi-provider", "openai-compatible", "free-tier"],
+  "relevance_score": 0.69
+}

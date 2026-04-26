@@ -1,0 +1,10 @@
+{
+  "id": "injaneity-pi-computer-use",
+  "title": "pi-computer-use",
+  "source": "github-trending",
+  "url": "https://github.com/injaneity/pi-computer-use",
+  "collected_at": "2026-04-26T10:30:00Z",
+  "summary": "基于 pi-coding-agent 的应用控制工具，号称"完全不可见"地操控用户应用程序。技术细节不明，实际功能有待验证。概念上属于 computer use 范畴。",
+  "tags": ["computer-use", "agent", "automation"],
+  "relevance_score": 0.61
+}

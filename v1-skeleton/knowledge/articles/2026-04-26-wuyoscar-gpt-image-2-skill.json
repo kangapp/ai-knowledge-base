@@ -1,0 +1,10 @@
+{
+  "id": "wuyoscar-gpt-image-2-skill",
+  "title": "gpt_image_2_skill",
+  "source": "github-trending",
+  "url": "https://github.com/wuyoscar/gpt_image_2_skill",
+  "collected_at": "2026-04-26T10:30:00Z",
+  "summary": "GPT Image 2 的 prompt 库和 CLI 工具，汇集了大量高质量 prompt 示例。支持 Claude Code Skill 格式可直接调用。对需要快速上手 GPT Image 2 的开发者有价值，但本质是 prompt 集合而非技术创新。",
+  "tags": ["gpt-image-2", "prompt-engineering", "cli", "image-generation"],
+  "relevance_score": 0.69
+}

@@ -1,0 +1,10 @@
+{
+  "id": "gammalabtechnologies-harmonist",
+  "title": "harmonist",
+  "source": "github-trending",
+  "url": "https://github.com/GammaLabTechnologies/harmonist",
+  "collected_at": "2026-04-26T10:30:00Z",
+  "summary": "纯 Python 实现的多 agent 编排框架，号称 186 个 agent、零运行时依赖。通过"机械协议强制执行"确保 agent 间协作的确定性。适合需要严格流程控制的企业场景。",
+  "tags": ["multi-agent-framework", "orchestration", "python", "agent-framework"],
+  "relevance_score": 0.84
+}

@@ -1,0 +1,10 @@
+{
+  "id": "future-agi-future-agi",
+  "title": "future-agi",
+  "source": "github-trending",
+  "url": "https://github.com/future-agi/future-agi",
+  "collected_at": "2026-04-26T10:30:00Z",
+  "summary": "一站式 LLM/AI agent 评测与观测平台，提供 Tracing、Evals、Simulations、Datasets、Gateway、Guardrails 等能力。自托管友好，Apache 2.0 开源。对需要系统化评估和监控 agent 行为的团队有吸引力。",
+  "tags": ["ai-gateway", "evals", "observability", "llm", "tracing"],
+  "relevance_score": 0.83
+}

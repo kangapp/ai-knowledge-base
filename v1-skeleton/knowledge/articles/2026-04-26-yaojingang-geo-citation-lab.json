@@ -1,0 +1,10 @@
+{
+  "id": "yaojingang-geo-citation-lab",
+  "title": "geo-citation-lab",
+  "source": "github-trending",
+  "url": "https://github.com/yaojingang/geo-citation-lab",
+  "collected_at": "2026-04-26T10:30:00Z",
+  "summary": "用于研究 AI 搜索引擎如何选择和使用 citations 的数据集与分析 pipeline。对搜索系统的可解释性研究有价值，属于学术向工具。",
+  "tags": ["dataset", "citation-analysis", "ai-search", "research"],
+  "relevance_score": 0.67
+}

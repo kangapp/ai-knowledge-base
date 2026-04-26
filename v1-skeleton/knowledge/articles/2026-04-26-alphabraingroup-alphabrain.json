@@ -1,0 +1,10 @@
+{
+  "id": "alphabraingroup-alphabrain",
+  "title": "AlphaBrain",
+  "source": "github-trending",
+  "url": "https://github.com/AlphaBrainGroup/AlphaBrain",
+  "collected_at": "2026-04-26T10:30:00Z",
+  "summary": "具身 AI（Embodied AI）模型的综合工具包，涵盖感知、决策、执行等能力。概念宽泛，描述缺乏具体技术细节，需进一步调研。",
+  "tags": ["embodied-ai", "robotics", "ai-toolkit"],
+  "relevance_score": 0.68
+}

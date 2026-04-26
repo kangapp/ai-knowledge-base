@@ -1,0 +1,10 @@
+{
+  "id": "tencent-hunyuan-hy3-preview",
+  "title": "Hy3-preview",
+  "source": "github-trending",
+  "url": "https://github.com/Tencent-Hunyuan/Hy3-preview",
+  "collected_at": "2026-04-26T10:30:00Z",
+  "summary": "腾讯混元推出的 Hy3-preview 模型，295B 参数、A21B 架构，专注于推理和 agent 能力。在同等规模中以成本效率为卖点。对关注国产大模型进展的开发者有参考价值。",
+  "tags": ["large-language-model", "reasoning-model", "hunyuan", "tencent"],
+  "relevance_score": 0.76
+}

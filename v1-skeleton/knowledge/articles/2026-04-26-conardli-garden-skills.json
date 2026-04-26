@@ -1,0 +1,10 @@
+{
+  "id": "conardli-garden-skills",
+  "title": "garden-skills",
+  "source": "github-trending",
+  "url": "https://github.com/ConardLi/garden-skills",
+  "collected_at": "2026-04-26T10:30:00Z",
+  "summary": "Claude 官方 Skills 集合的非官方实现版，提供 web design、knowledge retrieval、image generation 等能力。支持 Claude Code 和 Codex/Agent 扩展，将 AI 技能封装为可复用的工具单元。适合想快速为 AI 助手扩展能力的开发者。",
+  "tags": ["claude-code", "agent-skills", "rag", "web-design", "image-generation"],
+  "relevance_score": 0.85
+}

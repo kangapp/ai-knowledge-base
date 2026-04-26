@@ -1,0 +1,10 @@
+{
+  "id": "cintellifusion-multiworld",
+  "title": "MultiWorld",
+  "source": "github-trending",
+  "url": "https://github.com/CIntellifusion/MultiWorld",
+  "collected_at": "2026-04-26T10:30:00Z",
+  "summary": "多 agent 多视角视频世界模型的官方实现，用于生成交互式视频和游戏场景。基于扩散模型，支持动作条件生成。学术性质强，适合研究用。",
+  "tags": ["video-generation", "multi-agent", "diffusion-models", "worldmodel", "robotics"],
+  "relevance_score": 0.72
+}
