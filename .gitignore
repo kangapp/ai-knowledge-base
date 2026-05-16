@@ -1,7 +1,21 @@
-.superpowers/
+# 密钥
 .env
-__pycache__/
-*.pyc
-.venv/
+
+# 运行时数据
 data/
 output/
+
+# Python
+__pycache__/
+*.pyc
+*.egg-info/
+dist/
+.venv/
+
+# 测试
+.pytest_cache/
+.coverage
+
+# IDE
+.vscode/
+.idea/

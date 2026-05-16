@@ -1,0 +1,67 @@
+sources:
+  - id: github_trending
+    name: GitHub Trending
+    type: github
+    enabled: true
+    priority: 1
+    cron: "0 */6 * * *"
+    max_items: 10
+    config:
+      topics: [ai, llm, agent, machine-learning, rag, mcp]
+      min_stars: 50
+      lookback_days: 7
+
+  - id: rss_anthropic
+    name: Anthropic Blog
+    type: rss
+    enabled: true
+    priority: 2
+    cron: "0 9 * * *"
+    max_items: 5
+    config:
+      url: "https://www.anthropic.com/blog/feed.xml"
+      filter_keywords: []
+
+  - id: rss_openai
+    name: OpenAI Blog
+    type: rss
+    enabled: true
+    priority: 2
+    cron: "0 9 * * *"
+    max_items: 5
+    config:
+      url: "https://openai.com/blog/rss.xml"
+      filter_keywords: []
+
+  - id: rss_langchain
+    name: LangChain Blog
+    type: rss
+    enabled: true
+    priority: 2
+    cron: "0 10 * * *"
+    max_items: 5
+    config:
+      url: "https://blog.langchain.dev/feed"
+      filter_keywords: [AI, LLM, Agent, RAG]
+
+  - id: feishu
+    name: 飞书知识文档
+    type: feishu
+    enabled: false
+    priority: 3
+    cron: "0 10 * * *"
+    max_items: 10
+    config:
+      space_ids: []
+
+  - id: arxiv
+    name: arXiv
+    type: arxiv
+    enabled: false
+    priority: 3
+    cron: "0 11 * * 1"
+    max_items: 10
+    config:
+      categories: [cs.AI, cs.CL, cs.LG]
+      keywords: [LLM, agent, RAG, transformer]
+      lookback_days: 7

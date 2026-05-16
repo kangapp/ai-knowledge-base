@@ -1,0 +1,45 @@
+agents:
+  github_analyzer:
+    model:
+      primary: { provider: deepseek, model: deepseek-chat }
+      fallback: [{ provider: openai, model: gpt-4o-mini }]
+    params: { temperature: 0.3, max_tokens: 2048 }
+    prompt: prompts/github_analyzer.md
+    budget_weight: 1.0
+
+  rss_analyzer:
+    model:
+      primary: { provider: deepseek, model: deepseek-chat }
+      fallback: []
+    params: { temperature: 0.3, max_tokens: 2048 }
+    prompt: prompts/rss_analyzer.md
+    budget_weight: 1.0
+
+  feishu_analyzer:
+    model:
+      primary: { provider: minimax, model: abab6.5s-chat }
+      fallback: [{ provider: deepseek, model: deepseek-chat }]
+    params: { temperature: 0.3, max_tokens: 2048 }
+    prompt: prompts/feishu_analyzer.md
+    budget_weight: 1.0
+
+  arxiv_analyzer:
+    model:
+      primary: { provider: deepseek, model: deepseek-chat }
+      fallback: [{ provider: openai, model: gpt-4o-mini }]
+    params: { temperature: 0.3, max_tokens: 4096 }
+    prompt: prompts/arxiv_analyzer.md
+    budget_weight: 1.0
+
+  reviewer:
+    model:
+      primary: { provider: deepseek, model: deepseek-chat }
+      fallback: []
+    params: { temperature: 0.0, max_tokens: 1024 }
+    prompt: prompts/reviewer.md
+    budget_weight: 0.5
+
+budget:
+  monthly: 10.0
+  soft_limit: 0.8
+  hard_limit: 1.0
