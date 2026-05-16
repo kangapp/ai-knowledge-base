@@ -33,7 +33,7 @@
 - **首页**：日期范围过滤（快捷按钮 + 自定义）+ 搜索 + 来源/标签筛选 + 文章列表（分页 + 评分标签）
 - **文章详情页**：AI 摘要、原始链接、标签、元数据（来源/评分/token 花费）
 - **仪表盘**：KPI 卡片、来源分布图、每日花费趋势（日期范围联动）
-- 纯静态 HTML + 少量 Vanilla JS（客户端过滤全量 data.json，日均 50 条，1 年约 9MB）；首屏预渲染近 30 天；3 年后 data.json 超 25MB 时可切换按月分片加载；FastAPI /api/articles 作为兜底服务端查询
+- 数据文件拆分：`data.json`（列表字段不含 summary，首页过滤搜索，~9MB/年）+ `stats.json`（KPI+来源分布+每日花费，<10KB，仪表盘用）；详情页调 `/api/articles/{id}` 按需获取完整 summary；3 年后 data.json 超 25MB 可切换按月分片 + `manifest.json` 索引；FastAPI `/api/articles` 始终作为兜底服务端查询
 - 站点构建：去抖合并（5min 计时器）+ 双目录原子 rename 切换，防止高频渲染和半写文件
 
 ### 2.4 LLM 多模型管理
