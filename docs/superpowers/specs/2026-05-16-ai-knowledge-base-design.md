@@ -24,7 +24,7 @@
 - **Fan-out Analyzers**：4 个 SubAgent 并行分析（github/rss/feishu/arxiv），各自使用专属 Prompt 和模型
 - **Aggregator**：汇总并行结果，附加成本统计
 - **Reviewer**：结构化四维评分（AI相关度0-40 + 内容深度0-30 + 信息密度0-15 + 时效性0-15=100），temperature=0 保证一致性；≥80 入库，50-79 带具体改进反馈打回重分析（限 2 轮，同维度连续低分不再重试），<50 丢弃
-- **Cost Monitor**：横切节点，每次 LLM 调用记录 token/花费。两种熔断独立运作：Provider 熔断（per-provider 连续 3 次失败 → circuit open，指数退避 60/120/240/480/600s 试探恢复 → 自动 fallback 到 agent 配置的备选模型）；预算熔断（全局 80% 软熔断切便宜模型 / 100% 硬熔断停服）
+- **Cost Monitor**：LLM 客户端层的 TrackedClient wrapper（非 LangGraph 节点），每次 `chat.completions.create()` 调用自动记录 token/花费 + 检查熔断，调用方无感。两种熔断独立运作：Provider 熔断（per-provider 连续 3 次失败 → circuit open，指数退避 60/120/240/480/600s 试探恢复 → 自动 fallback 到 agent 配置的备选模型）；预算熔断（全局 80% 软熔断切便宜模型 / 100% 硬熔断停服）
 
 ### 2.3 前端展示（静态网站）
 - **首页**：日期范围过滤（快捷按钮 + 自定义）+ 搜索 + 来源/标签筛选 + 文章列表（分页 + 评分标签）
@@ -146,7 +146,7 @@ ai-knowledge-base/
 5. Reviewer 结构四维评分（含逐维度 reason + retry_feedback） → pass/retry(限2轮)/discard
 6. 入库 SQLite → articles + tags + cost_logs + pipeline_runs
 7. Site Builder 去抖触发（5min 计时器合并多轮采集）→ 渲染到临时目录 → 原子 rename 切换 → 静态站上线
-8. 横切：Cost Monitor 每步记录花费；Provider 熔断（per-provider 健康检查）和预算熔断（全局花费控制）独立运作
+8. 横切：Cost Monitor（LLM 客户端 wrapper）每次 LLM 调用自动记账 + 熔断检查；Provider 熔断（per-provider 健康检查）和预算熔断（全局花费控制）独立运作
 
 ## 6. Reviewer 评分细则
 
