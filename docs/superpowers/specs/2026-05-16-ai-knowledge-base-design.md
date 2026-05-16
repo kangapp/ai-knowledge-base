@@ -22,7 +22,7 @@
 ### 2.2 工作流（LangGraph）
 - **Collector**：按源并行采集原始数据；单源失败不影响其余源（try/except 隔离，失败返回空列表 + 记 error_log）；空数据源的 Analyzer 直接跳过不调 LLM；仅所有源全挂时 pipeline 才标记 failed；采集后 DB 批量查重（`WHERE url IN (...)`），已入库 url 直接跳过不发 Analyzer，避免重复 LLM 调用
 - **Router**：按 source 字段纯规则匹配分流（100% 规则，无需 LLM）
-- **Fan-out Analyzers**：4 个 SubAgent 并行分析（github/rss/feishu/arxiv），各自使用专属 Prompt 和模型；分析时自动建议 1-3 个标签（新标签自动收录到 tags 表，管理员可后续维护）；所有 Analyzer 共享 `AnalyzedItem` Pydantic 模型，输出 schema 注入 Prompt 模板保证一致性
+- **Fan-out Analyzers**：4 个 SubAgent 并行分析，共享 `base.analyze_items()` 通用实现（差异仅 Prompt + model），共享 `AnalyzedItem` Pydantic 模型 + 自动建议 1-3 个标签（新标签自动收录）；每个保留独立薄层文件（~8 行）作为 LangGraph 节点 + 未来扩展锚点
 - **Aggregator**：汇总并行结果，附加成本统计；每条结果过 Pydantic 校验，非法输出丢弃 + 记 parse_error
 - **Reviewer**：结构化四维评分（AI相关度0-40 + 内容深度0-30 + 信息密度0-15 + 时效性0-15=100），temperature=0 保证一致性；≥80 入库，50-79 带具体改进反馈打回重分析（限 2 轮，同维度连续低分不再重试），<50 丢弃
 - **LLM 输出容错**：`response_format={"type": "json_object"}` 强制 JSON 模式 + markdown 容错解析 + Pydantic 校验 + 两次重试
