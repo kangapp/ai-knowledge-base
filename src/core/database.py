@@ -1,0 +1,74 @@
+# src/core/database.py
+import os
+from pathlib import Path
+import aiosqlite
+
+
+class Database:
+    def __init__(self, db_path: Path | str, migrations_dir: Path | str | None = None):
+        self.db_path = str(db_path)
+        if migrations_dir:
+            self.migrations_dir = str(migrations_dir)
+        else:
+            self.migrations_dir = None
+        self._conn: aiosqlite.Connection | None = None
+
+    async def initialize(self):
+        self._conn = await aiosqlite.connect(self.db_path)
+        self._conn.row_factory = aiosqlite.Row
+        await self._run_migrations()
+
+    async def _run_migrations(self):
+        # 确保 schema_version 表存在（最简 bootstrap）
+        await self._conn.execute(
+            "CREATE TABLE IF NOT EXISTS schema_version (version INTEGER PRIMARY KEY)"
+        )
+        row = await self._conn.execute("SELECT version FROM schema_version")
+        result = await row.fetchone()
+        current = result["version"] if result else 0
+
+        if not self.migrations_dir:
+            return
+
+        mig_dir = Path(self.migrations_dir)
+        if not mig_dir.exists():
+            return
+
+        migrations = sorted(
+            [f for f in os.listdir(str(mig_dir)) if f.endswith(".sql")],
+            key=lambda f: int(f.split("_")[0])
+        )
+
+        for filename in migrations:
+            num = int(filename.split("_")[0])
+            if num > current:
+                sql = (mig_dir / filename).read_text()
+                await self._conn.executescript(sql)
+                await self._conn.commit()
+
+    async def fetch_one(self, sql: str, params: tuple = ()):
+        cursor = await self._conn.execute(sql, params)
+        return await cursor.fetchone()
+
+    async def fetch_all(self, sql: str, params: tuple = ()):
+        cursor = await self._conn.execute(sql, params)
+        return await cursor.fetchall()
+
+    async def execute(self, sql: str, params: tuple = ()):
+        return await self._conn.execute(sql, params)
+
+    async def execute_many(self, sql: str, params_list: list[tuple]):
+        return await self._conn.executemany(sql, params_list)
+
+    async def commit(self):
+        await self._conn.commit()
+
+    async def backup(self, target_path: str):
+        """在线热备份到 target_path（使用 aiosqlite 自带 API，不依赖 sqlite3 CLI）"""
+        target = await aiosqlite.connect(target_path)
+        await self._conn.backup(target)
+        await target.close()
+
+    async def close(self):
+        if self._conn:
+            await self._conn.close()
