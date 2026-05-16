@@ -23,7 +23,7 @@
 - **Fan-out Analyzers**：4 个 SubAgent 并行分析（github/rss/feishu/arxiv），各自使用专属 Prompt 和模型
 - **Aggregator**：汇总并行结果，附加成本统计
 - **Reviewer**：结构化四维评分（AI相关度0-40 + 内容深度0-30 + 信息密度0-15 + 时效性0-15=100），temperature=0 保证一致性；≥80 入库，50-79 带具体改进反馈打回重分析（限 2 轮，同维度连续低分不再重试），<50 丢弃
-- **Cost Monitor**：横切节点，每次 LLM 调用记录 token/花费，软熔断（80% 降级）/硬熔断（100% 停服）
+- **Cost Monitor**：横切节点，每次 LLM 调用记录 token/花费。两种熔断独立运作：Provider 熔断（per-provider 连续 3 次失败 → circuit open，指数退避 60/120/240/480/600s 试探恢复 → 自动 fallback 到 agent 配置的备选模型）；预算熔断（全局 80% 软熔断切便宜模型 / 100% 硬熔断停服）
 
 ### 2.3 前端展示（静态网站）
 - **首页**：日期范围过滤（快捷按钮 + 自定义）+ 搜索 + 来源/标签筛选 + 文章列表（分页 + 评分标签）
@@ -35,7 +35,7 @@
 - 所有 Provider 统一走 OpenAI 兼容协议（base_url + api_key）
 - 三层配置解耦：llm.yaml（Provider 注册）→ agents.yaml（SubAgent 绑定 + fallback + 参数）→ .env（密钥）
 - 健康检查：被动探测（调用记录失败）+ 主动探测（定时最小请求）+ 余额检查
-- 熔断：连续失败 3 次 → open → 冷却 60s → half_open 试探
+- Provider 熔断：per-provider 独立计数，连续失败 3 次 → circuit open → 指数退避冷却（60s/120s/240s/480s cap 600s）→ half_open 试探；LLMRegistry.get_client() 遍历 primary → fallback[] 自动切换
 
 ### 2.5 CI/CD
 - GitHub Actions：push main → pytest → docker build → SSH deploy to VPS
@@ -144,7 +144,7 @@ ai-knowledge-base/
 5. Reviewer 结构四维评分（含逐维度 reason + retry_feedback） → pass/retry(限2轮)/discard
 6. 入库 SQLite → articles + tags + cost_logs + pipeline_runs
 7. Site Builder 自动触发 → Jinja2 渲染 /output 静态站
-8. 横切：Cost Monitor 每步记录花费 + 熔断检查
+8. 横切：Cost Monitor 每步记录花费；Provider 熔断（per-provider 健康检查）和预算熔断（全局花费控制）独立运作
 
 ## 6. Reviewer 评分细则
 
