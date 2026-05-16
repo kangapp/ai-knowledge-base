@@ -45,6 +45,8 @@
 
 ### 2.5 CI/CD
 - GitHub Actions：push main → pytest → docker build → SSH deploy to VPS
+- 分层测试：CI 跑单元测试（LLM mock + API fixture，<30s）；push main 前手动跑集成测试（真实 API + 真实 LLM，少量数据）；部署前本地跑 E2E（全 mock 完整流程）
+- 标记筛选：`pytest -m "not integration and not e2e"` 确保 CI 不调真实外部服务
 - VPS 初始化：5 步完成（装 Docker、clone、配 .env、docker compose up、验证）
 - 密钥管理：`.env` 不入 Git，VPS 上手动维护；轮换直接改 `.env` + restart；新增 Provider 时本地先更新 `.env.example` 模板 → SSH 同步 `.env` → `docker compose up -d`
 - 备份：每次 pipeline 完成后 `sqlite3 .backup` 在线热备份到 `data/backup/`；本地保留 7 天滚动覆盖；一期不做异地备份（SQLite 仅 ~20MB/年，机器故障后重建 + 重跑采集即可恢复）
