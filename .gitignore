@@ -19,3 +19,9 @@ dist/
 # IDE
 .vscode/
 .idea/
+
+# macOS
+.DS_Store
+
+# Claude Code
+.superpowers/
