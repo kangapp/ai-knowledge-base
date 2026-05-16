@@ -115,7 +115,7 @@ ai-knowledge-base/
 
 ### 4.1 SQLite Schema
 
-**articles** — 文章主表（id, title, url, description, summary, source, source_detail, relevance_score, status, retry_count, collected_at, published_at, raw_metadata, analysis_cost, analysis_tokens, created_at, updated_at）；FTS5 全文索引 over (title, summary, description)
+**articles** — 文章主表（id, title, url, description, summary, source, source_detail, relevance_score, status, retry_count, collected_at, published_at, raw_metadata, analysis_cost, analysis_tokens, created_at, updated_at）；FTS5 全文索引 over (title, summary, description)；url UNIQUE 约束防同源重复采集；不做跨源去重（不同源的视角和 Prompt 不同，产出有差异，重叠率低）
 
 **tags** — 标签字典（id, name, color）
 
