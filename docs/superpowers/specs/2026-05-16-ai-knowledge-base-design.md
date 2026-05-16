@@ -25,6 +25,7 @@
 - **Aggregator**：汇总并行结果，附加成本统计
 - **Reviewer**：结构化四维评分（AI相关度0-40 + 内容深度0-30 + 信息密度0-15 + 时效性0-15=100），temperature=0 保证一致性；≥80 入库，50-79 带具体改进反馈打回重分析（限 2 轮，同维度连续低分不再重试），<50 丢弃
 - **Cost Monitor**：LLM 客户端层的 TrackedClient wrapper（非 LangGraph 节点），每次 `chat.completions.create()` 调用自动记录 token/花费 + 检查熔断，调用方无感。两种熔断独立运作：Provider 熔断（per-provider 连续 3 次失败 → circuit open，指数退避 60/120/240/480/600s 试探恢复 → 自动 fallback 到 agent 配置的备选模型）；预算熔断（全局 80% 软熔断切便宜模型 / 100% 硬熔断停服）
+- **调度**：APScheduler AsyncIOScheduler 与 FastAPI 共享 event loop；pipeline 全链路 async 不阻塞健康检查；`skip_if_running` 策略：上一轮未完成时跳过本轮，下轮 cron 兜底
 
 ### 2.3 前端展示（静态网站）
 - **首页**：日期范围过滤（快捷按钮 + 自定义）+ 搜索 + 来源/标签筛选 + 文章列表（分页 + 评分标签）
