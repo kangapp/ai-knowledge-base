@@ -1,4 +1,5 @@
 import os
+import pytest
 from src.core.config import load_llm_config, load_sources_config, load_agents_config
 
 
@@ -28,3 +29,10 @@ def test_env_interpolation(sample_llm_yaml, monkeypatch):
     monkeypatch.setenv("DEEPSEEK_API_KEY", "sk-test-123")
     cfg = load_llm_config(sample_llm_yaml)
     assert cfg.providers["deepseek"].api_key == "sk-test-123"
+
+
+def test_missing_env_var_raises(sample_llm_yaml, monkeypatch):
+    # 确保环境变量未设置
+    monkeypatch.delenv("DEEPSEEK_API_KEY", raising=False)
+    with pytest.raises(KeyError, match="DEEPSEEK_API_KEY"):
+        load_llm_config(sample_llm_yaml)

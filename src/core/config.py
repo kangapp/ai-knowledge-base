@@ -79,7 +79,11 @@ def _interpolate_env(obj):
         return [_interpolate_env(v) for v in obj]
     if isinstance(obj, str):
         def replacer(match):
-            return os.environ.get(match.group(1), "")
+            key = match.group(1)
+            val = os.environ.get(key)
+            if val is None:
+                raise KeyError(f"环境变量 {key} 未设置，但配置文件引用了 ${{{key}}}")
+            return val
         return re.sub(r'\$\{(\w+)\}', replacer, obj)
     return obj
 
