@@ -50,7 +50,7 @@
 |----|------|------|
 | 语言 | Python 3.12+ | |
 | 依赖管理 | uv | uv.lock 锁版本 |
-| 工作流 | langgraph + langgraph-checkpoint-sqlite | DAG + 断点恢复 |
+| 工作流 | langgraph | DAG 编排，短 pipeline 无需 checkpoint |
 | LLM SDK | openai (AsyncOpenAI) | 统一 OpenAI 兼容协议调用 |
 | 数据校验 | pydantic v2 | State + 配置 + API |
 | HTTP | httpx | 异步采集 + API 调用 |
@@ -188,4 +188,5 @@ Reviewer LLM 输出严格 JSON，每维包含 `score` + `reason`。verdict 为 r
 - 静态站日均 50 条，data.json 全量约 9MB/年，客户端过滤性能足够；3 年后超 25MB 可切换按月分片加载
 - 放弃 Anthropic 原生协议（prompt caching 等），需时再加适配器即可
 - 系统依赖 3 个外部服务（GitHub API、飞书 API、LLM Provider），任一出问题影响当天采集
+- 全自动短 pipeline（< 5min），幂等设计保证重跑安全，无需 checkpoint
 - SQLite 单文件，年数据量约 20MB，无需分库分表
