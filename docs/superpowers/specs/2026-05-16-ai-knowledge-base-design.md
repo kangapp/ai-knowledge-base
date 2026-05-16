@@ -31,7 +31,7 @@
 - **调度**：APScheduler AsyncIOScheduler 与 FastAPI 共享 event loop；pipeline 全链路 async 不阻塞健康检查；`skip_if_running` 策略：上一轮未完成时跳过本轮，下轮 cron 兜底
 
 ### 2.3 前端展示（静态网站）
-- **首页**：Jinja2 预渲染近 30 天文章为初始 HTML（首屏秒开）+ JS 后台加载 data.json 无缝扩展为全量；筛选/搜索/分页纯客户端
+- **首页**：Jinja2 预渲染近 30 天文章为初始 HTML（首屏秒开）+ JS 后台加载 data.json 无缝扩展为全量；来源/标签/日期/评分筛选纯客户端过滤；搜索框走 `/api/search?q=xxx` FTS5 全文检索（300ms 去抖）
 - **文章详情页**：`article.html` + JS 读 URL param 调 `/api/articles/{id}` 获取完整 summary 并渲染
 - **仪表盘**：Jinja2 内联 stats.json 渲染 KPI 卡片 + Chart.js（CDN，~70KB gzipped）画来源分布饼图 + 每日花费折线图
 - 数据文件拆分：`data.json`（列表字段不含 summary，首页过滤搜索，~9MB/年）+ `stats.json`（KPI+来源分布+每日花费，<10KB）；详情页调 API 按需获取完整 summary；3 年后 data.json 超 25MB 可切换按月分片 + `manifest.json` 索引；FastAPI `/api/articles` 始终作为兜底
