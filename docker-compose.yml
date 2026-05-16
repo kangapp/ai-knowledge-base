@@ -1,0 +1,28 @@
+services:
+  pipeline:
+    build: .
+    env_file: .env
+    volumes:
+      - ./data:/app/data
+      - ./output:/app/output
+      - ./config:/app/config:ro
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/health"]
+      interval: 30s
+      retries: 3
+      start_period: 10s
+
+  web:
+    image: caddy:alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      - KB_DOMAIN=${KB_DOMAIN:-kb.your-domain.com}
+    volumes:
+      - ./output:/srv:ro
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+    restart: unless-stopped
+    depends_on:
+      - pipeline
