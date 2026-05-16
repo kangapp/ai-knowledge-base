@@ -30,6 +30,7 @@
 - **文章详情页**：AI 摘要、原始链接、标签、元数据（来源/评分/token 花费）
 - **仪表盘**：KPI 卡片、来源分布图、每日花费趋势（日期范围联动）
 - 纯静态 HTML + 少量 Vanilla JS（客户端过滤全量 data.json，日均 50 条，1 年约 9MB）；首屏预渲染近 30 天；3 年后 data.json 超 25MB 时可切换按月分片加载；FastAPI /api/articles 作为兜底服务端查询
+- 站点构建：去抖合并（5min 计时器）+ 双目录原子 rename 切换，防止高频渲染和半写文件
 
 ### 2.4 LLM 多模型管理
 - 所有 Provider 统一走 OpenAI 兼容协议（base_url + api_key）
@@ -143,7 +144,7 @@ ai-knowledge-base/
 4. Aggregator 汇总 → 附加成本统计
 5. Reviewer 结构四维评分（含逐维度 reason + retry_feedback） → pass/retry(限2轮)/discard
 6. 入库 SQLite → articles + tags + cost_logs + pipeline_runs
-7. Site Builder 自动触发 → Jinja2 渲染 /output 静态站
+7. Site Builder 去抖触发（5min 计时器合并多轮采集）→ 渲染到临时目录 → 原子 rename 切换 → 静态站上线
 8. 横切：Cost Monitor 每步记录花费；Provider 熔断（per-provider 健康检查）和预算熔断（全局花费控制）独立运作
 
 ## 6. Reviewer 评分细则
