@@ -15,7 +15,7 @@
 ### 2.1 数据采集
 - 支持数据源：GitHub Trending、RSS、飞书知识文档、arXiv（配置驱动，可增删）
 - 每种源独立配置：优先级、定时 cron、获取数量、过滤关键词
-- GitHub API（带 Token 认证）、RSS/Atom 解析、飞书开放平台 API、arXiv API
+- GitHub：`/search/repositories`（`created:>7d + sort=stars` 近似 trending），认证后 rate limit 10 req/min 完全够用
 - RSS 按订阅源拆分为独立条目：各自配置 cron（周刊 vs 高频源互不拖慢）、独立启用/禁用；Collector 代码复用，所有 `type: rss` 走同一 `collect_rss()` + `asyncio.gather` 并行抓取
 - **飞书认证**：惰性刷新策略 — 内存缓存 `tenant_access_token` + 过期时间，采集时自动检查有效性（有效期不足 3 分钟则提前刷新）。token 请求频率由有效期（2h）决定而非采集频率，不会触发飞书限频（100 次/小时）。`FEISHU_APP_ID` / `FEISHU_APP_SECRET` 存放于 `.env`
 
