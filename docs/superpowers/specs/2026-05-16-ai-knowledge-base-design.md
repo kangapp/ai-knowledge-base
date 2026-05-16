@@ -132,7 +132,15 @@ ai-knowledge-base/
 
 **circuit_events** — 熔断事件记录（id, provider, event, reason, created_at）
 
-### 4.2 配置文件
+**schema_version** — 当前迁移版本（version INTEGER），启动时自动检测并执行增量迁移
+
+### 4.2 数据库迁移
+- 版本化 SQL 文件：`src/db/migrations/001_init.sql`, `002_xxx.sql`, ...，按编号递增
+- 启动时自动检测 `schema_version` → 执行未应用的迁移 → 按序往前滚
+- 零依赖：纯 SQL 文件 + 30 行 Python 逻辑，不引入 Alembic/SQLAlchemy
+- 回滚依赖备份：恢复 `.backup` 文件后重新跑迁移
+
+### 4.3 配置文件
 
 **config/llm.yaml**：providers 注册（base_url, api_key, models 清单及价格）
 
