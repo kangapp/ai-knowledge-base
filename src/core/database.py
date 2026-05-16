@@ -7,15 +7,13 @@ import aiosqlite
 class Database:
     def __init__(self, db_path: Path | str, migrations_dir: Path | str | None = None):
         self.db_path = str(db_path)
-        if migrations_dir:
-            self.migrations_dir = str(migrations_dir)
-        else:
-            self.migrations_dir = None
+        self.migrations_dir = str(migrations_dir) if migrations_dir else None
         self._conn: aiosqlite.Connection | None = None
 
     async def initialize(self):
         self._conn = await aiosqlite.connect(self.db_path)
         self._conn.row_factory = aiosqlite.Row
+        await self._conn.execute("PRAGMA foreign_keys = ON")
         await self._run_migrations()
 
     async def _run_migrations(self):
@@ -35,7 +33,7 @@ class Database:
             return
 
         migrations = sorted(
-            [f for f in os.listdir(str(mig_dir)) if f.endswith(".sql")],
+            [f for f in os.listdir(str(mig_dir)) if f.endswith(".sql") and f[0].isdigit()],
             key=lambda f: int(f.split("_")[0])
         )
 
@@ -46,11 +44,11 @@ class Database:
                 await self._conn.executescript(sql)
                 await self._conn.commit()
 
-    async def fetch_one(self, sql: str, params: tuple = ()):
+    async def fetch_one(self, sql: str, params: tuple = ()) -> aiosqlite.Row | None:
         cursor = await self._conn.execute(sql, params)
         return await cursor.fetchone()
 
-    async def fetch_all(self, sql: str, params: tuple = ()):
+    async def fetch_all(self, sql: str, params: tuple = ()) -> list[aiosqlite.Row]:
         cursor = await self._conn.execute(sql, params)
         return await cursor.fetchall()
 
@@ -63,11 +61,13 @@ class Database:
     async def commit(self):
         await self._conn.commit()
 
-    async def backup(self, target_path: str):
+    async def backup(self, target_path: Path | str):
         """在线热备份到 target_path（使用 aiosqlite 自带 API，不依赖 sqlite3 CLI）"""
-        target = await aiosqlite.connect(target_path)
-        await self._conn.backup(target)
-        await target.close()
+        target = await aiosqlite.connect(str(target_path))
+        try:
+            await self._conn.backup(target)
+        finally:
+            await target.close()
 
     async def close(self):
         if self._conn:
