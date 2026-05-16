@@ -44,6 +44,7 @@
 - GitHub Actions：push main → pytest → docker build → SSH deploy to VPS
 - VPS 初始化：5 步完成（装 Docker、clone、配 .env、docker compose up、验证）
 - 密钥管理：`.env` 不入 Git，VPS 上手动维护；轮换直接改 `.env` + restart；新增 Provider 时本地先更新 `.env.example` 模板 → SSH 同步 `.env` → `docker compose up -d`
+- 备份：每次 pipeline 完成后 `sqlite3 .backup` 在线热备份到 `data/backup/`；本地保留 7 天滚动覆盖；一期不做异地备份（SQLite 仅 ~20MB/年，机器故障后重建 + 重跑采集即可恢复）
 
 ## 3. 技术架构
 
