@@ -1,0 +1,4 @@
+[
+  {"url": "https://github.com/test/llm-framework", "title": "LLM Framework", "description": "A framework for LLM applications", "source": "github", "source_detail": "test/llm-framework"},
+  {"url": "https://example.com/ai-article", "title": "The Future of AI Agents", "description": "Exploring agent architectures", "source": "rss", "source_detail": "https://example.com/feed"}
+]
