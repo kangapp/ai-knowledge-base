@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block title %}AI Knowledge Base{% endblock %}
+{% block content %}
+<div class="filters">
+    <input type="search" id="search-box" placeholder="搜索... (FTS5)">
+    <select id="source-filter"><option value="">全部来源</option></select>
+    <select id="tag-filter"><option value="">全部标签</option></select>
+    <div class="date-filters">
+        <button data-days="7">近 7 天</button>
+        <button data-days="30">近 30 天</button>
+        <button data-days="0">全部</button>
+    </div>
+</div>
+<div id="article-list">
+    {% for article in articles %}
+    <div class="article-card" data-score="{{ article.relevance_score }}" data-source="{{ article.source }}">
+        <h3><a href="/article.html?id={{ article.id }}">{{ article.title }}</a></h3>
+        <p>{{ article.description[:200] }}</p>
+        <div class="meta">
+            <span>{{ article.source_detail or article.source }}</span>
+            <span>{{ article.collected_at[:10] }}</span>
+            <span class="score">{{ article.relevance_score }}分</span>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+<script>window.__INIT__ = {articles: {{ articles|tojson }}, stats: {{ stats|tojson }}};</script>
+{% endblock %}
