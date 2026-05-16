@@ -20,7 +20,7 @@
 - **飞书认证**：惰性刷新策略 — 内存缓存 `tenant_access_token` + 过期时间，采集时自动检查有效性（有效期不足 3 分钟则提前刷新）。token 请求频率由有效期（2h）决定而非采集频率，不会触发飞书限频（100 次/小时）。`FEISHU_APP_ID` / `FEISHU_APP_SECRET` 存放于 `.env`
 
 ### 2.2 工作流（LangGraph）
-- **Collector**：按源并行采集原始数据；单源失败不影响其余源（try/except 隔离，失败返回空列表 + 记 error_log）；空数据源的 Analyzer 直接跳过不调 LLM；仅所有源全挂时 pipeline 才标记 failed
+- **Collector**：按源并行采集原始数据；单源失败不影响其余源（try/except 隔离，失败返回空列表 + 记 error_log）；空数据源的 Analyzer 直接跳过不调 LLM；仅所有源全挂时 pipeline 才标记 failed；采集后 DB 批量查重（`WHERE url IN (...)`），已入库 url 直接跳过不发 Analyzer，避免重复 LLM 调用
 - **Router**：按 source 字段纯规则匹配分流（100% 规则，无需 LLM）
 - **Fan-out Analyzers**：4 个 SubAgent 并行分析（github/rss/feishu/arxiv），各自使用专属 Prompt 和模型；分析时自动建议 1-3 个标签（新标签自动收录到 tags 表，管理员可后续维护）；所有 Analyzer 共享 `AnalyzedItem` Pydantic 模型，输出 schema 注入 Prompt 模板保证一致性
 - **Aggregator**：汇总并行结果，附加成本统计；每条结果过 Pydantic 校验，非法输出丢弃 + 记 parse_error
