@@ -164,6 +164,18 @@ ai-knowledge-base/
 7. Site Builder 去抖触发（5min 计时器合并多轮采集）→ 渲染到临时目录 → 原子 rename 切换 → 静态站上线
 8. 横切：Cost Monitor（LLM 客户端 wrapper）每次 LLM 调用自动记账 + 熔断检查；Provider 熔断（per-provider 健康检查）和预算熔断（全局花费控制）独立运作
 
+### 5.1 字段流与阶段模型
+
+三个核心结构，通过 `ref_url` 关联（不继承，解耦采集和分析）：
+
+- **RawItem**（Collector 产出）：url, title, description, source, source_detail, published_at, raw_metadata, collected_at
+- **AnalyzedItem**（Analyzer 产出）：ref_url → RawItem.url, title, summary, tags[], language
+- **ReviewedItem**（Reviewer 产出）：ref_url, total_score, dimensions, verdict, retry_feedback
+
+最终合并写入 articles 表：`url→url`, `title→title`, `description→raw.description`, `summary→analyzed.summary`, `source→raw.source`, `source_detail→raw.source_detail`, `relevance_score→reviewed.total_score`, `status→reviewed.verdict`。四维评分细节和语言信息存入 `raw_metadata` JSON。
+
+任何阶段失败时 `ref_url` 未匹配上的数据自然丢弃，由 `pipeline_runs.summary` 记录。
+
 ## 6. Reviewer 评分细则
 
 ### 四维评分锚点
