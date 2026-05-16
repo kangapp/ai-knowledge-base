@@ -22,7 +22,7 @@
 - **Router**：按 source 字段纯规则匹配分流（100% 规则，无需 LLM）
 - **Fan-out Analyzers**：4 个 SubAgent 并行分析（github/rss/feishu/arxiv），各自使用专属 Prompt 和模型
 - **Aggregator**：汇总并行结果，附加成本统计
-- **Reviewer**：LLM 逐条评分，≥80 入库，50-79 打回重分析（限 2 轮），<50 丢弃
+- **Reviewer**：结构化四维评分（AI相关度0-40 + 内容深度0-30 + 信息密度0-15 + 时效性0-15=100），temperature=0 保证一致性；≥80 入库，50-79 带具体改进反馈打回重分析（限 2 轮，同维度连续低分不再重试），<50 丢弃
 - **Cost Monitor**：横切节点，每次 LLM 调用记录 token/花费，软熔断（80% 降级）/硬熔断（100% 停服）
 
 ### 2.3 前端展示（静态网站）
@@ -141,12 +141,27 @@ ai-knowledge-base/
 2. Router 规则分类 → 4 组数据分流
 3. LangGraph Send fan-out → 4 个 SubAgent 并行分析 → analyzed_items[]
 4. Aggregator 汇总 → 附加成本统计
-5. Reviewer LLM 评分 → pass/retry(限2轮)/discard
+5. Reviewer 结构四维评分（含逐维度 reason + retry_feedback） → pass/retry(限2轮)/discard
 6. 入库 SQLite → articles + tags + cost_logs + pipeline_runs
 7. Site Builder 自动触发 → Jinja2 渲染 /output 静态站
 8. 横切：Cost Monitor 每步记录花费 + 熔断检查
 
-## 6. LLM 配置推荐
+## 6. Reviewer 评分细则
+
+### 四维评分锚点
+
+| 维度 | 权重 | 评分标准 |
+|------|------|---------|
+| AI 相关度 | 0-40 | 35-40: 核心 AI/LLM/Agent/MCP/RAG；25-34: AI 基础设施；10-24: 泛技术提及 AI；0-9: 无关 |
+| 内容深度 | 0-30 | 25-30: 深度内容有原创贡献；15-24: 有具体细节；5-14: 简要介绍；0-4: 空内容 |
+| 信息密度 | 0-15 | 12-15: 新颖/独家信息；7-11: 有一定信息量；0-6: 重复/营销 |
+| 时效性 | 0-15 | 12-15: 本周内；7-11: 本月；0-6: 较早 |
+
+### 输出格式
+
+Reviewer LLM 输出严格 JSON，每维包含 `score` + `reason`。verdict 为 retry 时附带 `retry_feedback.suggestions`，指出具体改进方向。temperature=0 保证一致性。同一维度连续两次低分且 reason 一致 → 不再 retry，标记 exhausted 入库。
+
+## 7. LLM 配置推荐
 
 | SubAgent | 推荐 Provider | 模型 | 理由 |
 |----------|--------------|------|------|
@@ -156,7 +171,7 @@ ai-knowledge-base/
 | arxiv_analyzer | deepseek | deepseek-chat | 论文摘要分析 |
 | reviewer | deepseek | deepseek-chat | 评分判断，低温度 |
 
-## 7. 成本估算
+## 8. 成本估算
 
 | 项目 | 月费用 | 备注 |
 |------|--------|------|
@@ -167,7 +182,7 @@ ai-knowledge-base/
 | GitHub Actions | $0 | 公开仓库免费 |
 | **合计** | **¥85-125/月** | 约 $12-17 |
 
-## 8. 风险与约束
+## 9. 风险与约束
 
 - 静态站日均 50 条，data.json 全量约 9MB/年，客户端过滤性能足够；3 年后超 25MB 可切换按月分片加载
 - 放弃 Anthropic 原生协议（prompt caching 等），需时再加适配器即可
