@@ -66,7 +66,7 @@
 | Web 服务 | Caddy | 静态文件 + 自动 HTTPS + 反向代理 |
 | 部署 | Docker Compose | 2 容器 (pipeline + web) |
 | CI/CD | GitHub Actions | test → build → deploy |
-| 可观测性 | langfuse | LLM 追踪（Cloud 免费层） |
+| 可观测性 | langfuse + logging | LLM 追踪（Cloud 免费层）+ 结构化日志 stdout JSON lines（docker logs 排查） |
 
 ### 3.2 部署架构
 
