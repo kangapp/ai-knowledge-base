@@ -29,7 +29,7 @@ class AnalyzedItem(BaseModel):
 
 class ReviewedItem(BaseModel):
     """Reviewer 产出 — 四维评分 + 判决"""
-    ref_url: str
+    ref_url: Optional[str] = None  # LLM 输出不含此字段，由调用方补全
     total_score: int = Field(ge=0, le=100)
     dimensions: dict = {}  # {ai_relevance: {score, reason}, ...}
     verdict: Literal["approved", "retry", "discarded"]
