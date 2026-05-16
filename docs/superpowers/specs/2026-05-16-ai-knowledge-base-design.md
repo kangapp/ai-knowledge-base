@@ -19,7 +19,7 @@
 
 ### 2.2 工作流（LangGraph）
 - **Collector**：按源并行采集原始数据
-- **Router**：按来源类型分类，90% 规则匹配 + 10% LLM 兜底
+- **Router**：按 source 字段纯规则匹配分流（100% 规则，无需 LLM）
 - **Fan-out Analyzers**：4 个 SubAgent 并行分析（github/rss/feishu/arxiv），各自使用专属 Prompt 和模型
 - **Aggregator**：汇总并行结果，附加成本统计
 - **Reviewer**：LLM 逐条评分，≥80 入库，50-79 打回重分析（限 2 轮），<50 丢弃
@@ -138,7 +138,7 @@ ai-knowledge-base/
 ## 5. 数据流
 
 1. APScheduler cron 触发 → Collector 按源并行采集 → raw_items[]
-2. Router 规则/LLM 分类 → 4 组数据分流
+2. Router 规则分类 → 4 组数据分流
 3. LangGraph Send fan-out → 4 个 SubAgent 并行分析 → analyzed_items[]
 4. Aggregator 汇总 → 附加成本统计
 5. Reviewer LLM 评分 → pass/retry(限2轮)/discard
@@ -150,7 +150,6 @@ ai-knowledge-base/
 
 | SubAgent | 推荐 Provider | 模型 | 理由 |
 |----------|--------------|------|------|
-| router | deepseek | deepseek-chat | 极低延迟，足够分类 |
 | github_analyzer | deepseek | deepseek-chat | 代码/技术内容，性价比极高 |
 | rss_analyzer | deepseek | deepseek-chat | 通用文本分析 |
 | feishu_analyzer | minimax | abab6.5s-chat | 中文内容优化 |
