@@ -21,7 +21,7 @@
 ### 2.2 工作流（LangGraph）
 - **Collector**：按源并行采集原始数据；单源失败不影响其余源（try/except 隔离，失败返回空列表 + 记 error_log）；空数据源的 Analyzer 直接跳过不调 LLM；仅所有源全挂时 pipeline 才标记 failed
 - **Router**：按 source 字段纯规则匹配分流（100% 规则，无需 LLM）
-- **Fan-out Analyzers**：4 个 SubAgent 并行分析（github/rss/feishu/arxiv），各自使用专属 Prompt 和模型
+- **Fan-out Analyzers**：4 个 SubAgent 并行分析（github/rss/feishu/arxiv），各自使用专属 Prompt 和模型；分析时自动建议 1-3 个标签（新标签自动收录到 tags 表，管理员可后续维护）
 - **Aggregator**：汇总并行结果，附加成本统计
 - **Reviewer**：结构化四维评分（AI相关度0-40 + 内容深度0-30 + 信息密度0-15 + 时效性0-15=100），temperature=0 保证一致性；≥80 入库，50-79 带具体改进反馈打回重分析（限 2 轮，同维度连续低分不再重试），<50 丢弃
 - **Cost Monitor**：LLM 客户端层的 TrackedClient wrapper（非 LangGraph 节点），每次 `chat.completions.create()` 调用自动记录 token/花费 + 检查熔断，调用方无感。两种熔断独立运作：Provider 熔断（per-provider 连续 3 次失败 → circuit open，指数退避 60/120/240/480/600s 试探恢复 → 自动 fallback 到 agent 配置的备选模型）；预算熔断（全局 80% 软熔断切便宜模型 / 100% 硬熔断停服）
