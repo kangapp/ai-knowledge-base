@@ -16,6 +16,7 @@
 - 支持数据源：GitHub Trending、RSS、飞书知识文档、arXiv（配置驱动，可增删）
 - 每种源独立配置：优先级、定时 cron、获取数量、过滤关键词
 - GitHub API（带 Token 认证）、RSS/Atom 解析、飞书开放平台 API、arXiv API
+- **飞书认证**：惰性刷新策略 — 内存缓存 `tenant_access_token` + 过期时间，采集时自动检查有效性（有效期不足 3 分钟则提前刷新）。token 请求频率由有效期（2h）决定而非采集频率，不会触发飞书限频（100 次/小时）。`FEISHU_APP_ID` / `FEISHU_APP_SECRET` 存放于 `.env`
 
 ### 2.2 工作流（LangGraph）
 - **Collector**：按源并行采集原始数据
