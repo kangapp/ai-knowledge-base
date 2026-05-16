@@ -29,7 +29,7 @@
 - **首页**：日期范围过滤（快捷按钮 + 自定义）+ 搜索 + 来源/标签筛选 + 文章列表（分页 + 评分标签）
 - **文章详情页**：AI 摘要、原始链接、标签、元数据（来源/评分/token 花费）
 - **仪表盘**：KPI 卡片、来源分布图、每日花费趋势（日期范围联动）
-- 纯静态 HTML + 少量 Vanilla JS（客户端过滤 data.json），首屏预渲染近 30 天
+- 纯静态 HTML + 少量 Vanilla JS（客户端过滤全量 data.json，日均 50 条，1 年约 9MB）；首屏预渲染近 30 天；3 年后 data.json 超 25MB 时可切换按月分片加载；FastAPI /api/articles 作为兜底服务端查询
 
 ### 2.4 LLM 多模型管理
 - 所有 Provider 统一走 OpenAI 兼容协议（base_url + api_key）
@@ -170,7 +170,7 @@ ai-knowledge-base/
 
 ## 8. 风险与约束
 
-- 静态站日均 50 条，data.json 约 5MB，一年约 1.8 万条，客户端过滤性能足够
+- 静态站日均 50 条，data.json 全量约 9MB/年，客户端过滤性能足够；3 年后超 25MB 可切换按月分片加载
 - 放弃 Anthropic 原生协议（prompt caching 等），需时再加适配器即可
 - 系统依赖 3 个外部服务（GitHub API、飞书 API、LLM Provider），任一出问题影响当天采集
 - SQLite 单文件，年数据量约 20MB，无需分库分表
