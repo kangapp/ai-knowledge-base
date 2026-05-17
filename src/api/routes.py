@@ -131,3 +131,40 @@ async def trigger_build():
         raise HTTPException(500, "Builder not initialized")
     await _builder.build_now()
     return envelope({"status": "done"}, "Build triggered")
+
+
+@router.get("/pipeline/dag")
+async def get_pipeline_dag():
+    if not _db:
+        raise HTTPException(500, "DB not initialized")
+
+    # Get latest run
+    last_run = await _db.fetch_one(
+        "SELECT * FROM pipeline_runs ORDER BY started_at DESC LIMIT 1"
+    )
+    if not last_run:
+        return envelope({"status": "idle", "phases": [], "logs": []})
+
+    run_id = last_run["id"]
+    phases = await _db.fetch_all(
+        """SELECT phase, status, started_at, ended_at, duration_ms, details
+           FROM pipeline_phase_logs WHERE run_id=? ORDER BY id""",
+        (run_id,),
+    )
+
+    # Generate logs from phase transitions
+    logs = []
+    for p in phases:
+        time_str = p["started_at"][11:19] if p["started_at"] else ""
+        if p["status"] == "done":
+            logs.append({"time": time_str, "message": f"{p['phase']} 完成", "level": "success"})
+        elif p["status"] == "running":
+            logs.append({"time": time_str, "message": f"{p['phase']} 进行中", "level": "info"})
+
+    return envelope({
+        "run_id": run_id,
+        "status": last_run["status"],
+        "current_phase": phases[-1]["phase"] if phases and phases[-1]["status"] == "running" else None,
+        "phases": [dict(p) for p in phases],
+        "logs": logs,
+    })

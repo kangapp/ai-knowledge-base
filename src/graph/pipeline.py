@@ -1,4 +1,5 @@
 # src/graph/pipeline.py
+from datetime import datetime, timezone
 from langgraph.graph import StateGraph, START, END
 from langgraph.types import Send
 from .state import PipelineState
@@ -10,6 +11,36 @@ from .analyzers.rss import analyze_rss
 from .analyzers.feishu import analyze_feishu
 from .analyzers.arxiv import analyze_arxiv
 from ..core.llm_client import LLMRegistry
+
+
+PHASES = ["collect", "route", "analyze", "aggregate", "review"]
+
+
+async def record_phase_start(db, run_id: str, phase: str):
+    """Record phase start. Call this before starting a phase."""
+    await db.execute(
+        "INSERT INTO pipeline_phase_logs (run_id, phase, status, started_at) VALUES (?, ?, ?, ?)",
+        (run_id, phase, "running", datetime.now(timezone.utc).isoformat())
+    )
+
+
+async def record_phase_end(db, run_id: str, phase: str, status: str, details: str = None):
+    """Record phase end. Call this after a phase completes."""
+    ended_at = datetime.now(timezone.utc).isoformat()
+    # Find the running phase record and update it
+    row = await db.fetch_one(
+        "SELECT started_at FROM pipeline_phase_logs WHERE run_id=? AND phase=? AND status='running' ORDER BY id DESC LIMIT 1",
+        (run_id, phase)
+    )
+    duration_ms = None
+    if row and row["started_at"]:
+        start_str = row["started_at"].replace("Z", "+00:00")
+        start = datetime.fromisoformat(start_str)
+        duration_ms = int((datetime.now(timezone.utc) - start).total_seconds() * 1000)
+    await db.execute(
+        "UPDATE pipeline_phase_logs SET status=?, ended_at=?, duration_ms=?, details=? WHERE run_id=? AND phase=? AND status='running'",
+        (status, ended_at, duration_ms, details, run_id, phase)
+    )
 
 
 # 独立函数，供测试 mock 使用
@@ -108,3 +139,7 @@ def build_pipeline(registry: LLMRegistry):
     graph.add_edge("reviewer", END)
 
     return graph.compile()
+
+
+# Re-export for use by main.py
+__all__ = ["build_pipeline", "record_phase_start", "record_phase_end", "PHASES"]

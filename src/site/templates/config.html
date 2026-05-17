@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+{% block title %}配置查看{% endblock %}
+{% block content %}
+<div class="config-page">
+    <header class="page-header">
+        <h1>⚙️ 配置管理</h1>
+        <span class="badge">只读</span>
+    </header>
+
+    <div class="config-grid">
+        <div class="config-card">
+            <h3>🤖 LLM Providers</h3>
+            <div id="llm-content">加载中...</div>
+        </div>
+        <div class="config-card">
+            <h3>📡 数据源</h3>
+            <div id="sources-content">加载中...</div>
+        </div>
+        <div class="config-card">
+            <h3>🧠 Agents</h3>
+            <div id="agents-content">加载中...</div>
+        </div>
+    </div>
+</div>
+
+<script>
+async function loadConfig(type, containerId) {
+    try {
+        const res = await fetch(`/api/config/${type}`);
+        const json = await res.json();
+        if (json.code !== 0) throw new Error(json.message);
+        renderConfig(type, json.data.parsed, document.getElementById(containerId));
+    } catch (e) {
+        document.getElementById(containerId).innerHTML = `<p class="error">加载失败: ${e.message}</p>`;
+    }
+}
+
+function renderConfig(type, data, container) {
+    if (type === 'llm') {
+        container.innerHTML = Object.entries(data.providers).map(([name, p]) => `
+            <div class="config-item">
+                <div class="config-item-header">
+                    <span class="dot active"></span>
+                    <span class="name">${name}</span>
+                    <span class="meta">${p.models.length} models</span>
+                </div>
+                <div class="config-models">
+                    ${p.models.map(m => `<span class="model-tag">${m.id}</span>`).join('')}
+                </div>
+            </div>
+        `).join('');
+    } else if (type === 'sources') {
+        container.innerHTML = data.sources.map(s => `
+            <div class="config-item ${s.enabled ? '' : 'disabled'}">
+                <div class="config-item-header">
+                    <span class="dot ${s.enabled ? 'active' : ''}"></span>
+                    <span class="name">${s.id}</span>
+                    <span class="meta">${s.cron}</span>
+                </div>
+            </div>
+        `).join('');
+    } else if (type === 'agents') {
+        container.innerHTML = Object.entries(data.agents).map(([name, a]) => `
+            <div class="config-item">
+                <div class="config-item-header">
+                    <span class="dot active"></span>
+                    <span class="name">${name}</span>
+                    <span class="meta">${a.model.primary.provider}/${a.model.primary.model}</span>
+                </div>
+            </div>
+        `).join('');
+    }
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    loadConfig('llm', 'llm-content');
+    loadConfig('sources', 'sources-content');
+    loadConfig('agents', 'agents-content');
+});
+</script>
+{% endblock %}

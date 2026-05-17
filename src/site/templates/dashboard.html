@@ -1,31 +1,145 @@
 {% extends "base.html" %}
 {% block title %}仪表盘{% endblock %}
 {% block content %}
-<div class="kpi-cards">
-    <div class="kpi"><h3>{{ stats.total_articles }}</h3><p>文章总数</p></div>
-    <div class="kpi"><h3>{{ stats.period_articles }}</h3><p>近 30 天</p></div>
-    <div class="kpi"><h3>${{ stats.total_cost }}</h3><p>总花费</p></div>
+<div class="dashboard-page">
+    <header class="page-header">
+        <h1>📈 仪表盘</h1>
+        <div class="tabs">
+            <button class="tab active" data-view="day">天</button>
+            <button class="tab" data-view="week">周</button>
+            <button class="tab" data-view="month">月</button>
+        </div>
+    </header>
+
+    <div class="kpi-cards">
+        <div class="kpi-card">
+            <div class="kpi-label">总文章数</div>
+            <div class="kpi-value" id="kpi-total">-</div>
+            <div class="kpi-sub"><span id="kpi-period" class="trend">-</span> 本周期新增</div>
+        </div>
+        <div class="kpi-card">
+            <div class="kpi-label">周期费用</div>
+            <div class="kpi-value" id="kpi-cost">-</div>
+            <div class="kpi-sub" id="kpi-cost-trend">-</div>
+        </div>
+        <div class="kpi-card">
+            <div class="kpi-label">日均采集</div>
+            <div class="kpi-value" id="kpi-daily">-</div>
+            <div class="kpi-sub">近 30 天</div>
+        </div>
+        <div class="kpi-card">
+            <div class="kpi-label">活跃源</div>
+            <div class="kpi-value" id="kpi-sources">-</div>
+            <div class="kpi-sub" id="kpi-sources-sub">-</div>
+        </div>
+    </div>
+
+    <div class="charts-layout">
+        <div class="chart-card">
+            <h3>💰 成本趋势</h3>
+            <canvas id="cost-chart"></canvas>
+            <div class="chart-legend">
+                <span><span class="dot" style="background:#3b82f6"></span> 实际成本</span>
+                <span><span class="dot" style="background:#22c55e"></span> 滚动均值</span>
+            </div>
+        </div>
+        <div class="chart-card">
+            <h3>📊 来源分布</h3>
+            <div class="source-list" id="source-list"></div>
+        </div>
+    </div>
 </div>
-<div class="charts">
-    <canvas id="source-chart"></canvas>
-    <canvas id="cost-chart"></canvas>
-</div>
-<script>window.__STATS__ = {{ stats|tojson }};</script>
+
 <script>
-document.addEventListener('DOMContentLoaded', function() {
-const stats = window.__STATS__;
-if (typeof Chart !== 'undefined') {
-    new Chart(document.getElementById('source-chart'), {
-        type: 'pie',
-        data: {labels: stats.source_distribution.map(s=>s.source), datasets: [{data: stats.source_distribution.map(s=>s.count)}]}
-    });
-    new Chart(document.getElementById('cost-chart'), {
-        type: 'line',
-        data: {labels: stats.daily_cost.map(d=>d.date), datasets: [{label: '每日花费($)', data: stats.daily_cost.map(d=>d.cost)}]}
-    });
-} else {
-    console.warn('Chart.js not loaded, skipping charts');
+let costChart = null;
+let currentView = 'day';
+let statsData = null;
+
+async function loadStats() {
+    const res = await fetch('/api/stats/enhanced');
+    const json = await res.json();
+    if (json.code !== 0) return;
+    statsData = json.data;
+    updateDashboard(statsData);
 }
+
+function updateDashboard(data) {
+    const s = data.summary;
+    document.getElementById('kpi-total').textContent = s.total_articles.toLocaleString();
+    document.getElementById('kpi-period').textContent = '↑ ' + s.period_articles;
+    document.getElementById('kpi-cost').textContent = '$' + s.period_cost.toFixed(2);
+    document.getElementById('kpi-daily').textContent = '~' + Math.round(s.period_articles / 30);
+    document.getElementById('kpi-sources').textContent = s.active_sources;
+    document.getElementById('kpi-sources-sub').textContent = '个活跃数据源';
+
+    const list = document.getElementById('source-list');
+    const max = Math.max(...data.source_distribution.map(s => s.count), 1);
+    list.innerHTML = data.source_distribution.map(src => `
+        <div class="source-item">
+            <div class="source-info">
+                <span class="source-name">${src.source}</span>
+                <span class="source-count">${src.count.toLocaleString()}</span>
+            </div>
+            <div class="source-bar"><div class="source-bar-fill" style="width:${(src.count/max*100).toFixed(0)}%"></div></div>
+        </div>
+    `).join('');
+
+    updateChart(data);
+}
+
+function updateChart(data) {
+    const ctx = document.getElementById('cost-chart').getContext('2d');
+    let labels, costData;
+
+    if (currentView === 'day') {
+        labels = data.daily_cost.map(d => d.date.slice(5));
+        costData = data.daily_cost.map(d => d.cost);
+    } else if (currentView === 'week') {
+        labels = data.weekly_cost.map(d => d.week);
+        costData = data.weekly_cost.map(d => d.cost);
+    } else {
+        labels = data.monthly_cost.map(d => d.month);
+        costData = data.monthly_cost.map(d => d.cost);
+    }
+
+    const windowSize = currentView === 'day' ? 7 : currentView === 'week' ? 4 : 3;
+    const avgData = costData.map((_, i) => {
+        const start = Math.max(0, i - windowSize + 1);
+        const slice = costData.slice(start, i + 1);
+        return slice.reduce((a, b) => a + b, 0) / slice.length;
+    });
+
+    if (costChart) costChart.destroy();
+    costChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels,
+            datasets: [
+                { label: '成本', data: costData, borderColor: '#3b82f6', backgroundColor: 'rgba(59,130,246,0.1)', fill: true, tension: 0.4 },
+                { label: '均值', data: avgData, borderColor: '#22c55e', borderDash: [5, 5], fill: false, tension: 0.4 }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { display: false } },
+            scales: {
+                x: { grid: { color: '#334155' }, ticks: { color: '#94a3b8' } },
+                y: { grid: { color: '#334155' }, ticks: { color: '#94a3b8', callback: v => '$' + v.toFixed(2) } }
+            }
+        }
+    });
+}
+
+document.querySelectorAll('.tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+        document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+        tab.classList.add('active');
+        currentView = tab.dataset.view;
+        if (statsData) updateChart(statsData);
+    });
 });
+
+document.addEventListener('DOMContentLoaded', loadStats);
 </script>
 {% endblock %}

@@ -10,11 +10,13 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from .core.config import load_llm_config, load_sources_config, load_agents_config
 from .core.database import Database
 from .core.llm_client import LLMRegistry
-from .graph.pipeline import build_pipeline
+from .graph.pipeline import build_pipeline, record_phase_start, record_phase_end
 from .graph.state import PipelineState, ReviewedItem
 from .graph.collector import collect_all
 from .graph.router import router_node  # retry 循环中手动路由 retry items
 from .api.routes import router, set_db, set_run_pipeline, set_builder
+from .api.config import router as config_router
+from .api.stats import router as stats_router
 from .db.operations import (
     start_pipeline_run, end_pipeline_run, save_article, save_tags,
     save_cost_log, batch_check_existing_urls, backup_database,
@@ -83,6 +85,7 @@ async def run_pipeline(trigger: str = "cron", source_filter: str | None = None):
 
         run_id = f"run_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}"
         await start_pipeline_run(_db, run_id, trigger)
+        await record_phase_start(_db, run_id, "collect")
 
         sources_cfg = load_sources_config(CONFIG_DIR / "sources.yaml")
         active_sources = [s for s in sources_cfg.sources if s.enabled]
@@ -91,6 +94,7 @@ async def run_pipeline(trigger: str = "cron", source_filter: str | None = None):
 
         # ====== 图外：Collector + DB 查重（需要 DB 连接） ======
         raw_items, error_log = await collect_all(active_sources)
+        await record_phase_end(_db, run_id, "collect", "done", f"collected {len(raw_items)} items")
         logger.info("collector.done", extra={"total": len(raw_items), "errors": len(error_log)})
 
         if not raw_items and error_log:
@@ -109,8 +113,16 @@ async def run_pipeline(trigger: str = "cron", source_filter: str | None = None):
             return
 
         # ====== 图内：Router → Fan-out(4×Analyzer) → Aggregator → Reviewer ======
+        await record_phase_start(_db, run_id, "route")
         state = PipelineState(raw_items=new_items, run_id=run_id, trigger=trigger, error_log=error_log)
         final_state = await _graph.ainvoke(state)
+        await record_phase_end(_db, run_id, "route", "done")
+        await record_phase_start(_db, run_id, "analyze")
+        await record_phase_end(_db, run_id, "analyze", "done")
+        await record_phase_start(_db, run_id, "aggregate")
+        await record_phase_end(_db, run_id, "aggregate", "done")
+        await record_phase_start(_db, run_id, "review")
+        await record_phase_end(_db, run_id, "review", "done")
 
         # ====== Retry 循环（图外，最多 2 轮） ======
         all_reviewed = list(final_state["reviewed_items"])
@@ -270,6 +282,8 @@ def create_app() -> FastAPI:
 
     app = FastAPI(lifespan=lifespan, title="AI Knowledge Base")
     app.include_router(router)
+    app.include_router(config_router)
+    app.include_router(stats_router)
     app.add_exception_handler(HTTPException, http_exception_handler)
     app.add_exception_handler(Exception, general_exception_handler)
     return app
