@@ -29,6 +29,11 @@ def parse_and_validate(raw: str, ref_url: str = "") -> AnalyzedItem:
 
     # ref_url 由调用方赋值
     data["ref_url"] = ref_url
+
+    # 容错：tags 超过 3 个时裁剪
+    if "tags" in data and isinstance(data["tags"], list) and len(data["tags"]) > 3:
+        data["tags"] = data["tags"][:3]
+
     return AnalyzedItem.model_validate(data)
 
 
@@ -43,8 +48,11 @@ async def analyze_items(
     costs = []
 
     for item in items:
-        # 每条独立获取 client（provider 可能随熔断状态变化）
-        client, provider, model_id, params = registry.get_client(agent_name)
+        try:
+            client, provider, model_id, params = registry.get_client(agent_name)
+        except Exception as e:
+            logger.warning("analyzer.get_client_failed", extra={"agent": agent_name, "url": item.url, "error": str(e)})
+            continue
 
         user_prompt = prompt_template.format(
             title=item.title, description=item.description,
@@ -86,6 +94,6 @@ async def analyze_items(
                 registry.health.record_failure(provider, str(e))
                 if attempt == 1:
                     logger.warning("analyzer.parse_failed", extra={"agent": agent_name, "url": item.url, "error": str(e)})
-                continue
+                    continue  # 继续处理下一个 item，而不是 raise
 
     return results, costs
