@@ -13,7 +13,7 @@ from .analyzers.arxiv import analyze_arxiv
 from ..core.llm_client import LLMRegistry
 
 
-PHASES = ["collect", "route", "analyze", "aggregate", "review"]
+PHASES = ["collect", "process"]
 
 
 async def record_phase_start(db, run_id: str, phase: str):

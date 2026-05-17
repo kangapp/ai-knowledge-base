@@ -18,13 +18,7 @@
     <div class="pipeline-flow" id="pipeline-flow">
         <div class="stage" data-phase="collect"><div class="stage-box"><div class="stage-icon">📥</div><div class="stage-name">采集</div><div class="stage-time" id="time-collect">-</div></div></div>
         <div class="arrow">→</div>
-        <div class="stage" data-phase="route"><div class="stage-box"><div class="stage-icon">🔀</div><div class="stage-name">路由</div><div class="stage-time" id="time-route">-</div></div></div>
-        <div class="arrow">→</div>
-        <div class="stage" data-phase="analyze"><div class="stage-box"><div class="stage-icon">🧠</div><div class="stage-name">分析</div><div class="stage-time" id="time-analyze">-</div></div></div>
-        <div class="arrow">→</div>
-        <div class="stage" data-phase="aggregate"><div class="stage-box"><div class="stage-icon">📝</div><div class="stage-name">汇总</div><div class="stage-time" id="time-aggregate">-</div></div></div>
-        <div class="arrow">→</div>
-        <div class="stage" data-phase="review"><div class="stage-box"><div class="stage-icon">✅</div><div class="stage-name">审核</div><div class="stage-time" id="time-review">-</div></div></div>
+        <div class="stage" data-phase="process"><div class="stage-box"><div class="stage-icon">⚙️</div><div class="stage-name">处理</div><div class="stage-time" id="time-process">-</div></div></div>
     </div>
 
     <div class="dag-details">
@@ -36,7 +30,7 @@
 </div>
 
 <script>
-const PHASE_NAMES = {collect:'采集', route:'路由', analyze:'分析', aggregate:'汇总', review:'审核'};
+const PHASE_NAMES = {collect:'采集', process:'处理'};
 
 async function fetchDag() {
     try {
@@ -56,7 +50,7 @@ function updateDag(data) {
     const runInfo = document.getElementById('run-info');
 
     statusDot.className = 'status-dot ' + data.status;
-    statusText.textContent = data.status === 'running' ? '运行中' : data.status === 'done' ? '已完成' : '空闲';
+    statusText.textContent = data.status === 'running' ? '运行中' : data.status === 'completed' ? '已完成' : data.status === 'failed' ? '失败' : '空闲';
     phaseText.textContent = data.current_phase ? `阶段: ${PHASE_NAMES[data.current_phase] || data.current_phase}` : '';
     runInfo.innerHTML = data.run_id ? `<div>${data.run_id}</div><div class="run-time">${data.phases[0]?.started_at || ''}</div>` : '';
 
@@ -64,7 +58,7 @@ function updateDag(data) {
     const phaseMap = {};
     phases.forEach(p => phaseMap[p.phase] = p);
 
-    ['collect', 'route', 'analyze', 'aggregate', 'review'].forEach(phase => {
+    ['collect', 'process'].forEach(phase => {
         const stage = document.querySelector(`.stage[data-phase="${phase}"]`);
         const timeEl = document.getElementById(`time-${phase}`);
         const p = phaseMap[phase];

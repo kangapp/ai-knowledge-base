@@ -36,6 +36,9 @@
         if (state.source) {
             articles = articles.filter(a => a.source === state.source);
         }
+        if (state.tag) {
+            articles = articles.filter(a => (a.tags || []).includes(state.tag));
+        }
         if (state.query) {
             const q = state.query.toLowerCase();
             articles = articles.filter(a =>
@@ -69,6 +72,20 @@
             });
             sourceFilter.addEventListener('change', e => {
                 state.source = e.target.value;
+                filterArticles();
+            });
+        }
+
+        const tagFilter = document.getElementById('tag-filter');
+        if (tagFilter) {
+            const allTags = [...new Set(INIT.articles.flatMap(a => a.tags || []))].sort();
+            allTags.forEach(t => {
+                const opt = document.createElement('option');
+                opt.value = t; opt.textContent = t;
+                tagFilter.appendChild(opt);
+            });
+            tagFilter.addEventListener('change', e => {
+                state.tag = e.target.value;
                 filterArticles();
             });
         }
