@@ -4,13 +4,14 @@
 <div id="article-detail"><p>加载中...</p></div>
 <script>
 const id = new URLSearchParams(location.search).get('id');
-if (id) fetch('/api/articles/' + id).then(r => r.json()).then(a => {
+if (id) fetch('/api/articles/' + id).then(r => r.json()).then(res => {
+    const a = res.data;
     document.getElementById('article-detail').innerHTML = `
         <h1>${a.title}</h1>
-        <div class="meta">${a.source_detail || a.source} · ${a.collected_at}</div>
+        <div class="meta">${a.source_detail || a.source} · ${a.collected_at ? a.collected_at.slice(0,10) : ''}</div>
         <a href="${a.url}" target="_blank">查看原文</a>
-        <div class="summary">${a.summary}</div>
-        <div class="meta-footer">评分: ${a.relevance_score} · 花费: $${a.analysis_cost}</div>
+        <div class="summary">${a.summary || ''}</div>
+        <div class="meta-footer">评分: ${a.relevance_score} · 花费: $${a.analysis_cost || 0}</div>
     `;
 });
 </script>

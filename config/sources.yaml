@@ -1,6 +1,7 @@
 sources:
+  # ===== GitHub Trending =====
   - id: github_trending
-    name: GitHub Trending
+    name: GitHub Trending AI
     type: github
     enabled: true
     priority: 1
@@ -11,51 +12,109 @@ sources:
       min_stars: 50
       lookback_days: 7
 
-  - id: rss_anthropic
-    name: Anthropic Blog
+  # ===== 中文科技媒体 =====
+  - id: rss_36kr
+    name: 36氪
     type: rss
     enabled: true
     priority: 2
-    cron: "0 9 * * *"
-    max_items: 5
-    config:
-      url: "https://www.anthropic.com/blog/feed.xml"
-      filter_keywords: []
-
-  - id: rss_openai
-    name: OpenAI Blog
-    type: rss
-    enabled: true
-    priority: 2
-    cron: "0 9 * * *"
-    max_items: 5
-    config:
-      url: "https://openai.com/blog/rss.xml"
-      filter_keywords: []
-
-  - id: rss_langchain
-    name: LangChain Blog
-    type: rss
-    enabled: true
-    priority: 2
-    cron: "0 10 * * *"
-    max_items: 5
-    config:
-      url: "https://blog.langchain.dev/feed"
-      filter_keywords: [AI, LLM, Agent, RAG]
-
-  - id: feishu
-    name: 飞书知识文档
-    type: feishu
-    enabled: false
-    priority: 3
-    cron: "0 10 * * *"
+    cron: "0 */4 * * *"
     max_items: 10
     config:
-      space_ids: []
+      url: "https://36kr.com/feed"
+      filter_keywords: [AI, LLM, 大模型, Agent, 人工智能, 机器人, ChatGPT, DeepSeek, 开源, 算法]
 
-  - id: arxiv
-    name: arXiv
+  - id: rss_huxiu
+    name: 虎嗅
+    type: rss
+    enabled: true
+    priority: 2
+    cron: "0 */4 * * *"
+    max_items: 10
+    config:
+      url: "https://www.huxiu.com/rss/feed"
+      filter_keywords: [AI, LLM, 大模型, 人工智能, ChatGPT, Agent, 创业, 技术]
+
+  - id: rss_juejin
+    name: 稀土掘金
+    type: rss
+    enabled: true
+    priority: 2
+    cron: "0 */4 * * *"
+    max_items: 10
+    config:
+      url: "https://api.juejin.cn/rss"
+      filter_keywords: [AI, 大模型, LLM, 机器学习, 前端, Python]
+
+  - id: rss_ithome
+    name: IT之家
+    type: rss
+    enabled: true
+    priority: 2
+    cron: "0 */4 * * *"
+    max_items: 10
+    config:
+      url: "https://www.ithome.com/rss/"
+      filter_keywords: [AI, LLM, 大模型, ChatGPT, 智能, 科技]
+
+  # ===== 国际 AI / 科技媒体 =====
+  - id: rss_techcrunch
+    name: TechCrunch AI
+    type: rss
+    enabled: true
+    priority: 3
+    cron: "0 */6 * * *"
+    max_items: 10
+    config:
+      url: "https://techcrunch.com/feed/"
+      filter_keywords: [AI, artificial intelligence, machine learning, LLM, OpenAI, Anthropic]
+
+  - id: rss_verge
+    name: The Verge AI
+    type: rss
+    enabled: true
+    priority: 3
+    cron: "0 */6 * * *"
+    max_items: 10
+    config:
+      url: "https://www.theverge.com/rss/index.xml"
+      filter_keywords: [AI, artificial intelligence, machine learning]
+
+  - id: rss_arstechnica
+    name: Ars Technica
+    type: rss
+    enabled: true
+    priority: 3
+    cron: "0 8 * * *"
+    max_items: 10
+    config:
+      url: "https://feeds.arstechnica.com/arstechnica/index"
+      filter_keywords: [AI, artificial intelligence, machine learning, LLM]
+
+  - id: rss_reuters
+    name: Reuters Science
+    type: rss
+    enabled: true
+    priority: 3
+    cron: "0 8 * * *"
+    max_items: 10
+    config:
+      url: "https://feeds.reuters.com/reuters/scienceNews"
+      filter_keywords: [AI, artificial intelligence, technology]
+
+  - id: rss_producthunt
+    name: Product Hunt
+    type: rss
+    enabled: true
+    priority: 3
+    cron: "0 9 * * *"
+    max_items: 10
+    config:
+      url: "https://feeds.feedburner.com/producthunt"
+      filter_keywords: [AI, artificial intelligence]
+
+  - id: rss_arxiv
+    name: arXiv AI/ML
     type: arxiv
     enabled: false
     priority: 3
@@ -65,3 +124,14 @@ sources:
       categories: [cs.AI, cs.CL, cs.LG]
       keywords: [LLM, agent, RAG, transformer]
       lookback_days: 7
+
+  # ===== 飞书 =====
+  - id: feishu
+    name: 飞书知识文档
+    type: feishu
+    enabled: false
+    priority: 3
+    cron: "0 10 * * *"
+    max_items: 10
+    config:
+      space_ids: []

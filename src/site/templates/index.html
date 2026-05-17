@@ -14,6 +14,16 @@
 <div id="article-list">
     {% for article in articles %}
     <div class="article-card" data-score="{{ article.relevance_score }}" data-source="{{ article.source }}">
+        <div class="card-header">
+            <span class="source-badge">{{ article.source }}</span>
+            {% if article.tags %}
+            <div class="tags">
+                {% for tag in article.tags[:3] %}
+                <span class="tag">{{ tag }}</span>
+                {% endfor %}
+            </div>
+            {% endif %}
+        </div>
         <h3><a href="/article.html?id={{ article.id }}">{{ article.title }}</a></h3>
         <p>{{ article.description[:200] }}</p>
         <div class="meta">

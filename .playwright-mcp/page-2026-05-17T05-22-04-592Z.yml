@@ -1,0 +1,4 @@
+- generic [active] [ref=e1]:
+  - text: "{% extends \"base.html\" %} {% block title %}鏂囩珷璇︽儏{% endblock %} {% block content %}"
+  - paragraph [ref=e3]: 鍔犺浇涓�...
+  - text: "{% endblock %}"

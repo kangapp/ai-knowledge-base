@@ -4,12 +4,12 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}AI Knowledge Base{% endblock %}</title>
-    <link rel="stylesheet" href="/css/style.css">
+    <link rel="stylesheet" href="/static/css/style.css">
 </head>
 <body>
     <nav><a href="/">首页</a> | <a href="/dashboard.html">仪表盘</a></nav>
     <main>{% block content %}{% endblock %}</main>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
-    <script src="/js/app.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+    <script defer src="/static/js/app.js"></script>
 </body>
 </html>

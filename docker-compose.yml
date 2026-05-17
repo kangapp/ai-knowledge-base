@@ -16,8 +16,7 @@ services:
   web:
     image: caddy:alpine
     ports:
-      - "80:80"
-      - "443:443"
+      - "8090:80"
     environment:
       - KB_DOMAIN=${KB_DOMAIN:-kb.your-domain.com}
     volumes:

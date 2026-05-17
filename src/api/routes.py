@@ -105,9 +105,13 @@ async def cost_summary(days: int = Query(default=30)):
 
 
 _run_pipeline_cb = None
+_builder = None
 
 def set_run_pipeline(cb):
     global _run_pipeline_cb; _run_pipeline_cb = cb
+
+def set_builder(builder):
+    global _builder; _builder = builder
 
 @router.post("/pipeline/run")
 async def trigger_pipeline(source: str = Query(default="")):
@@ -119,3 +123,11 @@ async def trigger_pipeline(source: str = Query(default="")):
         source_filter=source or None,  # 空字符串 = 全量
     ))
     return envelope({"status": "queued"}, "Pipeline triggered")
+
+
+@router.post("/pipeline/build")
+async def trigger_build():
+    if not _builder:
+        raise HTTPException(500, "Builder not initialized")
+    await _builder.build_now()
+    return envelope({"status": "done"}, "Build triggered")

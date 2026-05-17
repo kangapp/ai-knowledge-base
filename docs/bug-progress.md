@@ -1,0 +1,313 @@
+# Bug 处理记录
+
+## Bug 1: parse_and_validate tags 超过 max_length 导致整批崩溃
+
+**发现时间**: 2026-05-17
+**发现场景**: 本地测试 RSS 采集 + LLM 分析时
+**根因**: LLM 返回的 tags 数组超过 Pydantic Field `max_length=3` 限制，validation 失败后异常向上传播
+
+**错误日志**:
+```
+analyzer.parse_failed, agent=rss_analyzer, url=..., error="1 validation error for AnalyzedItem\ntags\n  List should have at most 3 items after validation, not 5"
+```
+
+**处理**: 在 `parse_and_validate` 中对 tags 做容错裁剪
+```python
+# 容错：tags 超过 3 个时裁剪
+if "tags" in data and isinstance(data["tags"], list) and len(data["tags"]) > 3:
+    data["tags"] = data["tags"][:3]
+```
+
+**相关文件**: `src/graph/analyzers/base.py`
+
+---
+
+## Bug 2: analyze_items 单 item 失败导致整批中断
+
+**发现时间**: 2026-05-17
+**发现场景**: 同上，parse 失败后 `raise` 导致后续 item 不处理
+**根因**: 重试 2 次后 parse 仍失败，直接 raise 抛出异常，for 循环中断
+
+**错误日志**:
+```
+src.core.llm_client.AllProvidersUnavailable: No available provider for 'rss_analyzer'
+```
+
+**处理**: 
+- `get_client` 失败时 log warning + continue 到下一个 item
+- `parse` 失败后 log warning + continue 到下一个 item（不是 raise）
+
+**相关文件**: `src/graph/analyzers/base.py`
+
+---
+
+## Bug 3: ReviewedItem.ref_url 为 None 时 print 抛 TypeError
+
+**发现时间**: 2026-05-17
+**发现场景**: 测试脚本 print reviewed_items 时
+**根因**: `ReviewedItem` 中 `ref_url: Optional[str] = None` 允许为 None，但代码中 `item.ref_url[:60]` 会抛 TypeError
+
+**处理**: 
+- reviewer_node 正常路径中 `reviewed_items.append(reviewed)` 应保持 `reviewed.ref_url = item.ref_url`
+- 确认 ReviewedItem 定义中 `ref_url: Optional[str] = None` 符合 spec（LLM 输出不含此字段，由调用方补全）
+- 测试代码改为 `str(item.ref_url or "")[:60]`
+
+**相关文件**: `src/graph/reviewer.py`, `src/graph/state.py`
+
+---
+
+## 踩坑记录
+
+### 1. 环境变量加载顺序
+- `.env` 文件需使用 `set -a; source .env; set +a` 加载（fish shell）
+- 直接 `uv run` 不会自动读取 `.env`
+
+### 2. GitHub API 需要 GITHUB_TOKEN
+- `.env` 中 `GITHUB_TOKEN=ghp_xxx` 为占位符，需替换为真实 token
+- 无 token 时 GitHub API 返回 401，但不影响 RSS 等其他数据源采集
+
+### 3. LangGraph async 节点要用 callable 对象
+- `graph.add_node("reviewer", lambda s: reviewer_node(s, registry))` 不可行
+- 正确做法：`_AnalyzerNode` / `_ReviewerNode` 封装类实现 `__call__`
+
+### 4. Reviewer prompt 文件缺失时的 fallback
+- `_load_reviewer_prompt` 在 prompt 文件不存在时使用内置默认 prompt（符合设计）
+- 4 个 analyzer 的 `load_prompt` 在 prompt 文件不存在时直接抛 FileNotFoundError（符合"文件缺失应该报错"原则，prompt 文件需手动创建）
+
+---
+
+## Bug 4: save_article ON CONFLICT RETURNING id 在 aiosqlite 下失效
+
+**发现时间**: 2026-05-17
+**发现场景**: 完整 pipeline 测试，入库时 article_id 始终为 None
+**根因**: aiosqlite 的 `execute()` 是异步包装，但底层 `conn.execute()` 并不支持 SQLite 的 `INSERT ... RETURNING id` 子句（RETURNING 是同步语法，aiosqlite 无法正确解析）；同时缺少 `await db.commit()` 导致事务未提交
+
+**错误日志**:
+```
+row = await db.fetch_one("""INSERT ... ON CONFLICT(url) DO UPDATE SET ... RETURNING id""", ...)
+return row["id"] if row else None  # row 始终为 None
+```
+
+**处理**:
+- 改用 SELECT + UPDATE/INSERT 分离方案：先 `SELECT id FROM articles WHERE url=?` 检查是否存在
+- 存在则 UPDATE + commit，不存在则 INSERT + commit + `SELECT last_insert_rowid()`
+- 所有 `db.execute()` 后显式添加 `await db.commit()`
+
+**相关文件**: `src/db/operations.py`, `src/core/database.py`
+
+---
+
+## Bug 5: GitHub API 401 无认证 token 时整个采集失败
+
+**发现时间**: 2026-05-17
+**发现场景**: 触发 pipeline 时 GitHub API 返回 401
+**根因**: `.env` 中 `GITHUB_TOKEN=ghp_xxx` 为占位符，GitHub Search API 对未认证请求有严格限制（60 req/hr），超过后返回 401；`collect_all` 单源失败会导致整批采集部分失败但不影响其余源
+
+**处理**: GitHub collector 已实现：未配置 token 时使用未认证请求，失败时记录 error_log 不中断其他源
+
+**相关文件**: `src/graph/collector.py`
+
+---
+
+## Bug 6: Dockerfile 注释导致 Docker 构建失败
+
+**发现时间**: 2026-05-17
+**发现场景**: `docker compose up --build` 时
+**根因**: Dockerfile 中 `COPY` 指令行尾的注释 `# ...` 导致 Docker 构建失败，报错 `"/场景的": not found`
+
+**错误日志**:
+```
+failed to solve: failed to compute cache key: failed to calculate checksum of ref ...: "/场景的": not found
+```
+
+**错误写法**:
+```dockerfile
+COPY config/ ./config/    # compose volume mount 会覆盖，仅作为非 compose 场景的 fallback
+```
+
+**处理**: 删除行尾注释
+```dockerfile
+COPY config/ ./config/
+```
+
+**相关文件**: `Dockerfile`
+
+---
+
+## Bug 7: /api/pipeline/build 接口缺失
+
+**发现时间**: 2026-05-17
+**发现场景**: 手动触发站点构建时
+**根因**: 实现了 `trigger_build` 函数但未注册到 FastAPI 路由，也未调用 `set_builder()`
+
+**错误日志**: `POST /api/pipeline/build` 返回 404 Not Found
+
+**处理**:
+- 在 `src/api/routes.py` 添加 `trigger_build` 端点
+- 添加 `set_builder()` 函数将 `_builder` 暴露给 routes
+- 在 `src/main.py` lifespan 中 `_builder` 创建后调用 `set_builder(_builder)`
+
+**相关文件**: `src/api/routes.py`, `src/main.py`
+
+---
+
+## Bug 8: volume mount 环境下 rename 导致 "Device or resource busy"
+
+**发现时间**: 2026-05-17
+**发现场景**: Docker 部署中 `/api/pipeline/build` 触发站点构建时
+**根因**: OrbStack 虚拟机环境下 volume mount 的 `/app/output` 目录无法被 rename/shutil.rmtree
+
+**错误日志**:
+```
+OSError: [Errno 16] Device or resource busy: PosixPath('/app/output')
+```
+
+**处理**:
+- 不再尝试 rename/rmtree `/app/output` 目录
+- 改用文件覆盖方式：遍历临时目录，直接 `shutil.copy2` 到目标位置
+- 临时目录用时间戳命名（`output.tmp.{timestamp}`），避免删除操作
+
+```python
+# 直接覆盖文件（不删除目录，避免 volume mount busy 问题）
+for item in tmp_dir.rglob("*"):
+    if item.is_file():
+        dest = self.output_dir / item.relative_to(tmp_dir)
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(item, dest)
+```
+
+**相关文件**: `src/site/builder.py`
+
+---
+
+## Bug 9: search_articles 返回结果缺少 tags 字段
+
+**发现时间**: 2026-05-17
+**发现场景**: API 返回文章列表中 tags 为空
+**根因**: `search_articles` 只查询 articles 表，未关联查询 article_tags 和 tags 表
+
+**处理**: 在 `search_articles` 中遍历每篇文章，查询关联标签
+```python
+for r in rows:
+    article = dict(r)
+    tag_rows = await db.fetch_all(
+        "SELECT t.name FROM tags t JOIN article_tags at ON t.id=at.tag_id WHERE at.article_id=?",
+        (article["id"],))
+    article["tags"] = [t["name"] for t in tag_rows]
+```
+
+**相关文件**: `src/db/operations.py`
+
+---
+
+## Bug 10: Caddyfile 使用域名导致本地 HTTPS 申请失败
+
+**发现时间**: 2026-05-17
+**发现场景**: 本地 Docker 部署后访问 localhost:8080 失败
+**根因**: Caddyfile 中使用 `kb.your-domain.com` 域名，Caddy 尝试申请 Let's Encrypt 证书（需要 DNS 解析），本地验证失败导致服务不可用
+
+**错误日志**:
+```
+challenge failed, identifier="kb.your-domain.com", challenge_type="http-01"
+```
+
+**处理**: 改为本地开发配置
+```caddyfile
+# 本地开发禁用 HTTPS
+:8080 {
+    root * /srv
+    file_server
+    ...
+}
+```
+
+**相关文件**: `Caddyfile`
+
+---
+
+## Bug 11: OrbStack 端口转发 localhost 访问失败
+
+**发现时间**: 2026-05-17
+**发现场景**: `curl http://localhost:8080` 返回 "Empty reply from server"
+**根因**: OrbStack Docker 虚拟机的端口转发与宿主机网络不通
+
+**处理**: 使用 OrbStack 内部 DNS `web.ai-knowledge-base.orb.local/` 访问
+
+**相关文件**: 无（基础设施问题）
+
+---
+
+## Bug 12: article.html 详情页 API 响应未解包导致 undefined
+
+**发现时间**: 2026-05-17
+**发现场景**: Playwright MCP 测试文章详情页
+**根因**: API 响应格式为 `{code: 0, data: {...}, message: "ok"}`，详情页 JS 直接用 `a.title` 取值，但实际 title 在 `res.data.title`
+
+**错误日志**: 页面显示 "undefined" 所有字段
+
+**处理**: 解包 API 响应
+```javascript
+fetch('/api/articles/' + id).then(r => r.json()).then(res => {
+    const a = res.data;  // 解包 data 字段
+    document.getElementById('article-detail').innerHTML = `...`;
+});
+```
+
+**相关文件**: `src/site/templates/article.html`
+
+---
+
+## Bug 13: article.html collected_at 未格式化显示 undefined
+
+**发现时间**: 2026-05-17
+**发现场景**: 同上
+**根因**: `collected_at` 格式为 ISO 字符串 `2026-05-17T07:21:04.612826+00:00`，直接显示会显示完整字符串
+
+**处理**: 截取日期部分
+```javascript
+${a.collected_at ? a.collected_at.slice(0,10) : ''}
+```
+
+**相关文件**: `src/site/templates/article.html`
+
+---
+
+## Bug 14: dashboard.html Chart.js 在脚本加载前执行导致 undefined
+
+**发现时间**: 2026-05-17
+**发现场景**: Playwright MCP 测试仪表盘，控制台报错 `ReferenceError: Chart is not defined`
+**根因**: `new Chart()` 在 `<script src="chart.js">` 之前执行，Chart 全局变量还不存在
+
+**处理**: 
+1. base.html 中 Chart.js 加载添加 `defer` 属性
+2. dashboard.html 中 Chart 调用包裹在 `DOMContentLoaded` 事件中
+
+```html
+<!-- base.html -->
+<script defer src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+<script defer src="/static/js/app.js"></script>
+
+<!-- dashboard.html -->
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const stats = window.__STATS__;
+    if (typeof Chart !== 'undefined') {
+        new Chart(...);
+    }
+});
+</script>
+```
+
+**相关文件**: `src/site/templates/base.html`, `src/site/templates/dashboard.html`
+
+---
+
+## Bug 15: OrbStack 容器残留导致 docker compose up 失败
+
+**发现时间**: 2026-05-17
+**发现场景**: `docker compose up -d` 时报错 "container name already in use"
+**根因**: 之前的容器未正确删除，残留的 bf6b48d5624c 占用了名称
+
+**处理**: `docker rm -f <残留容器ID>`
+
+**相关文件**: 无（基础设施问题）

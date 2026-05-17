@@ -13,32 +13,37 @@ async def save_article(db: Database, raw: RawItem, analyzed: AnalyzedItem, revie
         "language": analyzed.language,
         "raw": raw.raw_metadata,
     }, ensure_ascii=False)
-    row = await db.fetch_one("""
-        INSERT INTO articles
-        (title, url, description, summary, source, source_detail,
-         relevance_score, status, retry_count, collected_at, published_at, extra_data, analysis_cost, analysis_tokens)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ON CONFLICT(url) DO UPDATE SET
-            title = excluded.title,
-            description = excluded.description,
-            summary = excluded.summary,
-            relevance_score = excluded.relevance_score,
-            status = excluded.status,
-            retry_count = excluded.retry_count,
-            extra_data = excluded.extra_data,
-            analysis_cost = excluded.analysis_cost,
-            analysis_tokens = excluded.analysis_tokens,
-            updated_at = datetime('now')
-        RETURNING id
-    """, (
+    params = (
         analyzed.title, raw.url, raw.description, analyzed.summary,
         raw.source, raw.source_detail, reviewed.total_score,
         reviewed.verdict, analyzed.retry_count,
         raw.collected_at, raw.published_at,
         extra,
         cost, tokens,
-    ))
-    return row["id"] if row else None
+    )
+    # 事务：先 SELECT 检查是否存在，存在则 UPDATE，否则 INSERT
+    existing = await db.fetch_one("SELECT id FROM articles WHERE url=?", (raw.url,))
+    if existing:
+        await db.execute("""
+            UPDATE articles SET
+                title=?, description=?, summary=?, relevance_score=?,
+                status=?, retry_count=?, extra_data=?,
+                analysis_cost=?, analysis_tokens=?, updated_at=datetime('now')
+            WHERE url=?
+        """, (analyzed.title, raw.description, analyzed.summary, reviewed.total_score,
+              reviewed.verdict, analyzed.retry_count, extra, cost, tokens, raw.url))
+        await db.commit()
+        return existing["id"]
+    else:
+        await db.execute("""
+            INSERT INTO articles
+            (title, url, description, summary, source, source_detail,
+             relevance_score, status, retry_count, collected_at, published_at, extra_data, analysis_cost, analysis_tokens)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, params)
+        await db.commit()
+        row = await db.fetch_one("SELECT last_insert_rowid() as id")
+        return row["id"] if row else None
 
 
 async def save_tags(db: Database, article_id: int, tags: list[str]):
@@ -89,7 +94,17 @@ async def search_articles(db: Database, query: str, source: str = "", days: int 
             where.append("collected_at >= date('now', ?)"); params.append(f"-{days} days")
         params.extend([limit, offset])
         rows = await db.fetch_all(f"SELECT * FROM articles WHERE {' AND '.join(where)} ORDER BY collected_at DESC LIMIT ? OFFSET ?", tuple(params))
-    return [dict(r) for r in rows]
+
+    # 查询标签
+    articles_with_tags = []
+    for r in rows:
+        article = dict(r)
+        tag_rows = await db.fetch_all(
+            "SELECT t.name FROM tags t JOIN article_tags at ON t.id=at.tag_id WHERE at.article_id=?",
+            (article["id"],))
+        article["tags"] = [t["name"] for t in tag_rows]
+        articles_with_tags.append(article)
+    return articles_with_tags
 
 
 async def get_stats(db: Database, days: int = 30) -> dict:

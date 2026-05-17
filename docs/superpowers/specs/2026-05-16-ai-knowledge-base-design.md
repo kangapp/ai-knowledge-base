@@ -34,7 +34,7 @@
 - **首页**：Jinja2 预渲染近 30 天文章为初始 HTML（首屏秒开）+ JS 后台加载 data.json 无缝扩展为全量；来源/标签/日期/评分筛选纯客户端过滤；搜索框走 `/api/search?q=xxx` FTS5 全文检索（300ms 去抖）
 - **文章详情页**：`article.html` + JS 读 URL param 调 `/api/articles/{id}` 获取完整 summary 并渲染
 - **仪表盘**：Jinja2 内联 stats.json 渲染 KPI 卡片 + Chart.js（CDN，~70KB gzipped）画来源分布饼图 + 每日花费折线图
-- 数据文件拆分：`data.json`（列表字段不含 summary，首页过滤搜索，~9MB/年）+ `stats.json`（KPI+来源分布+每日花费，<10KB）；详情页调 API 按需获取完整 summary；3 年后 data.json 超 25MB 可切换按月分片 + `manifest.json` 索引；FastAPI `/api/articles` 始终作为兜底
+- 数据文件拆分：`data.json`（列表字段不含 summary、description 截断至 200 字符，首页过滤搜索，~5MB/年）+ `stats.json`（KPI+来源分布+每日花费，<10KB）；详情页调 API 按需获取完整 summary；3 年后 data.json 超 25MB 可切换按月分片 + `manifest.json` 索引；FastAPI `/api/articles` 始终作为兜底
 - 站点构建：去抖合并（5min 计时器）+ 双目录原子 rename 切换，防止高频渲染和半写文件
 
 ### 2.4 LLM 多模型管理
@@ -123,7 +123,7 @@ ai-knowledge-base/
 
 ### 4.1 SQLite Schema
 
-**articles** — 文章主表（id, title, url, description, summary, source, source_detail, relevance_score, status, retry_count, collected_at, published_at, raw_metadata, analysis_cost, analysis_tokens, created_at, updated_at）；FTS5 全文索引 over (title, summary, description)；url UNIQUE 约束防同源重复采集；不做跨源去重（不同源的视角和 Prompt 不同，产出有差异，重叠率低）
+**articles** — 文章主表（id, title, url, description, summary, source, source_detail, relevance_score, status, retry_count, collected_at, published_at, extra_data, analysis_cost, analysis_tokens, created_at, updated_at）；FTS5 全文索引 over (title, summary, description)；url UNIQUE 约束防同源重复采集；不做跨源去重（不同源的视角和 Prompt 不同，产出有差异，重叠率低）
 
 **tags** — 标签字典（id, name, color）
 
@@ -169,10 +169,10 @@ ai-knowledge-base/
 三个核心结构，通过 `ref_url` 关联（不继承，解耦采集和分析）：
 
 - **RawItem**（Collector 产出）：url, title, description, source, source_detail, published_at, raw_metadata, collected_at
-- **AnalyzedItem**（Analyzer 产出）：ref_url → RawItem.url, title, summary, tags[], language
+- **AnalyzedItem**（Analyzer 产出）：ref_url → RawItem.url, title, summary, tags[], language, relevance_score (0-100), retry_count
 - **ReviewedItem**（Reviewer 产出）：ref_url, total_score, dimensions, verdict, retry_feedback
 
-最终合并写入 articles 表：`url→url`, `title→title`, `description→raw.description`, `summary→analyzed.summary`, `source→raw.source`, `source_detail→raw.source_detail`, `relevance_score→reviewed.total_score`, `status→reviewed.verdict`。四维评分细节和语言信息存入 `raw_metadata` JSON。
+最终合并写入 articles 表：`url→url`, `title→title`, `description→raw.description`, `summary→analyzed.summary`, `source→raw.source`, `source_detail→raw.source_detail`, `relevance_score→reviewed.total_score`, `status→reviewed.verdict`。四维评分细节、语言信息、原始采集元数据存入 `extra_data` JSON。
 
 任何阶段失败时 `ref_url` 未匹配上的数据自然丢弃，由 `pipeline_runs.summary` 记录。
 

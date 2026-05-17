@@ -1,0 +1,14 @@
+[      29ms] [ERROR] Failed to load resource: the server responded with a status of 404 (File not found) @ http://localhost:8001/api/articles/3:0
+[      33ms] Unexpected token '<', "<!DOCTYPE "... is not valid JSON
+[  643611ms] [ERROR] Failed to load resource: the server responded with a status of 404 (File not found) @ http://localhost:8001/api/articles/3:0
+[  643612ms] Unexpected token '<', "<!DOCTYPE "... is not valid JSON
+[  950266ms] ReferenceError: Chart is not defined
+    at http://localhost:8001/dashboard.html:24:1
+[  952631ms] [ERROR] Failed to load resource: the server responded with a status of 404 (File not found) @ http://localhost:8001/api/articles/3:0
+[  952633ms] Unexpected token '<', "<!DOCTYPE "... is not valid JSON
+[  956826ms] [ERROR] Failed to load resource: the server responded with a status of 404 (File not found) @ http://localhost:8001/api/articles/4:0
+[  956827ms] Unexpected token '<', "<!DOCTYPE "... is not valid JSON
+[ 1111057ms] ReferenceError: Chart is not defined
+    at http://localhost:8001/dashboard.html:24:1
+[ 1118116ms] [ERROR] Failed to load resource: the server responded with a status of 404 (File not found) @ http://localhost:8001/api/articles/7:0
+[ 1118117ms] Unexpected token '<', "<!DOCTYPE "... is not valid JSON

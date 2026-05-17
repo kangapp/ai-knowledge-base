@@ -186,8 +186,9 @@ cd /Users/liufukang/Workplace/ai-knowledge-base
 uv sync
 ```
 
-- [ ] **Step 3: 创建 .env.example**
+- [ ] **Step 3: 创建 .env.example 和 .gitignore**
 
+`.env.example`:
 ```bash
 # LLM Provider API Keys
 DEEPSEEK_API_KEY=sk-xxx
@@ -201,13 +202,80 @@ GITHUB_TOKEN=ghp_xxx
 FEISHU_APP_ID=cli_xxx
 FEISHU_APP_SECRET=xxx
 
+# 域名（Caddy 自动 HTTPS，替换为真实域名）
+KB_DOMAIN=kb.your-domain.com
+
 # Langfuse (可选)
 LANGFUSE_PUBLIC_KEY=pk-xxx
 LANGFUSE_SECRET_KEY=sk-xxx
 LANGFUSE_HOST=https://cloud.langfuse.com
 ```
 
-- [ ] **Step 4: 创建 config/sources.yaml（RSS 按订阅源拆分）**
+`.gitignore`:
+```
+# 密钥
+.env
+
+# 运行时数据
+data/
+output/
+
+# Python
+__pycache__/
+*.pyc
+*.egg-info/
+dist/
+.venv/
+
+# 测试
+.pytest_cache/
+.coverage
+
+# IDE
+.vscode/
+.idea/
+```
+
+- [ ] **Step 4: 创建 config/llm.yaml（Provider 注册）**
+
+```yaml
+providers:
+  deepseek:
+    base_url: https://api.deepseek.com/v1
+    api_key: ${DEEPSEEK_API_KEY}
+    supports_json_mode: true
+    models:
+      - id: deepseek-chat
+        price_per_1k_in: 0.000014
+        price_per_1k_out: 0.000028
+        max_tokens: 8192
+
+  openai:
+    base_url: https://api.openai.com/v1
+    api_key: ${OPENAI_API_KEY}
+    supports_json_mode: true
+    models:
+      - id: gpt-4o-mini
+        price_per_1k_in: 0.00015
+        price_per_1k_out: 0.0006
+        max_tokens: 16384
+      - id: gpt-4o
+        price_per_1k_in: 0.0025
+        price_per_1k_out: 0.01
+        max_tokens: 4096
+
+  minimax:
+    base_url: https://api.minimax.chat/v1
+    api_key: ${MINIMAX_API_KEY}
+    supports_json_mode: false
+    models:
+      - id: abab6.5s-chat
+        price_per_1k_in: 0.001
+        price_per_1k_out: 0.001
+        max_tokens: 8192
+```
+
+- [ ] **Step 5: 创建 config/sources.yaml（RSS 按订阅源拆分）**
 
 ```yaml
 sources:
@@ -279,7 +347,7 @@ sources:
       lookback_days: 7
 ```
 
-- [ ] **Step 5: 创建 config/agents.yaml（含 fallback 链）**
+- [ ] **Step 6: 创建 config/agents.yaml（含 fallback 链）**
 
 ```yaml
 agents:
@@ -329,33 +397,60 @@ budget:
   hard_limit: 1.0
 ```
 
-- [ ] **Step 6: 创建 prompts/*.md 占位文件**
+- [ ] **Step 7: 创建 prompts/*.md 占位文件**
 
 每个 Analyzer prompt 包含 schema 输出要求 + 标签建议指令：
 
 `prompts/github_analyzer.md`:
 ```
-分析以下 GitHub 仓库，输出 JSON（不要 markdown 包裹）:
-{ "title": "...", "summary": "核心功能和适用场景（100-200字中文）", "tags": ["标签1", "标签2"], "language": "zh" }
-标签从 AI/LLM/Agent/MCP/RAG/Open Source/Tool/Framework/Benchmark 中选择，也可建议新标签。
+分析以下 GitHub 仓库，输出 JSON（不要 markdown 包裹）。
+
+仓库: {title}
+描述: {description}
+URL: {url}
+元数据: {metadata}
+
+输出 JSON (schema={schema})
+标签从 AI/LLM/Agent/MCP/RAG/Open Source/Tool/Framework/Benchmark 中选择，也可建议新标签。relevance_score 评估文章与 AI 领域的相关度和质量（0-100）。
+注意：schema 中的 relevance_score 是你评估的相关度分数（0-100），不是 schema 的示例值。
 ```
 
 `prompts/rss_analyzer.md`:
 ```
-分析以下技术文章，输出 JSON:
-{ "title": "...", "summary": "文章核心观点（100-200字中文）", "tags": ["标签1", "标签2"], "language": "zh" }
+分析以下技术文章，输出 JSON（不要 markdown 包裹）。
+
+文章: {title}
+摘要: {description}
+链接: {url}
+来源: {metadata}
+
+输出 JSON (schema={schema})
+注意：schema 中的 relevance_score 是你评估的相关度分数（0-100），不是 schema 的示例值。
 ```
 
 `prompts/feishu_analyzer.md`:
 ```
-分析以下飞书文档，输出 JSON:
-{ "title": "...", "summary": "文档关键内容（100-200字中文）", "tags": ["标签1", "标签2"], "language": "zh" }
+分析以下飞书文档，输出 JSON（不要 markdown 包裹）。
+
+飞书文档: {title}
+内容: {description}
+元数据: {metadata}
+
+输出 JSON (schema={schema})
+注意：schema 中的 relevance_score 是你评估的相关度分数（0-100），不是 schema 的示例值。
 ```
 
 `prompts/arxiv_analyzer.md`:
 ```
-分析以下学术论文摘要，输出 JSON:
-{ "title": "...", "summary": "研究问题、方法、贡献点（100-200字中文）", "tags": ["标签1", "标签2"], "language": "en" }
+分析以下学术论文摘要，输出 JSON（不要 markdown 包裹）。
+
+论文: {title}
+摘要: {description}
+URL: {url}
+分类: {metadata}
+
+输出 JSON (schema={schema})
+注意：schema 中的 relevance_score 是你评估的相关度分数（0-100），不是 schema 的示例值。
 ```
 
 `prompts/reviewer.md`:
@@ -370,14 +465,14 @@ budget:
 { "total_score": 85, "dimensions": { "ai_relevance": {"score": 35, "reason": "..."}, ... }, "verdict": "approved"|"retry"|"discarded", "retry_feedback": null|{"suggestions": ["..."]} }
 ```
 
-- [ ] **Step 7: 创建目录结构**
+- [ ] **Step 8: 创建目录结构**
 
 ```bash
 mkdir -p src/core src/graph/analyzers src/db/migrations src/api src/site/templates tests/fixtures config prompts
 touch src/__init__.py src/core/__init__.py src/graph/__init__.py src/graph/analyzers/__init__.py src/db/__init__.py src/api/__init__.py src/site/__init__.py tests/__init__.py
 ```
 
-- [ ] **Step 8: Commit**
+- [ ] **Step 9: Commit**
 
 ```bash
 git add pyproject.toml uv.lock .env.example config/ prompts/ src/ tests/ .gitignore
@@ -413,6 +508,7 @@ providers:
   deepseek:
     base_url: https://api.deepseek.com/v1
     api_key: ${DEEPSEEK_API_KEY}
+    supports_json_mode: true
     models:
       - id: deepseek-chat
         price_per_1k_in: 0.000014
@@ -467,6 +563,7 @@ def test_load_llm_config(sample_llm_yaml):
     cfg = load_llm_config(sample_llm_yaml)
     assert "deepseek" in cfg.providers
     assert cfg.providers["deepseek"].base_url == "https://api.deepseek.com/v1"
+    assert cfg.providers["deepseek"].supports_json_mode is True
 
 def test_load_sources_config(sample_sources_yaml):
     cfg = load_sources_config(sample_sources_yaml)
@@ -515,6 +612,7 @@ class ModelInfo(BaseModel):
 class ProviderConfig(BaseModel):
     base_url: str
     api_key: str
+    supports_json_mode: bool = False
     models: list[ModelInfo]
 
 class LLMConfig(BaseModel):
@@ -627,7 +725,7 @@ CREATE TABLE IF NOT EXISTS articles (
     retry_count     INTEGER DEFAULT 0,
     collected_at    TEXT NOT NULL,
     published_at    TEXT,
-    raw_metadata    TEXT,
+    extra_data      TEXT,
     analysis_cost   REAL DEFAULT 0.0,
     analysis_tokens INTEGER DEFAULT 0,
     created_at      TEXT DEFAULT (datetime('now')),
@@ -642,6 +740,20 @@ CREATE INDEX IF NOT EXISTS idx_articles_collected ON articles(collected_at);
 CREATE VIRTUAL TABLE IF NOT EXISTS articles_fts USING fts5(
     title, summary, description, content='articles'
 );
+
+-- FTS5 同步触发器（外部内容表需手动维护）
+CREATE TRIGGER IF NOT EXISTS articles_ai AFTER INSERT ON articles BEGIN
+    INSERT INTO articles_fts(rowid, title, summary, description) VALUES (new.id, new.title, new.summary, new.description);
+END;
+
+CREATE TRIGGER IF NOT EXISTS articles_ad AFTER DELETE ON articles BEGIN
+    INSERT INTO articles_fts(articles_fts, rowid, title, summary, description) VALUES ('delete', old.id, old.title, old.summary, old.description);
+END;
+
+CREATE TRIGGER IF NOT EXISTS articles_au AFTER UPDATE ON articles BEGIN
+    INSERT INTO articles_fts(articles_fts, rowid, title, summary, description) VALUES ('delete', old.id, old.title, old.summary, old.description);
+    INSERT INTO articles_fts(rowid, title, summary, description) VALUES (new.id, new.title, new.summary, new.description);
+END;
 
 CREATE TABLE IF NOT EXISTS tags (
     id   INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -741,6 +853,44 @@ async def test_url_unique_constraint(tmp_path):
             "INSERT INTO articles (title, url, source, collected_at) VALUES (?, ?, ?, ?)",
             ("Test2", "https://example.com/1", "rss", "2026-05-16T11:00:00Z")
         )
+
+@pytest.mark.asyncio
+async def test_fts5_sync(tmp_path):
+    """验证 FTS5 外部内容表与 articles 表自动同步"""
+    db_path = tmp_path / "test.db"
+    db = Database(db_path)
+    await db.initialize()
+
+    # INSERT → FTS5 自动索引
+    await db.execute(
+        "INSERT INTO articles (title, url, source, summary, description, collected_at) VALUES (?, ?, ?, ?, ?, ?)",
+        ("LLM 框架", "https://example.com/2", "github", "高性能 LLM 推理", "描述文本", "2026-05-16T10:00:00Z")
+    )
+    await db.commit()
+
+    rows = await db.fetch_all("SELECT * FROM articles_fts WHERE articles_fts MATCH ?", ("LLM",))
+    assert len(rows) == 1
+
+    # UPDATE → FTS5 同步更新
+    row = await db.fetch_one("SELECT id FROM articles WHERE url = ?", ("https://example.com/2",))
+    await db.execute(
+        "UPDATE articles SET title = ?, summary = ? WHERE id = ?",
+        ("Agent 框架", "Agent 相关推理", row["id"])
+    )
+    await db.commit()
+
+    # 旧内容搜不到
+    rows = await db.fetch_all("SELECT * FROM articles_fts WHERE articles_fts MATCH ?", ("LLM",))
+    assert len(rows) == 0
+    # 新内容可搜
+    rows = await db.fetch_all("SELECT * FROM articles_fts WHERE articles_fts MATCH ?", ("Agent",))
+    assert len(rows) == 1
+
+    # DELETE → FTS5 同步删除
+    await db.execute("DELETE FROM articles WHERE id = ?", (row["id"],))
+    await db.commit()
+    rows = await db.fetch_all("SELECT * FROM articles_fts WHERE articles_fts MATCH ?", ("Agent",))
+    assert len(rows) == 0
 ```
 
 - [ ] **Step 3: 运行测试确认失败**
@@ -817,6 +967,12 @@ class Database:
     async def commit(self):
         await self._conn.commit()
 
+    async def backup(self, target_path: str):
+        """在线热备份到 target_path（使用 aiosqlite 自带 API，不依赖 sqlite3 CLI）"""
+        target = await aiosqlite.connect(target_path)
+        await self._conn.backup(target)
+        await target.close()
+
     async def close(self):
         if self._conn:
             await self._conn.close()
@@ -826,7 +982,7 @@ class Database:
 
 ```bash
 uv run pytest tests/test_database.py -v
-# 预期: 2 passed
+# 预期: 3 passed
 ```
 
 - [ ] **Step 6: Commit**
@@ -864,12 +1020,11 @@ def tracker():
 
 def test_initial_state(tracker):
     assert tracker.current_daily() == 0.0
-    assert not tracker.is_exceeded("deepseek")
+    assert not tracker.is_soft_exceeded()
 
 def test_add_cost(tracker):
     tracker.add_cost("deepseek", 0.5)
     assert tracker.current_daily() == 0.5
-    assert tracker._daily_spend["deepseek"] == 0.5
 
 def test_soft_exceeded(tracker):
     tracker._daily_spend["__global__"] = tracker.daily_limit * 0.85
@@ -879,12 +1034,11 @@ def test_soft_exceeded(tracker):
 def test_hard_exceeded(tracker):
     tracker._daily_spend["__global__"] = tracker.daily_limit
     assert tracker.is_hard_exceeded()
-    assert tracker.is_exceeded("deepseek")  # 硬熔断所有 provider 不可用
 
-def test_per_provider_budget(tracker):
-    tracker._daily_spend["deepseek"] = 999
-    assert tracker.is_exceeded("deepseek")
-    assert not tracker.is_exceeded("openai")  # 独立不影响
+def test_per_provider_tracking(tracker):
+    tracker.add_cost("deepseek", 1.0)
+    tracker.add_cost("openai", 0.5)
+    assert tracker.current_daily() == 1.5
 
 def test_reset_daily(tracker):
     tracker.add_cost("deepseek", 5.0)
@@ -914,13 +1068,6 @@ class BudgetTracker:
     def current_daily(self) -> float:
         return self._daily_spend.get("__global__", 0.0)
 
-    def is_exceeded(self, provider: str) -> bool:
-        if self.is_hard_exceeded():
-            return True
-        if self.is_soft_exceeded():
-            return True  # 软熔断也阻止，LLMRegistry 会 fallback 到便宜模型
-        return False
-
     def is_soft_exceeded(self) -> bool:
         return self.current_daily() >= self.daily_limit * self.soft_limit
 
@@ -935,7 +1082,7 @@ class BudgetTracker:
 
 ```bash
 uv run pytest tests/test_budget.py -v
-# 预期: 6 passed
+# 预期: 5 passed
 ```
 
 - [ ] **Step 4: Commit**
@@ -1115,7 +1262,8 @@ GITHUB_ANALYZE_RESPONSE = {
         "title": "llama.cpp",
         "summary": "高性能 LLM 推理框架",
         "tags": ["LLM", "Open Source"],
-        "language": "en"
+        "language": "en",
+        "relevance_score": 85
     })}}],
     "usage": {"prompt_tokens": 420, "completion_tokens": 88}
 }
@@ -1178,7 +1326,8 @@ def agents_cfg():
 
 def test_get_client_primary(llm_cfg, agents_cfg):
     registry = LLMRegistry(llm_cfg, agents_cfg)
-    client, model_id, params = registry.get_client("github_analyzer")
+    client, provider, model_id, params = registry.get_client("github_analyzer")
+    assert provider == "deepseek"
     assert model_id == "deepseek-chat"
     assert params["temperature"] == 0.3
 
@@ -1187,8 +1336,25 @@ def test_fallback_on_unhealthy(llm_cfg, agents_cfg):
     registry.health.record_failure("deepseek", "500")
     registry.health.record_failure("deepseek", "500")
     registry.health.record_failure("deepseek", "500")  # open
-    client, model_id, _ = registry.get_client("github_analyzer")
-    assert model_id == "gpt-4o-mini"  # fallback
+    client, provider, model_id, _ = registry.get_client("github_analyzer")
+    assert provider == "openai"  # fallback provider
+    assert model_id == "gpt-4o-mini"  # fallback model
+
+def test_soft_limit_skips_primary(llm_cfg, agents_cfg):
+    """软熔断 (80%) → 跳过 primary，只用 fallback"""
+    registry = LLMRegistry(llm_cfg, agents_cfg)
+    # 设置花费超过软熔断阈值
+    registry.budget._daily_spend["__global__"] = registry.budget.daily_limit * 0.85
+    client, provider, model_id, _ = registry.get_client("github_analyzer")
+    assert provider == "openai"  # fallback
+    assert model_id == "gpt-4o-mini"
+
+def test_hard_limit_raises(llm_cfg, agents_cfg):
+    """硬熔断 (100%) → 全部不可用"""
+    registry = LLMRegistry(llm_cfg, agents_cfg)
+    registry.budget._daily_spend["__global__"] = registry.budget.daily_limit
+    with pytest.raises(AllProvidersUnavailable):
+        registry.get_client("github_analyzer")
 
 def test_all_unavailable_raises(llm_cfg, agents_cfg):
     registry = LLMRegistry(llm_cfg, agents_cfg)
@@ -1226,26 +1392,50 @@ class LLMRegistry:
             self._clients[name] = AsyncOpenAI(base_url=p.base_url, api_key=p.api_key)
             self._models[name] = p.models
 
+        self._llm_cfg = llm_cfg
         self._agents = agents_cfg.agents
         self.budget = BudgetTracker(agents_cfg.budget)
         self.health = HealthTracker()
 
-    def get_client(self, agent_name: str) -> tuple[AsyncOpenAI, str, dict]:
+    def get_client(self, agent_name: str) -> tuple[AsyncOpenAI, str, str, dict]:
+        """返回 (client, provider_name, model_id, params)。
+
+        预算控制：
+        - 硬熔断 (100%): 全部不可用 → AllProvidersUnavailable
+        - 软熔断 (80%):  跳过 primary，只用 fallback[]（切便宜模型）
+        """
         agent = self._agents[agent_name]
+
+        if self.budget.is_hard_exceeded():
+            raise AllProvidersUnavailable(f"Budget hard limit reached")
+
         chain = [agent.model.primary] + agent.model.fallback
+
+        if self.budget.is_soft_exceeded():
+            chain = agent.model.fallback  # 软熔断：只用 fallback
+
+        if not chain:
+            raise AllProvidersUnavailable(f"No available provider for '{agent_name}' (soft limit, no fallback)")
 
         for ref in chain:
             if self.health.circuit_is_open(ref.provider):
                 continue
-            if self.budget.is_hard_exceeded():
-                continue
             return (
                 self._clients[ref.provider],
+                ref.provider,
                 ref.model,
                 agent.params,
             )
 
         raise AllProvidersUnavailable(f"No available provider for '{agent_name}'")
+
+    def supports_json_mode(self, provider_name: str) -> bool:
+        cfg = self._llm_cfg.providers.get(provider_name)
+        return cfg.supports_json_mode if cfg else False
+
+    def get_prompt_path(self, agent_name: str) -> str:
+        """返回 agent 配置的 prompt 文件路径"""
+        return self._agents[agent_name].prompt
 
     def calc_cost(self, provider: str, model_id: str, tokens_in: int, tokens_out: int) -> float:
         models = self._models.get(provider, [])
@@ -1259,14 +1449,14 @@ class LLMRegistry:
 
 ```bash
 uv run pytest tests/test_llm_client.py -v
-# 预期: 4 passed
+# 预期: 6 passed
 ```
 
 - [ ] **Step 5: Commit**
 
 ```bash
 git add src/core/llm_client.py tests/test_llm_client.py tests/fixtures/
-git commit -m "feat: LLMRegistry + 自动 fallback — per-provider 熔断 + 预算控制"
+git commit -m "feat: LLMRegistry + 自动 fallback + 软硬分级熔断 — per-provider 熔断 + 预算控制"
 ```
 
 ---
@@ -1287,7 +1477,8 @@ git commit -m "feat: LLMRegistry + 自动 fallback — per-provider 熔断 + 预
 ```python
 # src/graph/state.py
 from pydantic import BaseModel, Field
-from typing import Literal, Optional
+import operator
+from typing import Literal, Optional, Annotated
 
 class RawItem(BaseModel):
     """Collector 产出 — 原始采集数据"""
@@ -1307,6 +1498,8 @@ class AnalyzedItem(BaseModel):
     summary: str
     tags: list[str] = Field(default_factory=list, max_length=3)
     language: Literal["zh", "en"] = "zh"
+    relevance_score: int = Field(default=0, ge=0, le=100)
+    retry_count: int = Field(default=0, ge=0)
 
 class ReviewedItem(BaseModel):
     """Reviewer 产出 — 四维评分 + 判决"""
@@ -1332,9 +1525,9 @@ class PipelineState(BaseModel):
     routed_rss: list[RawItem] = []
     routed_feishu: list[RawItem] = []
     routed_arxiv: list[RawItem] = []
-    analyzed_items: list[AnalyzedItem] = []
+    analyzed_items: Annotated[list[AnalyzedItem], operator.add] = []
     reviewed_items: list[ReviewedItem] = []
-    cost_records: list[CostRecord] = []
+    cost_records: Annotated[list[CostRecord], operator.add] = []
     error_log: list[dict] = []
     run_id: str = ""
     trigger: str = "cron"
@@ -1344,7 +1537,7 @@ class PipelineState(BaseModel):
 
 ```bash
 git add src/graph/state.py
-git commit -m "feat: Pipeline State — RawItem → AnalyzedItem → ReviewedItem 字段流"
+git commit -m "feat: Pipeline State — RawItem → AnalyzedItem → ReviewedItem 字段流 + operator.add reducer 支持 fan-out 合并"
 ```
 
 ---
@@ -1670,10 +1863,12 @@ from tests.fixtures.llm_responses import GITHUB_ANALYZE_RESPONSE
 @pytest.mark.asyncio
 async def test_parse_and_validate_success():
     from src.graph.analyzers.base import parse_and_validate
-    raw = json.dumps({"title": "Test", "summary": "A test", "tags": ["AI"], "language": "zh"})
+    raw = json.dumps({"title": "Test", "summary": "A test", "tags": ["AI"], "language": "zh", "relevance_score": 75})
     result = parse_and_validate(raw)
     assert result.title == "Test"
     assert result.tags == ["AI"]
+    assert result.relevance_score == 75
+    assert result.retry_count == 0
 
 def test_parse_markdown_wrapped_json():
     from src.graph.analyzers.base import parse_and_validate
@@ -1694,11 +1889,19 @@ def test_invalid_output_raises():
 import json
 import re
 import logging
+from pathlib import Path
 from ..state import RawItem, AnalyzedItem, CostRecord
 from ...core.llm_client import LLMRegistry
 
 logger = logging.getLogger("pipeline")
-ANALYZED_SCHEMA_DESC = '{"title": "string", "summary": "100-200字中文", "tags": ["标签1", "标签2"], "language": "zh|en"}'
+ANALYZED_SCHEMA_DESC = '{"title": "string", "summary": "100-200字中文", "tags": ["标签1", "标签2"], "language": "zh|en", "relevance_score": 85}'
+
+
+def load_prompt(agent_name: str, registry: LLMRegistry) -> str:
+    """从 prompts/*.md 文件加载 prompt 模板，作为 .format() 模板使用"""
+    path = Path(registry.get_prompt_path(agent_name))
+    return path.read_text(encoding="utf-8")
+
 
 def parse_and_validate(raw: str) -> AnalyzedItem:
     # 1. 尝试直接解析
@@ -1724,9 +1927,11 @@ async def analyze_items(
 
     results = []
     costs = []
-    client, model_id, params = registry.get_client(agent_name)
 
     for item in items:
+        # 每条独立获取 client（provider 可能随熔断状态变化）
+        client, provider, model_id, params = registry.get_client(agent_name)
+
         user_prompt = prompt_template.format(
             title=item.title, description=item.description,
             url=item.url, metadata=str(item.raw_metadata),
@@ -1735,7 +1940,7 @@ async def analyze_items(
 
         for attempt in range(2):
             try:
-                response = await client.chat.completions.create(
+                kwargs = dict(
                     model=model_id,
                     messages=[
                         {"role": "system", "content": system_prompt or f"你是一个技术分析助手。只输出 JSON，格式：{ANALYZED_SCHEMA_DESC}"},
@@ -1743,19 +1948,18 @@ async def analyze_items(
                     ],
                     temperature=params.get("temperature", 0.3),
                     max_tokens=params.get("max_tokens", 2048),
-                    response_format={"type": "json_object"},
                 )
+                # 仅 provider 支持 JSON mode 时才传 response_format
+                if registry.supports_json_mode(provider):
+                    kwargs["response_format"] = {"type": "json_object"}
+
+                response = await client.chat.completions.create(**kwargs)
                 content = response.choices[0].message.content or "{}"
                 analyzed = parse_and_validate(content)
 
                 tokens_in = response.usage.prompt_tokens if response.usage else 0
                 tokens_out = response.usage.completion_tokens if response.usage else 0
-                cost = registry.calc_cost(
-                    agent_name,  # 此处需要实际 provider，简化处理
-                    model_id, tokens_in, tokens_out
-                )
-                # 实际 provider 通过 agent 配置获取，此处简化
-                provider = registry._agents[agent_name].model.primary.provider
+                cost = registry.calc_cost(provider, model_id, tokens_in, tokens_out)
 
                 registry.budget.add_cost(provider, cost)
                 registry.health.record_success(provider, 0)
@@ -1765,9 +1969,9 @@ async def analyze_items(
                 break
 
             except Exception as e:
+                registry.health.record_failure(provider, str(e))
                 if attempt == 1:
                     logger.warning("analyzer.parse_failed", extra={"agent": agent_name, "url": item.url, "error": str(e)})
-                    # 不阻断 pipeline，该条数据丢失由 pipeline_runs.summary 统计
                 continue
 
     return results, costs
@@ -1775,50 +1979,46 @@ async def analyze_items(
 
 ```python
 # src/graph/analyzers/github.py
-from .base import analyze_items
+from .base import analyze_items, load_prompt
 from ..state import RawItem, AnalyzedItem, CostRecord
 from ...core.llm_client import LLMRegistry
 
-PROMPT = """仓库: {title}\n描述: {description}\nURL: {url}\n元数据: {metadata}\n\n输出 JSON (schema={schema})"""
-
 async def analyze_github(items: list[RawItem], registry: LLMRegistry) -> tuple[list[AnalyzedItem], list[CostRecord]]:
-    return await analyze_items(items, "github_analyzer", registry, PROMPT)
+    prompt = load_prompt("github_analyzer", registry)
+    return await analyze_items(items, "github_analyzer", registry, prompt)
 ```
 
 ```python
 # src/graph/analyzers/rss.py
-from .base import analyze_items
+from .base import analyze_items, load_prompt
 from ..state import RawItem, AnalyzedItem, CostRecord
 from ...core.llm_client import LLMRegistry
 
-PROMPT = """文章: {title}\n摘要: {description}\n链接: {url}\n来源: {metadata}\n\n输出 JSON (schema={schema})"""
-
 async def analyze_rss(items: list[RawItem], registry: LLMRegistry) -> tuple[list[AnalyzedItem], list[CostRecord]]:
-    return await analyze_items(items, "rss_analyzer", registry, PROMPT)
+    prompt = load_prompt("rss_analyzer", registry)
+    return await analyze_items(items, "rss_analyzer", registry, prompt)
 ```
 
 ```python
 # src/graph/analyzers/feishu.py
-from .base import analyze_items
+from .base import analyze_items, load_prompt
 from ..state import RawItem, AnalyzedItem, CostRecord
 from ...core.llm_client import LLMRegistry
 
-PROMPT = """飞书文档: {title}\n内容: {description}\n元数据: {metadata}\n\n输出 JSON (schema={schema})"""
-
 async def analyze_feishu(items: list[RawItem], registry: LLMRegistry) -> tuple[list[AnalyzedItem], list[CostRecord]]:
-    return await analyze_items(items, "feishu_analyzer", registry, PROMPT)
+    prompt = load_prompt("feishu_analyzer", registry)
+    return await analyze_items(items, "feishu_analyzer", registry, prompt)
 ```
 
 ```python
 # src/graph/analyzers/arxiv.py
-from .base import analyze_items
+from .base import analyze_items, load_prompt
 from ..state import RawItem, AnalyzedItem, CostRecord
 from ...core.llm_client import LLMRegistry
 
-PROMPT = """论文: {title}\n摘要: {description}\nURL: {url}\n分类: {metadata}\n\n输出 JSON (schema={schema})"""
-
 async def analyze_arxiv(items: list[RawItem], registry: LLMRegistry) -> tuple[list[AnalyzedItem], list[CostRecord]]:
-    return await analyze_items(items, "arxiv_analyzer", registry, PROMPT)
+    prompt = load_prompt("arxiv_analyzer", registry)
+    return await analyze_items(items, "arxiv_analyzer", registry, prompt)
 ```
 
 - [ ] **Step 3: 运行测试确认通过**
@@ -1836,7 +2036,7 @@ git commit -m "feat: Analyzer 框架 — base.analyze_items + schema 校验 + �
 
 ---
 
-### Task 11: Aggregator + Reviewer（四维评分）
+### Task 11: Aggregator + Reviewer（LLM 四维评分）
 
 **Files:**
 - Create: `src/graph/aggregator.py`, `src/graph/reviewer.py`
@@ -1849,79 +2049,249 @@ git commit -m "feat: Analyzer 框架 — base.analyze_items + schema 校验 + �
 from .state import PipelineState
 
 async def aggregator_node(state: PipelineState) -> dict:
-    return {}  # analyzed_items 由 Send 累积，cost_records 亦然
+    return {}  # analyzed_items 和 cost_records 由 operator.add reducer 自动累积
 ```
 
 - [ ] **Step 2: 编写 Reviewer 测试**
 
 ```python
 # tests/test_reviewer.py
+import json
 import pytest
+from unittest.mock import AsyncMock, MagicMock, patch
 from src.graph.state import PipelineState, AnalyzedItem, ReviewedItem
-from src.graph.reviewer import _rule_based_review
+from src.graph.reviewer import reviewer_node, parse_reviewer_output
+from tests.fixtures.llm_responses import REVIEWER_RESPONSE
 
-def test_rule_based_review():
-    items = [
-        AnalyzedItem(ref_url="a", title="high", summary="x", tags=["AI"], relevance_score=85),
-        AnalyzedItem(ref_url="b", title="low", summary="y", tags=[], relevance_score=30),
-        AnalyzedItem(ref_url="c", title="mid", summary="z", tags=["LLM"], relevance_score=60),
+def test_parse_reviewer_output():
+    raw = json.dumps({
+        "total_score": 85,
+        "dimensions": {
+            "ai_relevance": {"score": 35, "reason": "核心 LLM 推理框架"},
+            "content_depth": {"score": 25, "reason": "有技术细节"},
+            "info_density": {"score": 12, "reason": "有新信息"},
+            "timeliness": {"score": 13, "reason": "本周发布"}
+        },
+        "verdict": "approved",
+        "retry_feedback": None
+    })
+    result = parse_reviewer_output(raw)
+    assert isinstance(result, ReviewedItem)
+    assert result.total_score == 85
+    assert result.verdict == "approved"
+    assert result.dimensions["ai_relevance"]["score"] == 35
+    assert result.retry_feedback is None
+
+def test_parse_reviewer_output_retry():
+    raw = json.dumps({
+        "total_score": 65,
+        "dimensions": {
+            "ai_relevance": {"score": 25, "reason": "AI 基础设施"},
+            "content_depth": {"score": 18, "reason": "有部分细节"},
+            "info_density": {"score": 10, "reason": "有一定信息量"},
+            "timeliness": {"score": 12, "reason": "本周"}
+        },
+        "verdict": "retry",
+        "retry_feedback": {"suggestions": ["补充 AI 相关度分析", "增加技术深度"]}
+    })
+    result = parse_reviewer_output(raw)
+    assert result.verdict == "retry"
+    assert result.retry_feedback["suggestions"] == ["补充 AI 相关度分析", "增加技术深度"]
+
+def test_parse_reviewer_output_markdown_wrapped():
+    raw = '```json\n{"total_score": 30, "dimensions": {"ai_relevance": {"score": 5, "reason": "无关"}, "content_depth": {"score": 8, "reason": "简要"}, "info_density": {"score": 5, "reason": "重复"}, "timeliness": {"score": 12, "reason": "本周"}}, "verdict": "discarded", "retry_feedback": null}\n```'
+    result = parse_reviewer_output(raw)
+    assert result.verdict == "discarded"
+
+@pytest.mark.asyncio
+async def test_reviewer_node_mocked():
+    """Mock LLM 调用，验证 Reviewer 节点正确分类"""
+    from src.core.llm_client import LLMRegistry
+    from src.core.config import (
+        LLMConfig, AgentsConfig, ProviderConfig, ModelInfo,
+        AgentConfig, ModelBinding, ModelRef, BudgetConfig
+    )
+
+    llm_cfg = LLMConfig(providers={
+        "deepseek": ProviderConfig(
+            base_url="https://api.deepseek.com/v1", api_key="sk-test",
+            models=[ModelInfo(id="deepseek-chat", price_per_1k_in=0.000014, price_per_1k_out=0.000028, max_tokens=8192)]
+        )
+    })
+    agents_cfg = AgentsConfig(
+        agents={
+            "reviewer": AgentConfig(
+                model=ModelBinding(primary=ModelRef(provider="deepseek", model="deepseek-chat"), fallback=[]),
+                params={"temperature": 0.0, "max_tokens": 1024}
+            ),
+        },
+        budget=BudgetConfig(monthly=10.0)
+    )
+    registry = LLMRegistry(llm_cfg, agents_cfg)
+
+    # Mock AsyncOpenAI client
+    mock_client = AsyncMock()
+    mock_response = AsyncMock()
+    mock_response.choices = [
+        MagicMock(message=MagicMock(content=json.dumps({
+            "total_score": 88, "dimensions": {
+                "ai_relevance": {"score": 38, "reason": "核心 Agent 框架"},
+                "content_depth": {"score": 25, "reason": "深度原创"},
+                "info_density": {"score": 13, "reason": "新颖"},
+                "timeliness": {"score": 12, "reason": "本周"}
+            }, "verdict": "approved", "retry_feedback": None
+        })))
     ]
-    passed, retry, discarded = _rule_based_review(items)
+    mock_response.usage = MagicMock(prompt_tokens=300, completion_tokens=120)
+    mock_client.chat.completions.create = AsyncMock(return_value=mock_response)
+    registry._clients["deepseek"] = mock_client
 
-    assert len(passed) == 1
-    assert passed[0].ref_url == "a"
-    assert len(discarded) == 1
-    assert discarded[0].ref_url == "b"
-    assert len(retry) == 1
-    assert retry[0].ref_url == "c"
+    state = PipelineState(analyzed_items=[
+        AnalyzedItem(ref_url="https://example.com/1", title="Test Agent", summary="A new agent framework", tags=["Agent", "Framework"], language="zh", relevance_score=0, retry_count=0)
+    ])
+    result = await reviewer_node(state, registry)
 
-def test_retry_limit():
-    """retry_count >= 2 则丢弃"""
-    item = AnalyzedItem(ref_url="x", title="x", summary="x", tags=[], retry_count=2, relevance_score=60)
-    passed, retry, discarded = _rule_based_review([item])
-    assert len(discarded) == 1
+    assert len(result["reviewed_items"]) == 1
+    reviewed = result["reviewed_items"][0]
+    assert reviewed.verdict == "approved"
+    assert reviewed.total_score == 88
+    assert len(result["cost_records"]) == 1
 ```
 
-- [ ] **Step 3: 实现 Reviewer（一期规则评分 + 四维评分 Prompt 预留）**
+- [ ] **Step 3: 运行测试确认失败**
+
+```bash
+uv run pytest tests/test_reviewer.py -v
+# 预期: ImportError (reviewer.py 不存在)
+```
+
+- [ ] **Step 4: 实现 Reviewer（LLM 四维评分）**
 
 ```python
 # src/graph/reviewer.py
-import json, re, logging
+import json
+import re
+import logging
 from .state import PipelineState, AnalyzedItem, ReviewedItem, CostRecord
+from ..core.llm_client import LLMRegistry
 
 logger = logging.getLogger("pipeline")
-PASS_THRESHOLD = 80
-RETRY_THRESHOLD = 50
 MAX_RETRIES = 2
 
-def _rule_based_review(items: list[AnalyzedItem]) -> tuple[list[AnalyzedItem], list[AnalyzedItem], list[AnalyzedItem]]:
-    """Analyzer 自带评分做初筛；LLM 四维评分版本替换此函数即可"""
-    passed, retry, discarded = [], [], []
-    for item in items:
-        score = getattr(item, 'relevance_score', 0)
-        retry_count = getattr(item, 'retry_count', 0)
-        if score >= PASS_THRESHOLD:
-            passed.append(item)
-        elif score >= RETRY_THRESHOLD and retry_count < MAX_RETRIES:
-            item.retry_count = retry_count + 1
-            retry.append(item)
+
+def _load_reviewer_prompt(registry: LLMRegistry) -> str:
+    """从 prompts/reviewer.md 加载系统 prompt；文件缺失时使用内置默认"""
+    from pathlib import Path
+    try:
+        path = Path(registry.get_prompt_path("reviewer"))
+        return path.read_text(encoding="utf-8")
+    except Exception:
+        return """你是内容审核员。对文章按四维评分（0-100）:
+- AI相关度(0-40): 核心AI/LLM/Agent/MCP/RAG=35-40, AI基础设施=25-34, 泛技术提及=10-24, 无关=0-9
+- 内容深度(0-30): 深度原创=25-30, 有细节=15-24, 简要=5-14, 空内容=0-4
+- 信息密度(0-15): 新颖独家=12-15, 有信息量=7-11, 重复营销=0-6
+- 时效性(0-15): 本周内=12-15, 本月=7-11, 较早=0-6
+
+输出 JSON:
+{"total_score": 85, "dimensions": {"ai_relevance": {"score": 35, "reason": "..."}, "content_depth": {"score": 25, "reason": "..."}, "info_density": {"score": 12, "reason": "..."}, "timeliness": {"score": 13, "reason": "..."}}, "verdict": "approved"|"retry"|"discarded", "retry_feedback": null|{"suggestions": ["..."]}}"""
+
+
+def parse_reviewer_output(raw: str) -> ReviewedItem:
+    try:
+        data = json.loads(raw)
+    except json.JSONDecodeError:
+        m = re.search(r'```(?:json)?\s*(.*?)\s*```', raw, re.DOTALL)
+        if m:
+            data = json.loads(m.group(1))
         else:
-            discarded.append(item)
-    return passed, retry, discarded
+            raise ValueError("Reviewer output is not valid JSON")
+    return ReviewedItem.model_validate(data)
 
 
-async def reviewer_node(state: PipelineState) -> dict:
-    # 一期使用规则评分
-    passed, retry, discarded = _rule_based_review(state.analyzed_items)
-    logger.info("reviewer.done", extra={"passed": len(passed), "retry": len(retry), "discarded": len(discarded)})
-    return {"analyzed_items": passed + retry + discarded}  # 保留全量，status 在入库时区分
+async def reviewer_node(state: PipelineState, registry: LLMRegistry) -> dict:
+    if not state.analyzed_items:
+        return {"reviewed_items": [], "cost_records": []}
+
+    system_prompt = _load_reviewer_prompt(registry)
+    reviewed_items = []
+    cost_records = []
+
+    for item in state.analyzed_items:
+        # 超过最大重试次数直接丢弃
+        if item.retry_count >= MAX_RETRIES:
+            reviewed_items.append(ReviewedItem(
+                ref_url=item.ref_url, total_score=0, dimensions={},
+                verdict="discarded",
+                retry_feedback={"reason": f"exceeded max retries ({MAX_RETRIES})"}
+            ))
+            continue
+
+        client, provider, model_id, params = registry.get_client("reviewer")
+        user_prompt = f"标题: {item.title}\n摘要: {item.summary}\n标签: {', '.join(item.tags)}\n来源: {item.ref_url}"
+
+        for attempt in range(2):
+            try:
+                kwargs = dict(
+                    model=model_id,
+                    messages=[
+                        {"role": "system", "content": system_prompt},
+                        {"role": "user", "content": user_prompt},
+                    ],
+                    temperature=0.0,
+                    max_tokens=params.get("max_tokens", 1024),
+                )
+                if registry.supports_json_mode(provider):
+                    kwargs["response_format"] = {"type": "json_object"}
+
+                response = await client.chat.completions.create(**kwargs)
+                content = response.choices[0].message.content or "{}"
+                reviewed = parse_reviewer_output(content)
+
+                tokens_in = response.usage.prompt_tokens if response.usage else 0
+                tokens_out = response.usage.completion_tokens if response.usage else 0
+                cost = registry.calc_cost(provider, model_id, tokens_in, tokens_out)
+                registry.budget.add_cost(provider, cost)
+                registry.health.record_success(provider, 0)
+
+                reviewed_items.append(reviewed)
+                cost_records.append(CostRecord(
+                    agent="reviewer", provider=provider, model=model_id,
+                    tokens_in=tokens_in, tokens_out=tokens_out, cost=cost
+                ))
+                break
+
+            except Exception as e:
+                registry.health.record_failure(provider, str(e))
+                if attempt == 1:
+                    logger.warning("reviewer.parse_failed", extra={"url": item.ref_url, "error": str(e)})
+                    reviewed_items.append(ReviewedItem(
+                        ref_url=item.ref_url, total_score=0, dimensions={},
+                        verdict="discarded",
+                        retry_feedback={"reason": f"parse failed after 2 attempts: {str(e)}"}
+                    ))
+
+    logger.info("reviewer.done", extra={
+        "total": len(reviewed_items),
+        "approved": sum(1 for r in reviewed_items if r.verdict == "approved"),
+        "retry": sum(1 for r in reviewed_items if r.verdict == "retry"),
+        "discarded": sum(1 for r in reviewed_items if r.verdict == "discarded"),
+    })
+
+    return {"reviewed_items": reviewed_items, "cost_records": cost_records}
 ```
 
-- [ ] **Step 4: Commit**
+- [ ] **Step 5: 运行测试确认通过**
+
+```bash
+uv run pytest tests/test_reviewer.py -v
+# 预期: 4 passed
+```
+
+- [ ] **Step 6: Commit**
 
 ```bash
 git add src/graph/aggregator.py src/graph/reviewer.py tests/test_reviewer.py
-git commit -m "feat: Aggregator + Reviewer — 规则评分 pass/retry/discard"
+git commit -m "feat: Aggregator + Reviewer — LLM 四维评分 (AI相关度+内容深度+信息密度+时效性)"
 ```
 
 ---
@@ -1932,21 +2302,123 @@ git commit -m "feat: Aggregator + Reviewer — 规则评分 pass/retry/discard"
 - Create: `src/graph/pipeline.py`
 - Create: `tests/test_pipeline.py`
 
+- [ ] **Step 1: 确认 Task 7 的 PipelineState 已完成 reducer 注解**
+
+Task 7 的 `analyzed_items` 和 `cost_records` 使用了 `Annotated[list[...], operator.add]`，这是 LangGraph fan-out 并行分支结果合并所必需的。
+
+- [ ] **Step 2: 编写测试**
+
 ```python
 # tests/test_pipeline.py
 import pytest
+from unittest.mock import AsyncMock
 from src.graph.pipeline import build_pipeline
+from src.graph.state import PipelineState, RawItem, AnalyzedItem, CostRecord, ReviewedItem
+from src.core.llm_client import LLMRegistry
+from src.core.config import (
+    LLMConfig, AgentsConfig, ProviderConfig, ModelInfo,
+    AgentConfig, ModelBinding, ModelRef, BudgetConfig
+)
 
-def test_pipeline_structure():
-    graph = build_pipeline()
-    compiled = graph.compile()  # 无 checkpointer
-    nodes = compiled.get_graph().nodes
+@pytest.fixture
+def registry():
+    llm_cfg = LLMConfig(providers={
+        "deepseek": ProviderConfig(
+            base_url="https://api.deepseek.com/v1", api_key="sk-test",
+            models=[ModelInfo(id="deepseek-chat", price_per_1k_in=0.000014, price_per_1k_out=0.000028, max_tokens=8192)]
+        )
+    })
+    agents_cfg = AgentsConfig(
+        agents={
+            "github_analyzer": AgentConfig(
+                model=ModelBinding(primary=ModelRef(provider="deepseek", model="deepseek-chat"), fallback=[]),
+                params={"temperature": 0.3, "max_tokens": 2048}
+            ),
+            "rss_analyzer": AgentConfig(
+                model=ModelBinding(primary=ModelRef(provider="deepseek", model="deepseek-chat"), fallback=[]),
+                params={"temperature": 0.3, "max_tokens": 2048}
+            ),
+            "feishu_analyzer": AgentConfig(
+                model=ModelBinding(primary=ModelRef(provider="deepseek", model="deepseek-chat"), fallback=[]),
+                params={"temperature": 0.3, "max_tokens": 2048}
+            ),
+            "arxiv_analyzer": AgentConfig(
+                model=ModelBinding(primary=ModelRef(provider="deepseek", model="deepseek-chat"), fallback=[]),
+                params={"temperature": 0.3, "max_tokens": 4096}
+            ),
+        },
+        budget=BudgetConfig(monthly=10.0)
+    )
+    return LLMRegistry(llm_cfg, agents_cfg)
+
+def test_pipeline_structure(registry):
+    graph = build_pipeline(registry)
+    nodes = graph.get_graph().nodes
     names = {n for n in nodes}
-    assert "collector" in names
     assert "router" in names
+    assert "github_analyzer" in names
+    assert "rss_analyzer" in names
+    assert "feishu_analyzer" in names
+    assert "arxiv_analyzer" in names
     assert "aggregator" in names
     assert "reviewer" in names
+
+@pytest.mark.asyncio
+async def test_pipeline_e2e_mocked(registry):
+    """全链路 mock 测试：router → fan-out → aggregator → reviewer"""
+    # Mock LLM 调用，让 analyzer 返回固定结果
+    async def mock_analyze_github(items, reg):
+        return [
+            AnalyzedItem(ref_url=items[0].url, title="Test", summary="Mocked", tags=["AI"], language="zh")
+        ], [CostRecord(agent="github_analyzer", provider="deepseek", model="deepseek-chat", tokens_in=100, tokens_out=50, cost=0.001)]
+
+    # 替换 registry 的 get_client，避免真实 LLM 调用
+    # 测试中通过 monkeypatch 覆盖 analyzer 函数
+
+    graph = build_pipeline(registry)
+    state = PipelineState(
+        raw_items=[
+            RawItem(url="https://github.com/test/x", title="x", description="desc", source="github", collected_at="2026-05-16T10:00:00Z"),
+            RawItem(url="https://example.com/y", title="y", description="desc", source="rss", collected_at="2026-05-16T10:00:00Z"),
+        ],
+        run_id="test_run", trigger="manual"
+    )
+
+    # Router 先跑一次得到 routed_*
+    from src.graph.router import router_node
+    routed = await router_node(state)
+    state = state.model_copy(update=routed)
+
+    # 用 patch 替换 analyzer 和 reviewer 函数，避免真实 LLM 调用
+    import src.graph.pipeline as pl
+    with patch.object(pl, "github_analyzer_node", new=AsyncMock(return_value={
+        "analyzed_items": [AnalyzedItem(ref_url="https://github.com/test/x", title="Test", summary="Mocked", tags=["AI"], language="zh")],
+        "cost_records": [CostRecord(agent="github_analyzer", provider="deepseek", model="deepseek-chat", tokens_in=100, tokens_out=50, cost=0.001)]
+    })), \
+         patch.object(pl, "rss_analyzer_node", new=AsyncMock(return_value={
+             "analyzed_items": [],
+             "cost_records": []
+         })), \
+         patch.object(pl, "reviewer_node", new=AsyncMock(return_value={
+             "reviewed_items": [ReviewedItem(ref_url="https://github.com/test/x", total_score=85, dimensions={}, verdict="approved")],
+             "cost_records": []
+         })):
+        result = await graph.ainvoke(state)
+
+    assert len(result["analyzed_items"]) == 1
+    assert result["analyzed_items"][0].ref_url == "https://github.com/test/x"
+    assert len(result["reviewed_items"]) == 1
+    assert result["reviewed_items"][0].verdict == "approved"
 ```
+
+- [ ] **Step 2: 运行测试确认失败**
+
+```bash
+uv run pytest tests/test_pipeline.py -v
+# 预期: ImportError (pipeline.py 不存在)
+```
+
+- [ ] **Step 3: 实现 build_pipeline（含闭包注入 registry）**
 
 ```python
 # src/graph/pipeline.py
@@ -1956,8 +2428,40 @@ from .state import PipelineState
 from .router import router_node
 from .aggregator import aggregator_node
 from .reviewer import reviewer_node
+from .analyzers.github import analyze_github
+from .analyzers.rss import analyze_rss
+from .analyzers.feishu import analyze_feishu
+from .analyzers.arxiv import analyze_arxiv
+from ..core.llm_client import LLMRegistry
 
-# 注意：collector、analyzer 节点在执行时通过配置注入，此处定义图结构
+
+async def github_analyzer_node(state: PipelineState, registry: LLMRegistry) -> dict:
+    if not state.routed_github:
+        return {"analyzed_items": [], "cost_records": []}
+    items, costs = await analyze_github(state.routed_github, registry)
+    return {"analyzed_items": items, "cost_records": costs}
+
+
+async def rss_analyzer_node(state: PipelineState, registry: LLMRegistry) -> dict:
+    if not state.routed_rss:
+        return {"analyzed_items": [], "cost_records": []}
+    items, costs = await analyze_rss(state.routed_rss, registry)
+    return {"analyzed_items": items, "cost_records": costs}
+
+
+async def feishu_analyzer_node(state: PipelineState, registry: LLMRegistry) -> dict:
+    if not state.routed_feishu:
+        return {"analyzed_items": [], "cost_records": []}
+    items, costs = await analyze_feishu(state.routed_feishu, registry)
+    return {"analyzed_items": items, "cost_records": costs}
+
+
+async def arxiv_analyzer_node(state: PipelineState, registry: LLMRegistry) -> dict:
+    if not state.routed_arxiv:
+        return {"analyzed_items": [], "cost_records": []}
+    items, costs = await analyze_arxiv(state.routed_arxiv, registry)
+    return {"analyzed_items": items, "cost_records": costs}
+
 
 def continue_to_analyzers(state: PipelineState):
     sends = []
@@ -1969,25 +2473,30 @@ def continue_to_analyzers(state: PipelineState):
         sends.append(Send("feishu_analyzer", state))
     if state.routed_arxiv:
         sends.append(Send("arxiv_analyzer", state))
-    if not sends:
-        return []
     return sends
 
-def build_pipeline():
+
+def build_pipeline(registry: LLMRegistry):
+    """构建并编译 LangGraph pipeline。
+
+    Collector 和 DB 查重在图外执行（需要 DB 连接），
+    图内编排：Router → Fan-out(4×Analyzer) → Aggregator → Reviewer。
+
+    analyzed_items 和 cost_records 使用 operator.add reducer，
+    fan-out 并行分支的结果自动合并。
+    """
     graph = StateGraph(PipelineState)
 
     graph.add_node("router", router_node)
+    graph.add_node("github_analyzer", lambda s: github_analyzer_node(s, registry))
+    graph.add_node("rss_analyzer", lambda s: rss_analyzer_node(s, registry))
+    graph.add_node("feishu_analyzer", lambda s: feishu_analyzer_node(s, registry))
+    graph.add_node("arxiv_analyzer", lambda s: arxiv_analyzer_node(s, registry))
     graph.add_node("aggregator", aggregator_node)
-    graph.add_node("reviewer", reviewer_node)
+    graph.add_node("reviewer", lambda s: reviewer_node(s, registry))
 
-    # collector 和 analyzers 在执行时动态添加
     graph.add_edge(START, "router")
-    graph.add_conditional_edges("router", continue_to_analyzers, {
-        "github_analyzer": "github_analyzer",
-        "rss_analyzer": "rss_analyzer",
-        "feishu_analyzer": "feishu_analyzer",
-        "arxiv_analyzer": "arxiv_analyzer",
-    })
+    graph.add_conditional_edges("router", continue_to_analyzers)
     graph.add_edge("github_analyzer", "aggregator")
     graph.add_edge("rss_analyzer", "aggregator")
     graph.add_edge("feishu_analyzer", "aggregator")
@@ -1995,13 +2504,21 @@ def build_pipeline():
     graph.add_edge("aggregator", "reviewer")
     graph.add_edge("reviewer", END)
 
-    return graph
+    return graph.compile()
 ```
+
+- [ ] **Step 4: 运行测试确认通过**
 
 ```bash
 uv run pytest tests/test_pipeline.py -v
+# 预期: 2 passed
+```
+
+- [ ] **Step 5: Commit**
+
+```bash
 git add src/graph/pipeline.py tests/test_pipeline.py
-git commit -m "feat: LangGraph Pipeline 组装 — Collector→Router→Fan-out→Aggregator→Reviewer（无 checkpoint）"
+git commit -m "feat: LangGraph Pipeline — 编译图含 Router→Fan-out(4×Analyzer)→Aggregator→Reviewer"
 ```
 
 ---
@@ -2021,28 +2538,49 @@ git commit -m "feat: LangGraph Pipeline 组装 — Collector→Router→Fan-out�
 
 ```python
 # src/db/operations.py
-import json, subprocess, os, shutil
+import json
 from pathlib import Path
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from ..core.database import Database
 from ..graph.state import AnalyzedItem, CostRecord, ReviewedItem
 
-async def save_article(db: Database, raw, analyzed: AnalyzedItem, reviewed: ReviewedItem, cost: float, tokens: int):
-    await db.execute("""
-        INSERT OR REPLACE INTO articles
+async def save_article(db: Database, raw, analyzed: AnalyzedItem, reviewed: ReviewedItem, cost: float, tokens: int) -> int | None:
+    """保存文章，返回 article id（新插入或已存在行的 id）"""
+    extra = json.dumps({
+        "dimensions": reviewed.dimensions,
+        "language": analyzed.language,
+        "raw": raw.raw_metadata,
+    }, ensure_ascii=False)
+    row = await db.fetch_one("""
+        INSERT INTO articles
         (title, url, description, summary, source, source_detail,
-         relevance_score, status, retry_count, collected_at, published_at, raw_metadata, analysis_cost, analysis_tokens)
+         relevance_score, status, retry_count, collected_at, published_at, extra_data, analysis_cost, analysis_tokens)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(url) DO UPDATE SET
+            title = excluded.title,
+            description = excluded.description,
+            summary = excluded.summary,
+            relevance_score = excluded.relevance_score,
+            status = excluded.status,
+            retry_count = excluded.retry_count,
+            extra_data = excluded.extra_data,
+            analysis_cost = excluded.analysis_cost,
+            analysis_tokens = excluded.analysis_tokens,
+            updated_at = datetime('now')
+        RETURNING id
     """, (
         analyzed.title, raw.url, raw.description, analyzed.summary,
         raw.source, raw.source_detail, reviewed.total_score,
-        reviewed.verdict, getattr(analyzed, "retry_count", 0),
+        reviewed.verdict, analyzed.retry_count,
         raw.collected_at, raw.published_at,
-        json.dumps({"dimensions": reviewed.dimensions, "language": analyzed.language, "raw": raw.raw_metadata}, ensure_ascii=False),
+        extra,
         cost, tokens,
     ))
+    return row["id"] if row else None
 
 async def save_tags(db: Database, article_id: int, tags: list[str]):
+    # 先清旧标签，再插入新标签（retry 重分析时标签可能变化）
+    await db.execute("DELETE FROM article_tags WHERE article_id = ?", (article_id,))
     for tag_name in tags:
         await db.execute("INSERT OR IGNORE INTO tags (name) VALUES (?)", (tag_name,))
         row = await db.fetch_one("SELECT id FROM tags WHERE name = ?", (tag_name,))
@@ -2103,14 +2641,15 @@ async def get_stats(db: Database, days: int = 30) -> dict:
         "top_tags": [{"name": t["name"], "count": t["c"]} for t in top_tags],
     }
 
-async def backup_database(db_path: str, backup_dir: str):
-    """sqlite3 .backup 在线热备份，保留 7 天"""
+async def backup_database(db: Database, backup_dir: str):
+    """aiosqlite .backup() 在线热备份，保留 7 天"""
     Path(backup_dir).mkdir(parents=True, exist_ok=True)
     today = datetime.now().strftime("%Y%m%d")
     backup_file = Path(backup_dir) / f"knowledge-{today}.db"
-    subprocess.run(["sqlite3", db_path, f".backup {backup_file}"], check=True)
+    await db.backup(str(backup_file))
+
     # 清理 7 天前
-    cutoff = datetime.now() - __import__("datetime").timedelta(days=7)
+    cutoff = datetime.now() - timedelta(days=7)
     for f in Path(backup_dir).glob("knowledge-*.db"):
         try:
             date_str = f.stem.replace("knowledge-", "")
@@ -2130,14 +2669,17 @@ git commit -m "feat: DB 操作 — CRUD + 批量查重 + stats + FTS 搜索 + �
 
 ---
 
-### Task 14: FastAPI 端点
+### Task 14: FastAPI 端点（含统一响应信封）
 
 **Files:**
 - Create: `src/api/routes.py`
 
+- [ ] **Step 1: 实现统一信封 + 端点**
+
 ```python
 # src/api/routes.py
-from fastapi import APIRouter, Query, HTTPException
+from fastapi import APIRouter, Query, HTTPException, Request
+from fastapi.responses import JSONResponse
 from ..core.database import Database
 from ..db import operations
 
@@ -2147,46 +2689,140 @@ _db: Database | None = None
 def set_db(db: Database):
     global _db; _db = db
 
+# ===== 统一响应信封 =====
+
+def envelope(data=None, message="ok", code=0):
+    """成功响应信封"""
+    return {"code": code, "data": data, "message": message}
+
+
+async def http_exception_handler(request: Request, exc: HTTPException):
+    """HTTPException → 结构化错误响应"""
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={
+            "code": exc.status_code,
+            "data": None,
+            "message": exc.detail,
+        }
+    )
+
+
+async def general_exception_handler(request: Request, exc: Exception):
+    """未捕获异常 → 50001"""
+    return JSONResponse(
+        status_code=500,
+        content={"code": 50001, "data": None, "message": "服务内部错误"},
+    )
+
+
+# ===== 端点 =====
+
 @router.get("/articles")
-async def list_articles(query: str = Query(default=""), source: str = Query(default=""), days: int = Query(default=30, ge=1, le=3650), limit: int = Query(default=20, ge=1, le=100), offset: int = Query(default=0, ge=0)):
-    if not _db: raise HTTPException(500, "DB not initialized")
-    return await operations.search_articles(_db, query, source, days, limit, offset)
+async def list_articles(
+    query: str = Query(default=""),
+    source: str = Query(default=""),
+    days: int = Query(default=30, ge=1, le=3650),
+    page: int = Query(default=1, ge=1),
+    page_size: int = Query(default=20, ge=1, le=100),
+):
+    if not _db:
+        raise HTTPException(500, "DB not initialized")
+    offset = (page - 1) * page_size
+    rows = await operations.search_articles(_db, query, source, days, page_size, offset)
+    total = len(rows)  # 简化：实际应 COUNT 查询
+    return envelope({
+        "items": rows,
+        "total": total,
+        "page": page,
+        "page_size": page_size,
+    })
+
 
 @router.get("/articles/{article_id}")
 async def get_article(article_id: int):
-    if not _db: raise HTTPException(500, "DB not initialized")
+    if not _db:
+        raise HTTPException(500, "DB not initialized")
     row = await _db.fetch_one("SELECT * FROM articles WHERE id = ?", (article_id,))
-    if not row: raise HTTPException(404, "Not found")
-    return dict(row)
+    if not row:
+        raise HTTPException(status_code=404, detail=f"文章 {article_id} 不存在")
+    return envelope(dict(row))
+
 
 @router.get("/search")
-async def search(query: str = Query(min_length=1), limit: int = Query(default=20, ge=1, le=100)):
-    if not _db: raise HTTPException(500, "DB not initialized")
-    return await operations.search_articles(_db, query, days=3650, limit=limit)
+async def search(
+    q: str = Query(min_length=1),
+    limit: int = Query(default=20, ge=1, le=100),
+):
+    if not _db:
+        raise HTTPException(500, "DB not initialized")
+    rows = await operations.search_articles(_db, q, days=3650, limit=limit)
+    return envelope({"items": rows, "total": len(rows)})
+
 
 @router.get("/stats")
 async def get_stats(days: int = Query(default=30, ge=1, le=3650)):
-    if not _db: raise HTTPException(500, "DB not initialized")
-    return await operations.get_stats(_db, days)
+    if not _db:
+        raise HTTPException(500, "DB not initialized")
+    return envelope(await operations.get_stats(_db, days))
+
 
 @router.get("/health")
 async def health():
-    return {"status": "ok"}
+    return {"status": "ok"}  # 不包信封，Caddy/Compose healthcheck 直接读
+
 
 @router.get("/cost/summary")
 async def cost_summary(days: int = Query(default=30)):
-    if not _db: raise HTTPException(500, "DB not initialized")
-    rows = await _db.fetch_all("SELECT provider, model, SUM(cost) as total_cost, SUM(tokens_in+tokens_out) as total_tokens FROM cost_logs WHERE created_at >= date('now', ?) GROUP BY provider, model", (f"-{days} days",))
-    return [dict(r) for r in rows]
+    if not _db:
+        raise HTTPException(500, "DB not initialized")
+    rows = await _db.fetch_all(
+        "SELECT provider, model, SUM(cost) as total_cost, SUM(tokens_in+tokens_out) as total_tokens "
+        "FROM cost_logs WHERE created_at >= date('now', ?) GROUP BY provider, model",
+        (f"-{days} days",),
+    )
+    return envelope([dict(r) for r in rows])
+
+
+_run_pipeline_cb = None
+
+def set_run_pipeline(cb):
+    global _run_pipeline_cb; _run_pipeline_cb = cb
 
 @router.post("/pipeline/run")
-async def trigger_pipeline():
-    return {"status": "queued", "message": "Pipeline triggered via internal call"}
+async def trigger_pipeline(source: str = Query(default="")):
+    if not _run_pipeline_cb:
+        raise HTTPException(500, "Pipeline not initialized")
+    import asyncio
+    asyncio.create_task(_run_pipeline_cb(
+        trigger="manual",
+        source_filter=source or None,  # 空字符串 = 全量
+    ))
+    return envelope({"status": "queued"}, "Pipeline triggered")
 ```
 
+- [ ] **Step 2: 在 main.py 中注册异常处理器**
+
+Task 16 的 `create_app()` 需注册两个 exception handler：
+
+```python
+def create_app() -> FastAPI:
+    from .api.routes import http_exception_handler, general_exception_handler
+
+    app = FastAPI(lifespan=lifespan, title="AI Knowledge Base")
+    app.include_router(router)
+    app.add_exception_handler(HTTPException, http_exception_handler)  # FastAPI 的 HTTPException
+    app.add_exception_handler(Exception, general_exception_handler)
+    return app
+```
+
+注意：FastAPI 自带 `HTTPException` 的默认 handler，需要覆盖它。`exception_handler` 注册在 app 级别，不会影响 middleware/startup 等。
+
+- [ ] **Step 3: Commit**
+
 ```bash
-git add src/api/routes.py
-git commit -m "feat: FastAPI 端点 — /api/articles, /api/search, /api/stats, /api/health"
+git add src/api/routes.py src/main.py
+git commit -m "feat: FastAPI 端点 — 统一响应信封 + 结构化错误 + 分页元数据"
 ```
 
 ---
@@ -2242,12 +2878,13 @@ class SiteBuilder:
         dash_html = self.env.get_template("dashboard.html").render(stats=stats)
         (tmp_dir / "dashboard.html").write_text(dash_html, encoding="utf-8")
 
-        # data.json — 列表字段不含 summary
+        # data.json — 列表字段不含 summary，description 截断到 200 字符（详情页走 API）
         json_articles = []
         for a in all_articles:
+            desc = a.get("description", "") or ""
             json_articles.append({
                 "id": a["id"], "title": a["title"], "url": a["url"],
-                "description": a.get("description", ""),
+                "description": desc[:200],
                 "source": a["source"], "source_detail": a.get("source_detail", ""),
                 "relevance_score": a["relevance_score"],
                 "published_at": a.get("published_at", ""),
@@ -2421,35 +3058,48 @@ from pathlib import Path
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
 from .core.config import load_llm_config, load_sources_config, load_agents_config
 from .core.database import Database
 from .core.llm_client import LLMRegistry
 from .graph.pipeline import build_pipeline
-from .graph.state import PipelineState, RawItem, AnalyzedItem, ReviewedItem
-from .graph.collector import collect_all, COLLECTOR_MAP
-from .graph.router import router_node
-from .graph.aggregator import aggregator_node
-from .graph.reviewer import reviewer_node
-from .graph.analyzers.github import analyze_github
-from .graph.analyzers.rss import analyze_rss
-from .graph.analyzers.feishu import analyze_feishu
-from .graph.analyzers.arxiv import analyze_arxiv
-from .api.routes import router, set_db
+from .graph.state import PipelineState, ReviewedItem
+from .graph.collector import collect_all
+from .graph.router import router_node  # retry 循环中手动路由 retry items
+from .api.routes import router, set_db, set_run_pipeline
 from .db.operations import (
     start_pipeline_run, end_pipeline_run, save_article, save_tags,
     save_cost_log, batch_check_existing_urls, backup_database,
 )
 from .site.builder import SiteBuilder, DebouncedBuilder
 
-# 结构化日志：stdout JSON lines
-logging.basicConfig(
-    stream=sys.stdout,
-    format='{"ts": "%(asctime)s", "level": "%(levelname)s", "msg": %(message)s}',
-    level=logging.INFO,
-)
+# 结构化日志：stdout JSON lines（每行一条合法 JSON）
+class JSONFormatter(logging.Formatter):
+    _SKIP_KEYS = {
+        "name", "msg", "args", "created", "filename", "funcName",
+        "levelname", "levelno", "lineno", "module", "msecs", "pathname",
+        "process", "processName", "relativeCreated", "stack_info",
+        "exc_info", "exc_text", "thread", "threadName", "message",
+    }
+
+    def format(self, record):
+        entry = {
+            "ts": datetime.now(timezone.utc).isoformat(),
+            "level": record.levelname,
+            "msg": record.getMessage(),
+        }
+        for k, v in record.__dict__.items():
+            if k not in self._SKIP_KEYS and not k.startswith("_"):
+                entry[k] = v
+        if record.exc_info and record.exc_info[0]:
+            entry["exception"] = self.formatException(record.exc_info)
+        return json.dumps(entry, ensure_ascii=False)
+
+handler = logging.StreamHandler(sys.stdout)
+handler.setFormatter(JSONFormatter())
+logging.basicConfig(level=logging.INFO, handlers=[handler])
 logger = logging.getLogger("pipeline")
 
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -2463,11 +3113,13 @@ _registry: LLMRegistry | None = None
 _db: Database | None = None
 _scheduler: AsyncIOScheduler | None = None
 _builder: DebouncedBuilder | None = None
+_graph = None  # LangGraph 编译图
 _running = False
 
 
-async def run_pipeline(trigger: str = "cron"):
-    global _registry, _db, _builder, _running
+async def run_pipeline(trigger: str = "cron", source_filter: str | None = None):
+    """source_filter 为 None 时采集所有源，否则只采集指定 source.id"""
+    global _registry, _db, _builder, _running, _graph
 
     if _running:
         logger.warning("pipeline.skip", extra={"reason": "previous run still in progress"})
@@ -2475,7 +3127,7 @@ async def run_pipeline(trigger: str = "cron"):
     _running = True
 
     try:
-        if _registry is None or _db is None:
+        if _registry is None or _db is None or _graph is None:
             logger.error("pipeline.not_initialized")
             return
 
@@ -2484,8 +3136,10 @@ async def run_pipeline(trigger: str = "cron"):
 
         sources_cfg = load_sources_config(CONFIG_DIR / "sources.yaml")
         active_sources = [s for s in sources_cfg.sources if s.enabled]
+        if source_filter:
+            active_sources = [s for s in active_sources if s.id == source_filter]
 
-        # === Collector ===
+        # ====== 图外：Collector + DB 查重（需要 DB 连接） ======
         raw_items, error_log = await collect_all(active_sources)
         logger.info("collector.done", extra={"total": len(raw_items), "errors": len(error_log)})
 
@@ -2494,65 +3148,93 @@ async def run_pipeline(trigger: str = "cron"):
             await end_pipeline_run(_db, run_id, "failed", summary)
             return
 
-        # === DB 查重 ===
         all_urls = [item.url for item in raw_items]
         existing = await batch_check_existing_urls(_db, all_urls)
         new_items = [item for item in raw_items if item.url not in existing]
         logger.info("collector.dedup", extra={"total": len(raw_items), "new": len(new_items), "skipped": len(raw_items) - len(new_items)})
 
+        if not new_items:
+            summary = json.dumps({"collected": {"total": len(raw_items), "new": 0}, "message": "all items already exist"})
+            await end_pipeline_run(_db, run_id, "completed", summary)
+            return
+
+        # ====== 图内：Router → Fan-out(4×Analyzer) → Aggregator → Reviewer ======
         state = PipelineState(raw_items=new_items, run_id=run_id, trigger=trigger, error_log=error_log)
+        final_state = await _graph.ainvoke(state)
 
-        # === Router ===
-        state = state.model_copy(update=await router_node(state))
+        # ====== Retry 循环（图外，最多 2 轮） ======
+        all_reviewed = list(final_state["reviewed_items"])
+        all_costs = list(final_state["cost_records"])
+        all_analyzed = list(final_state["analyzed_items"])
 
-        # === Fan-out Analyzers (并行) ===
-        import asyncio
-        analyze_tasks = []
-        if state.routed_github:
-            analyze_tasks.append(analyze_github(state.routed_github, _registry))
-        else:
-            analyze_tasks.append(asyncio.coroutine(lambda: ([], []))())
-        if state.routed_rss:
-            analyze_tasks.append(analyze_rss(state.routed_rss, _registry))
-        else:
-            analyze_tasks.append(asyncio.coroutine(lambda: ([], []))())
-        if state.routed_feishu:
-            analyze_tasks.append(analyze_feishu(state.routed_feishu, _registry))
-        else:
-            analyze_tasks.append(asyncio.coroutine(lambda: ([], []))())
-        if state.routed_arxiv:
-            analyze_tasks.append(analyze_arxiv(state.routed_arxiv, _registry))
-        else:
-            analyze_tasks.append(asyncio.coroutine(lambda: ([], []))())
+        for retry_round in range(1, 3):  # 第 1、2 轮 retry
+            retry_reviewed = [r for r in all_reviewed if r.verdict == "retry"]
+            if not retry_reviewed:
+                break
 
-        results = await asyncio.gather(*analyze_tasks)
-        all_analyzed = []
-        all_costs = []
-        for r_items, r_costs in results:
-            all_analyzed.extend(r_items)
-            all_costs.extend(r_costs)
-        logger.info("analyzer.done", extra={"analyzed": len(all_analyzed), "llm_calls": len(all_costs)})
+            # 找到对应的 analyzed items + raw items，递增 retry_count
+            retry_raw_items = []
+            retry_analyzed_items = []
+            for rr in retry_reviewed:
+                matched = next((a for a in all_analyzed if a.ref_url == rr.ref_url), None)
+                raw = next((r for r in new_items if r.url == rr.ref_url), None)
+                if matched and raw and matched.retry_count < 2:
+                    matched.retry_count += 1
+                    retry_raw_items.append(raw)
+                    retry_analyzed_items.append(matched)
 
-        state = state.model_copy(update={"analyzed_items": all_analyzed, "cost_records": all_costs})
+            if not retry_raw_items:
+                break
 
-        # === Reviewer ===
-        review_result = await reviewer_node(state)
-        state = state.model_copy(update=review_result)
+            logger.info("pipeline.retry", extra={"round": retry_round, "items": len(retry_raw_items)})
 
-        # === 入库 ===
+            # 构建 retry state：直接跳过 Router，手动设置 routed_* 再跑图
+            retry_state = PipelineState(raw_items=retry_raw_items, run_id=run_id, trigger=trigger)
+            retry_state = retry_state.model_copy(update=await router_node(retry_state))
+            retry_result = await _graph.ainvoke(retry_state)
+
+            # 合并结果（同一 ref_url 的 reviewed_item 用最新一轮的覆盖）
+            existing_urls = {r.ref_url for r in all_reviewed}
+            for r in retry_result["reviewed_items"]:
+                if r.ref_url in existing_urls:
+                    # 替换旧结果
+                    all_reviewed = [x for x in all_reviewed if x.ref_url != r.ref_url]
+                all_reviewed.append(r)
+                existing_urls.add(r.ref_url)
+
+            all_costs.extend(retry_result["cost_records"])
+            all_analyzed.extend(retry_result["analyzed_items"])
+
+        logger.info("pipeline.graph_done", extra={
+            "analyzed": len(all_analyzed),
+            "reviewed": len(all_reviewed),
+            "llm_calls": len(all_costs),
+        })
+
+        # ====== 图外：入库（需要 DB 连接） ======
         passed_count = 0
-        for analyzed in all_analyzed:
-            raw = next((r for r in state.raw_items if r.url == analyzed.ref_url), None)
-            if raw is None:
+        retry_count = 0
+        discarded_count = 0
+
+        for reviewed in all_reviewed:
+            raw = next((r for r in new_items if r.url == reviewed.ref_url), None)
+            analyzed = next((a for a in all_analyzed if a.ref_url == reviewed.ref_url), None)
+            if raw is None or analyzed is None:
                 continue
-            # 简化：reviewer 一期规则评分直接在 state 里有结果
-            await save_article(_db, raw, analyzed,
-                ReviewedItem(ref_url=analyzed.ref_url, total_score=getattr(analyzed, "relevance_score", 0), dimensions={}, verdict="approved"),
-                0, 0)
-            row = await _db.fetch_one("SELECT last_insert_rowid()")
-            if row:
-                await save_tags(_db, row[0], analyzed.tags)
-            passed_count += 1
+
+            if reviewed.verdict == "approved":
+                article_id = await save_article(_db, raw, analyzed, reviewed, 0, 0)
+                if article_id:
+                    await save_tags(_db, article_id, analyzed.tags)
+                passed_count += 1
+            elif reviewed.verdict == "retry":
+                if analyzed.retry_count >= 2:
+                    discarded_count += 1
+                else:
+                    await save_article(_db, raw, analyzed, reviewed, 0, 0)
+                    retry_count += 1
+            else:  # discarded
+                discarded_count += 1
 
         for record in all_costs:
             await save_cost_log(_db, run_id, record)
@@ -2561,13 +3243,21 @@ async def run_pipeline(trigger: str = "cron"):
             "collected": {"total": len(raw_items), "new": len(new_items)},
             "analyzed": len(all_analyzed),
             "approved": passed_count,
+            "retry": retry_count,
+            "discarded": discarded_count,
             "errors": error_log,
         })
         await end_pipeline_run(_db, run_id, "completed", summary)
-        logger.info("pipeline.done", extra={"run_id": run_id, "passed": passed_count, "cost": sum(c.cost for c in all_costs)})
+        logger.info("pipeline.done", extra={
+            "run_id": run_id,
+            "passed": passed_count,
+            "retry": retry_count,
+            "discarded": discarded_count,
+            "cost": sum(c.cost for c in all_costs),
+        })
 
-        # === 备份 + 站点构建 ===
-        await backup_database(str(DB_PATH), str(BACKUP_DIR))
+        # ====== 图外：备份 + 站点构建 ======
+        await backup_database(_db, str(BACKUP_DIR))
         if _builder:
             await _builder.schedule()
 
@@ -2580,7 +3270,7 @@ async def run_pipeline(trigger: str = "cron"):
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    global _registry, _db, _scheduler, _builder
+    global _registry, _db, _scheduler, _builder, _graph
 
     DATA_DIR.mkdir(parents=True, exist_ok=True)
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
@@ -2594,6 +3284,9 @@ async def lifespan(app: FastAPI):
     _registry = LLMRegistry(llm_cfg, agents_cfg)
 
     set_db(_db)
+    set_run_pipeline(run_pipeline)
+
+    _graph = build_pipeline(_registry)
 
     template_dir = BASE_DIR / "src" / "site" / "templates"
     site_builder = SiteBuilder(_db, OUTPUT_DIR, template_dir)
@@ -2606,8 +3299,11 @@ async def lifespan(app: FastAPI):
         if not source.enabled:
             continue
         parts = source.cron.strip().split()
+        # 用 functools.partial 绑定 source_filter，每个 cron job 只采集自己的源
+        from functools import partial
         _scheduler.add_job(
-            run_pipeline, "cron",
+            partial(run_pipeline, source_filter=source.id),
+            "cron",
             minute=parts[0], hour=parts[1], day=parts[2], month=parts[3], day_of_week=parts[4],
             id=f"collect-{source.id}",
         )
@@ -2622,8 +3318,12 @@ async def lifespan(app: FastAPI):
 
 
 def create_app() -> FastAPI:
+    from .api.routes import http_exception_handler, general_exception_handler
+
     app = FastAPI(lifespan=lifespan, title="AI Knowledge Base")
     app.include_router(router)
+    app.add_exception_handler(HTTPException, http_exception_handler)
+    app.add_exception_handler(Exception, general_exception_handler)
     return app
 
 
@@ -2636,7 +3336,7 @@ if __name__ == "__main__":
 
 ```bash
 git add src/main.py
-git commit -m "feat: 主入口 — FastAPI + APScheduler + skip_if_running + 结构化日志 + 备份 + 站点构建"
+git commit -m "feat: 主入口 — FastAPI + APScheduler + LangGraph 图驱动 pipeline + 结构化日志 + 备份 + 站点构建"
 ```
 
 ---
@@ -2654,10 +3354,10 @@ WORKDIR /app
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
 COPY pyproject.toml uv.lock ./
 RUN uv sync --frozen --no-dev
-COPY config/ ./config/
+COPY config/ ./config/    # compose volume mount 会覆盖，仅作为非 compose 场景的 fallback
 COPY prompts/ ./prompts/
 COPY src/ ./src/
-RUN mkdir -p /app/data /app/output && apt-get update && apt-get install -y sqlite3 curl && rm -rf /var/lib/apt/lists/*
+RUN mkdir -p /app/data /app/output && apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
 EXPOSE 8000
 CMD ["uv", "run", "uvicorn", "src.main:app", "--host", "0.0.0.0", "--port", "8000"]
 ```
@@ -2671,7 +3371,7 @@ services:
     volumes:
       - ./data:/app/data
       - ./output:/app/output
-      - ./config:/app/config
+      - ./config:/app/config:ro
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/api/health"]
@@ -2684,6 +3384,8 @@ services:
     ports:
       - "80:80"
       - "443:443"
+    environment:
+      - KB_DOMAIN=${KB_DOMAIN:-kb.your-domain.com}
     volumes:
       - ./output:/srv:ro
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
@@ -2694,7 +3396,9 @@ services:
 
 ```
 # Caddyfile
-kb.your-domain.com {
+# 注意：部署前将 your-domain.com 替换为实际域名，
+# 或设置环境变量 KB_DOMAIN=kb.example.com 通过 docker-compose.yml 传入
+{$KB_DOMAIN:kb.your-domain.com} {
     root * /srv
     file_server
     header Cache-Control "public, max-age=3600"

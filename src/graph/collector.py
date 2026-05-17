@@ -102,11 +102,52 @@ _feishu_auth = FeishuAuth()
 
 
 async def collect_feishu(source: SourceConfig) -> list[RawItem]:
-    if not _feishu_auth.app_id:
+    """采集飞书知识库文档"""
+    if not _feishu_auth.app_id or _feishu_auth.app_id.startswith("cli_"):
         return []
+    cfg = source.config
+    items = []
+    now = datetime.now(timezone.utc).isoformat()
     token = await _feishu_auth.get_token()
-    # 一期返回空，后续实现飞书 API 调用
-    return []
+    headers = {"Authorization": f"Bearer {token}"}
+
+    async with httpx.AsyncClient(timeout=30) as client:
+        for space_id in cfg.get("space_ids", []):
+            # 获取知识库空间下的节点列表
+            resp = await client.get(
+                f"https://open.feishu.cn/open-apis/wiki/v2/spaces/{space_id}/nodes",
+                headers=headers,
+                params={"page_size": source.max_items},
+            )
+            if resp.status_code != 200:
+                continue
+            data = resp.json()
+            nodes = data.get("data", {}).get("nodes", [])
+            for node in nodes:
+                node_id = node.get("node_id", "")
+                node_type = node.get("node_type", "")
+                if node_type == "origin_page":
+                    # 获取页面详情
+                    page_resp = await client.get(
+                        f"https://open.feishu.cn/open-apis/wiki/v2/pages/{node_id}",
+                        headers=headers,
+                    )
+                    if page_resp.status_code == 200:
+                        page = page_resp.json().get("data", {}).get("page", {})
+                        title = page.get("title", "")
+                        url = page.get("url", "")
+                        if title and url:
+                            items.append(RawItem(
+                                url=url,
+                                title=title,
+                                description="",
+                                source="feishu",
+                                source_detail=space_id,
+                                published_at=node.get("create_time", ""),
+                                raw_metadata={"node_id": node_id, "space_id": space_id},
+                                collected_at=now,
+                            ))
+    return items
 
 
 async def collect_arxiv(source: SourceConfig) -> list[RawItem]:

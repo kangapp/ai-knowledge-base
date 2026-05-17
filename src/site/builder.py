@@ -13,11 +13,15 @@ class SiteBuilder:
         self.env = Environment(loader=FileSystemLoader(str(template_dir)), autoescape=True)
 
     async def build(self):
-        tmp_dir = self.output_dir.parent / "output.tmp"
-        if tmp_dir.exists():
-            shutil.rmtree(tmp_dir)
-        tmp_dir.mkdir()
+        # 用时间戳生成临时目录，避免删除 volume mount 的 /app/output
+        tmp_dir = self.output_dir.parent / f"output.tmp.{datetime.now().strftime('%Y%m%d%H%M%S')}"
+        tmp_dir.mkdir(parents=True, exist_ok=True)
         (tmp_dir / "articles").mkdir()
+
+        # 复制静态资源 (css, js)
+        static_src = Path(__file__).parent / "static"
+        if static_src.exists():
+            shutil.copytree(static_src, tmp_dir / "static", dirs_exist_ok=True)
 
         all_articles = await search_articles(self.db, "", days=3650, limit=100000)
         stats = await get_stats(self.db, days=30)
@@ -47,18 +51,19 @@ class SiteBuilder:
             })
         (tmp_dir / "data.json").write_text(json.dumps(json_articles, ensure_ascii=False), encoding="utf-8")
 
+        # article.html — 静态外壳，详情内容由 JS 通过 /api/articles/{id} 渲染
+        article_html = self.env.get_template("article.html").render()
+        (tmp_dir / "article.html").write_text(article_html, encoding="utf-8")
+
         # stats.json
         (tmp_dir / "stats.json").write_text(json.dumps(stats, ensure_ascii=False), encoding="utf-8")
 
-        # 原子 rename 切换
-        old_dir = self.output_dir.parent / "output.old"
-        if old_dir.exists():
-            shutil.rmtree(old_dir)
-        if self.output_dir.exists():
-            self.output_dir.rename(old_dir)
-        tmp_dir.rename(self.output_dir)
-        if old_dir.exists():
-            shutil.rmtree(old_dir)
+        # 直接覆盖文件（不删除目录，避免 volume mount busy 问题）
+        for item in tmp_dir.rglob("*"):
+            if item.is_file():
+                dest = self.output_dir / item.relative_to(tmp_dir)
+                dest.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(item, dest)
 
 
 class DebouncedBuilder:

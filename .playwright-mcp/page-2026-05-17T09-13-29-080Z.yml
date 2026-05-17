@@ -1,0 +1,15 @@
+- generic [active] [ref=e1]:
+  - navigation [ref=e2]:
+    - link "首页" [ref=e3] [cursor=pointer]:
+      - /url: /
+    - text: "|"
+    - link "仪表盘" [ref=e4] [cursor=pointer]:
+      - /url: /dashboard.html
+  - main [ref=e5]:
+    - generic [ref=e6]:
+      - heading "美国最大电网电价一年间近乎翻倍，数据中心成罪魁祸首" [level=1] [ref=e7]
+      - generic [ref=e8]: https://www.ithome.com/rss/ · 2026-05-17
+      - link "查看原文" [ref=e9] [cursor=pointer]:
+        - /url: https://www.ithome.com/0/951/503.htm
+      - generic [ref=e10]: 美国最大电网PJM互联电网的电价在过去一年间近乎翻倍，从每兆瓦时77.78美元涨至136.53美元。独立市场监测机构Monitoring Analytics指出，数据中心用电需求激增是电价上涨的主要原因，而PJM电网未能充分应对这一变化，导致用户负担加重。
+      - generic [ref=e11]: "评分: 72 · 花费: $0"

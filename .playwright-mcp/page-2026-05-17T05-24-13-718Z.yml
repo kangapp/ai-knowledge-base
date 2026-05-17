@@ -1,0 +1,83 @@
+- generic [active] [ref=e1]:
+  - navigation [ref=e2]:
+    - link "首页" [ref=e3] [cursor=pointer]:
+      - /url: /
+    - text: "|"
+    - link "仪表盘" [ref=e4] [cursor=pointer]:
+      - /url: /dashboard.html
+  - main [ref=e5]:
+    - generic [ref=e6]:
+      - searchbox "搜索... (FTS5)" [ref=e7]
+      - combobox [ref=e8]:
+        - option "全部来源" [selected]
+        - option "rss"
+      - combobox [ref=e9]:
+        - option "全部标签" [selected]
+      - generic [ref=e10]:
+        - button "近 7 天" [ref=e11] [cursor=pointer]
+        - button "近 30 天" [ref=e12] [cursor=pointer]
+        - button "全部" [ref=e13] [cursor=pointer]
+    - generic [ref=e14]:
+      - generic [ref=e15]:
+        - heading "Test" [level=3] [ref=e16]:
+          - link "Test" [ref=e17] [cursor=pointer]:
+            - /url: /article.html?id=1
+        - paragraph [ref=e18]: desc
+        - generic [ref=e19]:
+          - generic [ref=e20]: detail
+          - generic [ref=e21]: 2026-05-17
+          - generic [ref=e22]: 85分
+      - generic [ref=e23]:
+        - heading "OpenAI与马耳他合作向所有公民提供ChatGPT Plus" [level=3] [ref=e24]:
+          - link "OpenAI与马耳他合作向所有公民提供ChatGPT Plus" [ref=e25] [cursor=pointer]:
+            - /url: /article.html?id=3
+        - paragraph [ref=e26]: OpenAI and Malta partner to expand AI access, offering ChatGPT Plus and training to help citizens build practical AI skills and use AI responsibly.
+        - generic [ref=e27]:
+          - generic [ref=e28]: https://openai.com/blog/rss.xml
+          - generic [ref=e29]: 2026-05-17
+          - generic [ref=e30]: 82分
+      - generic [ref=e31]:
+        - heading "业务运营团队如何使用Codex" [level=3] [ref=e32]:
+          - link "业务运营团队如何使用Codex" [ref=e33] [cursor=pointer]:
+            - /url: /article.html?id=4
+        - paragraph [ref=e34]: See how business operations teams can use Codex to create initiative briefs, strategy updates, leadership decision packets, progress updates, and more from real work inputs.
+        - generic [ref=e35]:
+          - generic [ref=e36]: https://openai.com/blog/rss.xml
+          - generic [ref=e37]: 2026-05-17
+          - generic [ref=e38]: 82分
+      - generic [ref=e39]:
+        - heading "Databricks brings GPT-5.5 to enterprise agent workflows" [level=3] [ref=e40]:
+          - link "Databricks brings GPT-5.5 to enterprise agent workflows" [ref=e41] [cursor=pointer]:
+            - /url: /article.html?id=5
+        - paragraph [ref=e42]: Databricks uses GPT-5.5 for enterprise agent workflows after the model set a new state of the art on the OfficeQA Pro benchmark.
+        - generic [ref=e43]:
+          - generic [ref=e44]: https://openai.com/blog/rss.xml
+          - generic [ref=e45]: 2026-05-17
+          - generic [ref=e46]: 85分
+      - generic [ref=e47]:
+        - heading "How data science teams use Codex" [level=3] [ref=e48]:
+          - link "How data science teams use Codex" [ref=e49] [cursor=pointer]:
+            - /url: /article.html?id=6
+        - paragraph [ref=e50]: See how data science teams can use Codex to build root-cause briefs, impact readouts, KPI memos, scoped analyses, and dashboard specs from real work inputs.
+        - generic [ref=e51]:
+          - generic [ref=e52]: https://openai.com/blog/rss.xml
+          - generic [ref=e53]: 2026-05-17
+          - generic [ref=e54]: 72分
+      - generic [ref=e55]:
+        - heading "ChatGPT 个人理财新体验" [level=3] [ref=e56]:
+          - link "ChatGPT 个人理财新体验" [ref=e57] [cursor=pointer]:
+            - /url: /article.html?id=7
+        - paragraph [ref=e58]: Preview a new personal finance experience in ChatGPT for Pro users in the U.S. Securely connect your financial accounts and get AI-powered insights and guidance grounded in your financial context, goa
+        - generic [ref=e59]:
+          - generic [ref=e60]: https://openai.com/blog/rss.xml
+          - generic [ref=e61]: 2026-05-17
+          - generic [ref=e62]: 85分
+      - generic [ref=e63]:
+        - heading "Test2" [level=3] [ref=e64]:
+          - link "Test2" [ref=e65] [cursor=pointer]:
+            - /url: /article.html?id=2
+        - paragraph [ref=e66]: desc
+        - generic [ref=e67]:
+          - generic [ref=e68]: detail
+          - generic [ref=e69]: 2026-05-17
+          - generic [ref=e70]: 85分

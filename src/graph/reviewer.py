@@ -84,6 +84,7 @@ async def reviewer_node(state: PipelineState, registry: LLMRegistry) -> dict:
                 registry.health.record_success(provider, 0)
 
                 reviewed_items.append(reviewed)
+                reviewed.ref_url = item.ref_url  # LLM 输出不含此字段，由调用方补全
                 cost_records.append(CostRecord(
                     agent="reviewer", provider=provider, model=model_id,
                     tokens_in=tokens_in, tokens_out=tokens_out, cost=cost

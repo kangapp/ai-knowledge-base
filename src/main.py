@@ -14,7 +14,7 @@ from .graph.pipeline import build_pipeline
 from .graph.state import PipelineState, ReviewedItem
 from .graph.collector import collect_all
 from .graph.router import router_node  # retry 循环中手动路由 retry items
-from .api.routes import router, set_db, set_run_pipeline
+from .api.routes import router, set_db, set_run_pipeline, set_builder
 from .db.operations import (
     start_pipeline_run, end_pipeline_run, save_article, save_tags,
     save_cost_log, batch_check_existing_urls, backup_database,
@@ -54,6 +54,10 @@ DATA_DIR = BASE_DIR / "data"
 OUTPUT_DIR = BASE_DIR / "output"
 DB_PATH = DATA_DIR / "kb.db"
 BACKUP_DIR = DATA_DIR / "backup"
+
+# 加载 .env 环境变量
+from dotenv import load_dotenv
+load_dotenv(BASE_DIR / ".env")
 
 _registry: LLMRegistry | None = None
 _db: Database | None = None
@@ -231,12 +235,10 @@ async def lifespan(app: FastAPI):
 
     set_db(_db)
     set_run_pipeline(run_pipeline)
-
-    _graph = build_pipeline(_registry)
-
     template_dir = BASE_DIR / "src" / "site" / "templates"
     site_builder = SiteBuilder(_db, OUTPUT_DIR, template_dir)
     _builder = DebouncedBuilder(site_builder, debounce_seconds=300)
+    set_builder(_builder)
 
     # APScheduler
     sources_cfg = load_sources_config(CONFIG_DIR / "sources.yaml")

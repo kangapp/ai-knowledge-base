@@ -12,14 +12,20 @@
 </div>
 <script>window.__STATS__ = {{ stats|tojson }};</script>
 <script>
+document.addEventListener('DOMContentLoaded', function() {
 const stats = window.__STATS__;
-new Chart(document.getElementById('source-chart'), {
-    type: 'pie',
-    data: {labels: stats.source_distribution.map(s=>s.source), datasets: [{data: stats.source_distribution.map(s=>s.count)}]}
-});
-new Chart(document.getElementById('cost-chart'), {
-    type: 'line',
-    data: {labels: stats.daily_cost.map(d=>d.date), datasets: [{label: '每日花费($)', data: stats.daily_cost.map(d=>d.cost)}]}
+if (typeof Chart !== 'undefined') {
+    new Chart(document.getElementById('source-chart'), {
+        type: 'pie',
+        data: {labels: stats.source_distribution.map(s=>s.source), datasets: [{data: stats.source_distribution.map(s=>s.count)}]}
+    });
+    new Chart(document.getElementById('cost-chart'), {
+        type: 'line',
+        data: {labels: stats.daily_cost.map(d=>d.date), datasets: [{label: '每日花费($)', data: stats.daily_cost.map(d=>d.cost)}]}
+    });
+} else {
+    console.warn('Chart.js not loaded, skipping charts');
+}
 });
 </script>
 {% endblock %}

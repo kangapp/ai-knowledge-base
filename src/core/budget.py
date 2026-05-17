@@ -8,7 +8,6 @@ class BudgetTracker:
         self.hard_limit = budget_cfg.hard_limit
         self.daily_limit = budget_cfg.monthly / 30
         self._daily_spend: dict[str, float] = {}
-        self._monthly_spend: dict[str, float] = {}
 
     def add_cost(self, provider: str, cost: float):
         self._daily_spend["__global__"] = self._daily_spend.get("__global__", 0) + cost

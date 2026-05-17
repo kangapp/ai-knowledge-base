@@ -1,0 +1,28 @@
+- generic [active] [ref=e1]:
+  - navigation [ref=e2]:
+    - link "首页" [ref=e3] [cursor=pointer]:
+      - /url: /
+    - text: "|"
+    - link "仪表盘" [ref=e4] [cursor=pointer]:
+      - /url: /dashboard.html
+  - main [ref=e5]:
+    - generic [ref=e6]:
+      - searchbox "搜索... (FTS5)" [ref=e7]
+      - combobox [ref=e8]:
+        - option "全部来源" [selected]
+        - option "rss"
+      - combobox [ref=e9]:
+        - option "全部标签" [selected]
+      - generic [ref=e10]:
+        - button "近 7 天" [ref=e11] [cursor=pointer]
+        - button "近 30 天" [ref=e12] [cursor=pointer]
+        - button "全部" [ref=e13] [cursor=pointer]
+    - generic [ref=e15]:
+      - heading "Test" [level=3] [ref=e16]:
+        - link "Test" [ref=e17] [cursor=pointer]:
+          - /url: /article.html?id=1
+      - paragraph [ref=e18]: desc
+      - generic [ref=e19]:
+        - generic [ref=e20]: detail
+        - generic [ref=e21]: 2026-05-17
+        - generic [ref=e22]: 85分

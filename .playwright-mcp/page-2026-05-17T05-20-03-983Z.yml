@@ -1,0 +1,18 @@
+- generic [active] [ref=e1]:
+  - navigation [ref=e2]:
+    - link "首页" [ref=e3] [cursor=pointer]:
+      - /url: /
+    - text: "|"
+    - link "仪表盘" [ref=e4] [cursor=pointer]:
+      - /url: /dashboard.html
+  - main [ref=e5]:
+    - generic [ref=e6]:
+      - generic [ref=e7]:
+        - heading "7" [level=3] [ref=e8]
+        - paragraph [ref=e9]: 文章总数
+      - generic [ref=e10]:
+        - heading "7" [level=3] [ref=e11]
+        - paragraph [ref=e12]: 近 30 天
+      - generic [ref=e13]:
+        - heading "$0" [level=3] [ref=e14]
+        - paragraph [ref=e15]: 总花费
