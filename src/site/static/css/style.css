@@ -97,6 +97,7 @@ main { max-width: 1200px; margin: 2rem auto; padding: 0 1rem; }
 .charts-layout { display: grid; grid-template-columns: 2fr 1fr; gap: 1.5rem; }
 .chart-card { background: #1e293b; border-radius: 12px; padding: 1.5rem; border: 1px solid #334155; }
 .chart-card h3 { font-size: 0.875rem; color: #94a3b8; margin-bottom: 1rem; text-transform: uppercase; }
+.chart-canvas-wrapper { position: relative; height: 350px; width: 100%; }
 .chart-legend { display: flex; gap: 1.5rem; margin-top: 1rem; font-size: 0.75rem; color: #94a3b8; }
 .chart-legend .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; margin-right: 0.5rem; }
 .source-list { display: flex; flex-direction: column; gap: 0.5rem; }
