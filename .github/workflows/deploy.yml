@@ -10,6 +10,10 @@ jobs:
       - uses: astral-sh/setup-uv@v5
       - run: uv sync --frozen
       - run: uv run --with pytest,pytest-asyncio,pytest-httpx pytest -m "not integration and not e2e"
+        env:
+          DEEPSEEK_API_KEY: sk-test-ci
+          MINIMAX_API_KEY: sk-test-ci
+          OPENAI_API_KEY: sk-test-ci
 
   deploy:
     needs: test

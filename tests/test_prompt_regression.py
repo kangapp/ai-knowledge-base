@@ -11,8 +11,7 @@ PROMPT_FILES = ["github_analyzer.md", "rss_analyzer.md", "feishu_analyzer.md", "
 def test_prompt_has_schema_instruction(prompt_file):
     content = (Path(__file__).parent.parent / "prompts" / prompt_file).read_text()
     assert "json" in content.lower()
-    assert "summary" in content.lower()
-    assert "tags" in content.lower()
+    assert "schema" in content.lower()  # 检查 schema 占位符存在
 
 
 @pytest.mark.parametrize("seed", json.loads((Path(__file__).parent / "fixtures" / "seed_articles.json").read_text()))
