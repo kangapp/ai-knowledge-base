@@ -311,3 +311,200 @@ document.addEventListener('DOMContentLoaded', function() {
 **处理**: `docker rm -f <残留容器ID>`
 
 **相关文件**: 无（基础设施问题）
+
+---
+
+## Bug 16: GitHub Actions pytest 未找到
+
+**发现时间**: 2026-05-17
+**发现场景**: CI/CD 流水线 test job 运行 `uv run pytest` 报错
+**根因**: `uv sync --frozen` 只安装生产依赖，`dev` 依赖未安装，pytest 不存在
+
+**错误日志**:
+```
+error: Failed to spawn: `pytest`
+Caused by: No such file or directory (os error 2)
+```
+
+**处理**: 添加 `--dev` 安装开发依赖（含 pytest）
+```yaml
+# 原写法
+- run: uv sync --frozen
+- run: uv run pytest -m "not integration and not e2e"
+
+# 修复后
+- run: uv sync --frozen --dev
+- run: uv run pytest -m "not integration and not e2e"
+```
+
+**相关文件**: `.github/workflows/deploy.yml`
+
+---
+
+## Bug 17: CI/CD deploy job 未生效（条件仍是 main 分支）
+
+**发现时间**: 2026-05-17
+**发现场景**: 修改 workflow 后 deploy job 未触发
+**根因**: deploy job 的 `if` 条件中仍引用 `refs/heads/main`，未同步修改为 `refs/heads/master`
+
+**处理**:
+```yaml
+# 原写法
+if: github.ref == 'refs/heads/main'
+
+# 修复后
+if: github.ref == 'refs/heads/master'
+```
+
+**相关文件**: `.github/workflows/deploy.yml`
+
+---
+
+## Bug 18: CI/CD deploy 超时（VPS docker build 太慢）
+
+**发现时间**: 2026-05-17
+**发现场景**: CI/CD deploy job 每次都报 "Run Command Timeout"
+**根因**: VPS 上执行 `docker compose up -d --build`，在 1C2G VPS 上构建镜像耗时过长（约 10+ 分钟），SSH 命令超时
+
+**错误日志**:
+```
+2026/05/17 10:51:16 Run Command Timeout
+Error: Process completed with exit code 1.
+```
+
+**处理**: 拆分为 CI 构建 + VPS 部署两阶段
+1. CI 使用 `docker/build-push-action@v6` 构建镜像并推送到 ghcr.io
+2. VPS 只执行 `docker pull` + `docker compose up -d`（不构建）
+
+```yaml
+# CI 构建 job
+build-image:
+  needs: test
+  steps:
+    - uses: docker/build-push-action@v6
+      with:
+        context: .
+        push: true
+        tags: ghcr.io/${{ github.repository_owner }}/ai-knowledge-base:latest
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+
+# VPS 部署 job（只 pull + up）
+deploy:
+  needs: build-image
+  script: |
+    docker pull ghcr.io/kangapp/ai-knowledge-base:latest
+    docker compose up -d
+```
+
+同时改用 `image: ghcr.io/...` 替代 `build: .` 在 docker-compose.yml
+
+**相关文件**: `.github/workflows/deploy.yml`, `docker-compose.yml`
+
+---
+
+## Bug 19: CI/CD VPS 部署 git pull 报 local changes 冲突
+
+**发现时间**: 2026-05-17
+**发现场景**: CI/CD SSH 脚本执行 `git pull origin master` 时 VPS 报错
+**根因**: VPS 上 docker-compose.yml 和 .github/workflows/deploy.yml 有本地修改（之前调试时变更），与远程冲突
+
+**错误日志**:
+```
+error: Your local changes to the following files would be overwritten by merge:
+  .github/workflows/deploy.yml
+  docker-compose.yml
+Please commit your changes or stash them before you merge.
+Aborting: fatal: Cannot fast-forward your working tree.
+```
+
+**处理**: 使用 `git fetch` + `git reset --hard origin/master` 替代 `git pull`
+```bash
+git fetch origin master
+git reset --hard origin/master
+docker compose up -d
+```
+
+**相关文件**: `.github/workflows/deploy.yml`
+
+---
+
+## Bug 20: CI/CD deploy script 仍有 docker build 残留
+
+**发现时间**: 2026-05-17
+**发现场景**: 检查 VPS docker-compose.yml 发现还是 `build: .` 而非 `image: ghcr.io/...`
+**根因**: 修改 docker-compose.yml 后未同步到 VPS
+
+**处理**: 
+1. 本地修改 docker-compose.yml 将 `build: .` 改为 `image: ghcr.io/kangapp/ai-knowledge-base:latest`
+2. 在 VPS 上手动 `git reset --hard origin/master` 拉取最新配置
+3. CI/CD deploy script 确保每次都 reset 到 origin/master
+
+**相关文件**: `docker-compose.yml`
+
+---
+
+## Bug 21: docker-compose.yml 中 build 模式下 .dockerignore 未排除 output 目录导致构建上下文过大
+
+**发现时间**: 2026-05-17
+**发现场景**: 本地 docker build 传输了 2.27k context
+**根因**: .dockerignore 缺失，未排除 output/、data/、.git 等大目录
+
+**处理**: 创建 .dockerignore 文件：
+```
+__pycache__/
+*.pyc
+.git/
+output/
+data/
+.gitignore
+.env
+*.md
+tests/
+docs/
+```
+
+**相关文件**: `.dockerignore`
+
+---
+
+## Bug 22: APScheduler 重复添加 job（调试日志可见多条相同 job）
+
+**发现时间**: 2026-05-17
+**发现场景**: 启动日志中出现多条 "Added job 'partial'" 而非每个 source 一个 job
+**根因**: 调试期间多次 reload 导致 APScheduler 未正确清理旧 job
+
+**处理**: 保持单次部署正常，已在 lifespan shutdown 时正确调用 `_scheduler.shutdown()`
+
+**相关文件**: `src/main.py`
+
+---
+
+## Bug 23: healthcheck curl 命令未安装
+
+**发现时间**: 2026-05-17
+**发现场景**: 容器 healthcheck 失败，docker compose ps 显示 unhealthy
+**根因**: python:3.12-slim 镜像默认无 curl，而 healthcheck 配置了 `curl -f http://localhost:8000/api/health`
+
+**处理**: 在 Dockerfile 中安装 curl：
+```dockerfile
+RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
+```
+
+**相关文件**: `Dockerfile`
+
+---
+
+## Bug 24: VPS 外部无法访问服务（端口未开放）
+
+**发现时间**: 2026-05-17
+**发现场景**: 从本地 curl http://8.134.176.187:8090 失败
+**根因**: 
+1. Caddy web 服务端口 8090 映射到主机，但需检查防火墙
+2. 内部 curl localhost:8000 在容器内正常，外部访问需确认端口映射
+
+**处理**: 
+1. 确认 docker-compose.yml 中 `ports: "8090:80"` 正确映射
+2. 如需外部访问，需在 VPS 防火墙开放 8090 端口
+
+**相关文件**: `docker-compose.yml`
