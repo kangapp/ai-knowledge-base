@@ -543,3 +543,62 @@ RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
 **处理**: 重新刷新页面获取最新错误列表
 
 **相关文件**: 无
+
+---
+
+## Bug 27: 仪表盘 cost-chart canvas 高度失控导致页面无限拉长
+
+**发现时间**: 2026-05-17
+**发现场景**: 访问 VPS 仪表盘 http://8.134.176.187:8090/dashboard.html，页面被无限拉长
+**根因**: `canvas#cost-chart` 没有固定高度的父容器。Chart.js 配置了 `responsive: true` + `maintainAspectRatio: false`，但 `.chart-card` 无高度约束，导致 canvas 渲染高度达到 ~236,627px，页面总高度 ~25,000px
+
+**Playwright 检测数据**:
+```
+修复前:
+  canvas height: 236,627px
+  page height:   24,950px
+
+修复后:
+  canvas height: 150px (在 350px wrapper 内)
+  page height:   630px
+```
+
+**处理**:
+1. `dashboard.html`: canvas 外层包裹 `<div class="chart-canvas-wrapper">`
+2. `style.css`: 新增 `.chart-canvas-wrapper { position: relative; height: 350px; width: 100%; }`
+
+这是 Chart.js 的已知最佳实践：当 `responsive: true` 且 `maintainAspectRatio: false` 时，必须给 canvas 的容器设置固定高度。
+
+**相关文件**: `src/site/templates/dashboard.html`, `src/site/static/css/style.css`
+
+**关联发现**: Caddy 配置了 `Cache-Control: max-age=3600`，部署后浏览器可能缓存旧 CSS/JS 长达 1 小时，导致修复后仍需强制刷新才能看到效果。后续可考虑给静态资源 URL 添加版本查询参数。
+
+---
+
+## Bug 28: CI/CD deploy job 未执行 docker pull 导致 VPS 镜像不更新
+
+**发现时间**: 2026-05-17
+**发现场景**: Bug 27 修复推送到 master 后，CI/CD 显示部署成功，但 VPS 上 dashboard.html 仍是旧版（无 `.chart-canvas-wrapper`）
+**根因**: `deploy.yml` 的 SSH 脚本中只执行了 `docker compose up -d`，Docker Compose 不会自动拉取已存在的 `latest` 标签镜像。需要显式 `docker compose pull` 先拉取最新镜像
+
+**处理**:
+```yaml
+# 修复前
+script: |
+  set -e
+  cd /opt/ai-knowledge-base
+  git fetch origin master
+  git reset --hard origin/master
+  docker compose up -d
+
+# 修复后
+script: |
+  set -e
+  cd /opt/ai-knowledge-base
+  git fetch origin master
+  git reset --hard origin/master
+  docker compose pull          # ← 新增
+  docker compose up -d
+```
+
+**相关文件**: `.github/workflows/deploy.yml`
