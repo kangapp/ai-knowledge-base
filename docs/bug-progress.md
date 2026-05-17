@@ -602,3 +602,32 @@ script: |
 ```
 
 **相关文件**: `.github/workflows/deploy.yml`
+
+---
+
+## Bug 29: lifespan 未初始化 _graph 导致 pipeline.not_initialized
+
+**发现时间**: 2026-05-17
+**发现场景**: 手动触发 `POST /api/pipeline/run`，日志显示 `pipeline.not_initialized`，定时任务同样失败
+**根因**: `lifespan()` 中 `_graph` 始终为 `None` — `build_pipeline` 已在文件顶部 import，但初始化代码漏掉了 `_graph = build_pipeline(_registry)` 调用
+
+**错误日志**:
+```
+{"ts": "2026-05-17T14:29:03.449335+00:00", "level": "ERROR", "msg": "pipeline.not_initialized", "taskName": "Task-51"}
+{"ts": "2026-05-17T14:43:09.599562+00:00", "level": "ERROR", "msg": "pipeline.not_initialized", "taskName": "Task-83"}
+```
+
+**处理**: 在 `lifespan()` 中 `_registry = LLMRegistry(...)` 之后添加一行：
+```python
+_graph = build_pipeline(_registry)
+```
+
+**关联发现**: 修复后测试发现 DAG 状态仍不准确 — `start_pipeline_run`、`end_pipeline_run`、`save_cost_log`、`record_phase_start`、`record_phase_end` 全部缺少 `await db.commit()`。同时 `db.backup()` 在有未提交事务时会卡住，产生 0 字节备份文件并锁死数据库。
+
+**关联修复** (同 commit):
+- 所有 DB 写操作添加 `await db.commit()`
+- `start_pipeline_run` INSERT 时显式设置 `status='running'`
+- 简化 phase 记录：route/analyze/aggregate/review 合并为单个 `process` 阶段
+- `save_cost_log` 添加 commit
+
+**相关文件**: `src/main.py`, `src/db/operations.py`, `src/graph/pipeline.py`
