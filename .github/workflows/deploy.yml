@@ -8,8 +8,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v5
-      - run: uv sync --frozen --with pytest,pytest-asyncio,pytest-httpx
-      - run: uv run pytest -m "not integration and not e2e"
+      - run: uv sync --frozen
+      - run: uv run --with pytest,pytest-asyncio,pytest-httpx pytest -m "not integration and not e2e"
 
   deploy:
     needs: test
