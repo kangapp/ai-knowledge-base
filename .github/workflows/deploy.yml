@@ -58,5 +58,6 @@ jobs:
             cd /opt/ai-knowledge-base
             git fetch origin master
             git reset --hard origin/master
+            docker compose pull
             docker compose up -d
             docker compose ps
