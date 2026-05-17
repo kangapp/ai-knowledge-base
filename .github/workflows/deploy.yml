@@ -52,11 +52,11 @@ jobs:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.VPS_SSH_KEY }}
-          timeout: 30m
+          timeout: 10m
           script: |
             set -e
             cd /opt/ai-knowledge-base
-            git pull origin master
-            cat docker-compose.yml | head -5
+            git fetch origin master
+            git reset --hard origin/master
             docker compose up -d
             docker compose ps
