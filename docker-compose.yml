@@ -1,6 +1,6 @@
 services:
   pipeline:
-    build: .
+    image: ghcr.io/kangapp/ai-knowledge-base:latest
     env_file: .env
     volumes:
       - ./data:/app/data
