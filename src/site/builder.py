@@ -58,6 +58,17 @@ class SiteBuilder:
         # stats.json
         (tmp_dir / "stats.json").write_text(json.dumps(stats, ensure_ascii=False), encoding="utf-8")
 
+        # 新增页面：配置查看页、DAG 状态页（需要 API 数据，由浏览器 JS 渲染）
+        # base.html 需先复制，然后 config/dag.html 用 Jinja2 渲染
+        base_src = self.template_dir / "base.html"
+        if base_src.exists():
+            shutil.copy2(base_src, tmp_dir / "base.html")
+        for tmpl in ("config.html", "dag.html"):
+            src = self.template_dir / tmpl
+            if src.exists():
+                rendered = self.env.get_template(tmpl).render()
+                (tmp_dir / tmpl).write_text(rendered, encoding="utf-8")
+
         # 直接覆盖文件（不删除目录，避免 volume mount busy 问题）
         for item in tmp_dir.rglob("*"):
             if item.is_file():
