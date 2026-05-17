@@ -8,7 +8,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v5
-      - run: uv sync --frozen --dev
+      - run: uv sync --frozen --group dev
       - run: uv run pytest -m "not integration and not e2e"
 
   deploy:
