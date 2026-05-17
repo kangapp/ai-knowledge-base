@@ -125,7 +125,12 @@ function updateChart(data) {
             plugins: { legend: { display: false } },
             scales: {
                 x: { grid: { color: '#334155' }, ticks: { color: '#94a3b8' } },
-                y: { grid: { color: '#334155' }, ticks: { color: '#94a3b8', callback: v => '$' + v.toFixed(2) } }
+                y: {
+                    grid: { color: '#334155' },
+                    ticks: { color: '#94a3b8', callback: v => '$' + v.toFixed(2) },
+                    beginAtZero: true,
+                    grace: '0.5'
+                }
             }
         }
     });
