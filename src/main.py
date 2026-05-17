@@ -113,16 +113,10 @@ async def run_pipeline(trigger: str = "cron", source_filter: str | None = None):
             return
 
         # ====== 图内：Router → Fan-out(4×Analyzer) → Aggregator → Reviewer ======
-        await record_phase_start(_db, run_id, "route")
+        await record_phase_start(_db, run_id, "process")
         state = PipelineState(raw_items=new_items, run_id=run_id, trigger=trigger, error_log=error_log)
         final_state = await _graph.ainvoke(state)
-        await record_phase_end(_db, run_id, "route", "done")
-        await record_phase_start(_db, run_id, "analyze")
-        await record_phase_end(_db, run_id, "analyze", "done")
-        await record_phase_start(_db, run_id, "aggregate")
-        await record_phase_end(_db, run_id, "aggregate", "done")
-        await record_phase_start(_db, run_id, "review")
-        await record_phase_end(_db, run_id, "review", "done")
+        await record_phase_end(_db, run_id, "process", "done")
 
         # ====== Retry 循环（图外，最多 2 轮） ======
         all_reviewed = list(final_state["reviewed_items"])

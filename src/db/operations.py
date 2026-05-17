@@ -58,17 +58,20 @@ async def save_tags(db: Database, article_id: int, tags: list[str]):
 
 async def start_pipeline_run(db: Database, run_id: str, trigger: str):
     now = datetime.now(timezone.utc).isoformat()
-    await db.execute("INSERT INTO pipeline_runs (id, started_at, trigger) VALUES (?, ?, ?)", (run_id, now, trigger))
+    await db.execute("INSERT INTO pipeline_runs (id, status, started_at, trigger) VALUES (?, 'running', ?, ?)", (run_id, now, trigger))
+    await db.commit()
 
 
 async def end_pipeline_run(db: Database, run_id: str, status: str, summary: str):
     now = datetime.now(timezone.utc).isoformat()
     await db.execute("UPDATE pipeline_runs SET ended_at=?, status=?, summary=? WHERE id=?", (now, status, summary, run_id))
+    await db.commit()
 
 
 async def save_cost_log(db: Database, run_id: str, record: CostRecord):
     await db.execute("INSERT INTO cost_logs (run_id, agent, provider, model, tokens_in, tokens_out, cost) VALUES (?,?,?,?,?,?,?)",
         (run_id, record.agent, record.provider, record.model, record.tokens_in, record.tokens_out, record.cost))
+    await db.commit()
 
 
 async def batch_check_existing_urls(db: Database, urls: list[str]) -> set[str]:

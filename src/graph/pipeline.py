@@ -22,6 +22,7 @@ async def record_phase_start(db, run_id: str, phase: str):
         "INSERT INTO pipeline_phase_logs (run_id, phase, status, started_at) VALUES (?, ?, ?, ?)",
         (run_id, phase, "running", datetime.now(timezone.utc).isoformat())
     )
+    await db.commit()
 
 
 async def record_phase_end(db, run_id: str, phase: str, status: str, details: str = None):
@@ -41,6 +42,7 @@ async def record_phase_end(db, run_id: str, phase: str, status: str, details: st
         "UPDATE pipeline_phase_logs SET status=?, ended_at=?, duration_ms=?, details=? WHERE run_id=? AND phase=? AND status='running'",
         (status, ended_at, duration_ms, details, run_id, phase)
     )
+    await db.commit()
 
 
 # 独立函数，供测试 mock 使用
