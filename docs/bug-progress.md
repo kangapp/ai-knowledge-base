@@ -508,3 +508,38 @@ RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
 2. 如需外部访问，需在 VPS 防火墙开放 8090 端口
 
 **相关文件**: `docker-compose.yml`
+
+---
+
+## Bug 25: 新增 config.html/dag.html 页面部署后返回 404
+
+**发现时间**: 2026-05-17
+**发现场景**: 部署后访问 http://8.134.176.187:8090/config.html 返回 404
+**根因**: 
+1. builder.py 中新增页面的构建逻辑正确执行，但容器可能未拉取最新镜像
+2. Caddy 配置只做静态文件服务 + /api/* 反向代理，新增页面在 output/ 目录需要先被构建出来
+
+**排查过程**:
+- `/dashboard.html` 正常返回（存在）
+- `/config.html` 返回 404（不存在）
+- `/api/config/llm` 返回 404（新 API 路由未注册）
+- 执行 `POST /api/pipeline/build` 后 `/config.html` 仍然 404
+
+**处理**: 
+1. 在 builder.py 中添加 config.html 和 dag.html 的构建逻辑（复制 base.html + 渲染模板）
+2. 确保 CI/CD deploy job 正确执行 `docker compose up -d`（会 pull 最新镜像）
+3. 检查 VPS 容器是否运行最新镜像：`docker compose ps` + `docker image ls`
+
+**相关文件**: `src/site/builder.py`
+
+---
+
+## Bug 26: Playwright MCP 测试时控制台残留历史错误
+
+**发现时间**: 2026-05-17
+**发现场景**: Playwright MCP 测试完成后，控制台错误列表包含大量历史错误（如早期测试的 localhost:8888、localhost:8765 等）
+**根因**: Playwright 持久化控制台日志，早期测试的 API 404 错误残留
+
+**处理**: 重新刷新页面获取最新错误列表
+
+**相关文件**: 无
