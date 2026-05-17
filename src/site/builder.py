@@ -46,6 +46,7 @@ class SiteBuilder:
                 "description": desc[:200],
                 "source": a["source"], "source_detail": a.get("source_detail", ""),
                 "relevance_score": a["relevance_score"],
+                "tags": a.get("tags", []),
                 "published_at": a.get("published_at", ""),
                 "collected_at": a.get("collected_at", ""),
             })

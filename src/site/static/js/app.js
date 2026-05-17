@@ -11,6 +11,10 @@
         }
         list.innerHTML = articles.map(a => `
             <div class="article-card" data-score="${a.relevance_score}" data-source="${a.source}">
+                <div class="card-header">
+                    <span class="source-badge">${a.source}</span>
+                    ${(a.tags || []).length ? '<div class="tags">' + (a.tags || []).slice(0, 3).map(t => `<span class="tag">${escapeHtml(t)}</span>`).join('') + '</div>' : ''}
+                </div>
                 <h3><a href="/article.html?id=${a.id}">${escapeHtml(a.title)}</a></h3>
                 <p>${escapeHtml(a.description || '')}</p>
                 <div class="meta">
