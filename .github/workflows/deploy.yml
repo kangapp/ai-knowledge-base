@@ -54,6 +54,11 @@ jobs:
           key: ${{ secrets.VPS_SSH_KEY }}
           timeout: 10m
           script: |
+            set -e
             cd /opt/ai-knowledge-base
+            pwd
+            ls -la docker-compose.yml || echo "No docker-compose.yml found"
+            docker compose ps || true
             docker pull ghcr.io/kangapp/ai-knowledge-base:latest
             docker compose up -d
+            docker compose ps
