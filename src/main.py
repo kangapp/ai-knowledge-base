@@ -242,7 +242,7 @@ async def lifespan(app: FastAPI):
     _graph = build_pipeline(_registry)
 
     set_db(_db)
-	set_pipeline_db(_db)
+        set_pipeline_db(_db)
     set_run_pipeline(run_pipeline)
     template_dir = BASE_DIR / "src" / "site" / "templates"
     site_builder = SiteBuilder(_db, OUTPUT_DIR, template_dir)
