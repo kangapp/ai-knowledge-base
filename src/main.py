@@ -10,7 +10,7 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from .core.config import load_llm_config, load_sources_config, load_agents_config
 from .core.database import Database
 from .core.llm_client import LLMRegistry
-from .graph.pipeline import build_pipeline, record_phase_start, record_phase_end
+from .graph.pipeline import build_pipeline, record_phase_start, record_phase_end, set_pipeline_db, reset_analyzer_counter
 from .graph.state import PipelineState, ReviewedItem
 from .graph.collector import collect_all
 from .graph.router import router_node  # retry 循环中手动路由 retry items
@@ -113,10 +113,10 @@ async def run_pipeline(trigger: str = "cron", source_filter: str | None = None):
             return
 
         # ====== 图内：Router → Fan-out(4×Analyzer) → Aggregator → Reviewer ======
-        await record_phase_start(_db, run_id, "process")
+        # 各节点内部记录 phase（route/analyze/aggregate/review）
+        reset_analyzer_counter()
         state = PipelineState(raw_items=new_items, run_id=run_id, trigger=trigger, error_log=error_log)
         final_state = await _graph.ainvoke(state)
-        await record_phase_end(_db, run_id, "process", "done")
 
         # ====== Retry 循环（图外，最多 2 轮） ======
         all_reviewed = list(final_state["reviewed_items"])
@@ -147,6 +147,7 @@ async def run_pipeline(trigger: str = "cron", source_filter: str | None = None):
             # 构建 retry state：直接跳过 Router，手动设置 routed_* 再跑图
             retry_state = PipelineState(raw_items=retry_raw_items, run_id=run_id, trigger=trigger)
             retry_state = retry_state.model_copy(update=await router_node(retry_state))
+            reset_analyzer_counter()
             retry_result = await _graph.ainvoke(retry_state)
 
             # 合并结果（同一 ref_url 的 reviewed_item 用最新一轮的覆盖）
@@ -241,6 +242,7 @@ async def lifespan(app: FastAPI):
     _graph = build_pipeline(_registry)
 
     set_db(_db)
+	set_pipeline_db(_db)
     set_run_pipeline(run_pipeline)
     template_dir = BASE_DIR / "src" / "site" / "templates"
     site_builder = SiteBuilder(_db, OUTPUT_DIR, template_dir)

@@ -61,7 +61,14 @@ async def test_pipeline_e2e_mocked(registry):
     """全链路 mock 测试：router → fan-out → aggregator → reviewer"""
     from src.graph import pipeline as pl
     from src.graph.router import router_node
-    from unittest.mock import patch
+    from unittest.mock import patch, AsyncMock, MagicMock
+
+    # Mock DB — phase 记录需要 execute/commit/fetch_one
+    mock_db = MagicMock()
+    mock_db.execute = AsyncMock()
+    mock_db.commit = AsyncMock()
+    mock_db.fetch_one = AsyncMock(return_value=None)
+    pl.set_pipeline_db(mock_db)
 
     # 先定义 mock 函数
     async def mock_analyze_github(items, reg):
@@ -76,10 +83,10 @@ async def test_pipeline_e2e_mocked(registry):
             "cost_records": []
         }
 
-    # Patch 分析函数，再 build 图（_AnalyzerNode 在 build 时捕获）
+    # Patch 分析函数 + reviewer 内部函数，再 build 图
     with patch.object(pl, "analyze_github", mock_analyze_github), \
          patch.object(pl, "analyze_rss", mock_analyze_rss), \
-         patch.object(pl, "reviewer_node", mock_reviewer):
+         patch.object(pl, "_reviewer_fn", mock_reviewer):
         graph = build_pipeline(registry)
 
     state = PipelineState(
@@ -94,6 +101,7 @@ async def test_pipeline_e2e_mocked(registry):
     routed = await router_node(state)
     state = state.model_copy(update=routed)
 
+    pl.reset_analyzer_counter()
     result = await graph.ainvoke(state)
 
     assert len(result["analyzed_items"]) == 1

@@ -18,7 +18,13 @@
     <div class="pipeline-flow" id="pipeline-flow">
         <div class="stage" data-phase="collect"><div class="stage-box"><div class="stage-icon">📥</div><div class="stage-name">采集</div><div class="stage-time" id="time-collect">-</div></div></div>
         <div class="arrow">→</div>
-        <div class="stage" data-phase="process"><div class="stage-box"><div class="stage-icon">⚙️</div><div class="stage-name">处理</div><div class="stage-time" id="time-process">-</div></div></div>
+        <div class="stage" data-phase="route"><div class="stage-box"><div class="stage-icon">🔀</div><div class="stage-name">路由</div><div class="stage-time" id="time-route">-</div></div></div>
+        <div class="arrow">→</div>
+        <div class="stage" data-phase="analyze"><div class="stage-box"><div class="stage-icon">🧠</div><div class="stage-name">分析</div><div class="stage-time" id="time-analyze">-</div></div></div>
+        <div class="arrow">→</div>
+        <div class="stage" data-phase="aggregate"><div class="stage-box"><div class="stage-icon">📝</div><div class="stage-name">汇总</div><div class="stage-time" id="time-aggregate">-</div></div></div>
+        <div class="arrow">→</div>
+        <div class="stage" data-phase="review"><div class="stage-box"><div class="stage-icon">✅</div><div class="stage-name">审核</div><div class="stage-time" id="time-review">-</div></div></div>
     </div>
 
     <div class="dag-details">
@@ -30,7 +36,7 @@
 </div>
 
 <script>
-const PHASE_NAMES = {collect:'采集', process:'处理'};
+const PHASE_NAMES = {collect:'采集', route:'路由', analyze:'分析', aggregate:'汇总', review:'审核'};
 
 async function fetchDag() {
     try {
@@ -58,7 +64,7 @@ function updateDag(data) {
     const phaseMap = {};
     phases.forEach(p => phaseMap[p.phase] = p);
 
-    ['collect', 'process'].forEach(phase => {
+    ['collect', 'route', 'analyze', 'aggregate', 'review'].forEach(phase => {
         const stage = document.querySelector(`.stage[data-phase="${phase}"]`);
         const timeEl = document.getElementById(`time-${phase}`);
         const p = phaseMap[phase];
