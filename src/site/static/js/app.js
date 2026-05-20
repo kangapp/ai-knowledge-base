@@ -9,10 +9,13 @@
             list.innerHTML = '<p class="loading">暂无文章</p>';
             return;
         }
-        list.innerHTML = articles.map(a => `
-            <div class="article-card" data-score="${a.relevance_score}" data-source="${a.source}">
+        // RSS 显示 source_detail，其他显示 source
+        list.innerHTML = articles.map(a => {
+            const displaySource = (a.source === 'rss' && a.source_detail) ? a.source_detail : a.source;
+            return `
+            <div class="article-card" data-score="${a.relevance_score}" data-source="${a.source}" data-source-detail="${a.source_detail || ''}">
                 <div class="card-header">
-                    <span class="source-badge">${a.source}</span>
+                    <span class="source-badge">${displaySource}</span>
                     ${(a.tags || []).length ? '<div class="tags">' + (a.tags || []).slice(0, 3).map(t => `<span class="tag">${escapeHtml(t)}</span>`).join('') + '</div>' : ''}
                 </div>
                 <h3><a href="/article.html?id=${a.id}">${escapeHtml(a.title)}</a></h3>
@@ -23,7 +26,7 @@
                     <span class="score">${a.relevance_score}分</span>
                 </div>
             </div>
-        `).join('');
+        `}).join('');
     }
 
     function filterArticles() {
@@ -34,7 +37,17 @@
             articles = articles.filter(a => new Date(a.collected_at) >= cutoff);
         }
         if (state.source) {
-            articles = articles.filter(a => a.source === state.source);
+            // state.source 可能是 'github'、'rss'、或具体 RSS 子源名（如 '36氪'）
+            articles = articles.filter(a => {
+                if (state.source === 'github' || state.source === 'feishu' || state.source === 'arxiv') {
+                    return a.source === state.source;
+                }
+                // RSS 子源匹配：source_detail 匹配，或 source=rss 且无 detail
+                if (a.source === 'rss') {
+                    return a.source_detail === state.source || (!a.source_detail && state.source === 'rss');
+                }
+                return false;
+            });
         }
         if (state.tag) {
             articles = articles.filter(a => (a.tags || []).includes(state.tag));
@@ -64,8 +77,12 @@
 
         const sourceFilter = document.getElementById('source-filter');
         if (sourceFilter) {
-            const sources = [...new Set(INIT.articles.map(a => a.source))];
-            sources.forEach(s => {
+            // RSS 显示 source_detail（具体子源名），其他显示 source
+            const sourceOptions = [...new Set(INIT.articles.map(a => {
+                if (a.source === 'rss' && a.source_detail) return a.source_detail;
+                return a.source;
+            }))];
+            sourceOptions.forEach(s => {
                 const opt = document.createElement('option');
                 opt.value = s; opt.textContent = s;
                 sourceFilter.appendChild(opt);
