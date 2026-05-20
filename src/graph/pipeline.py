@@ -102,7 +102,15 @@ class _RouterNode:
         await record_phase_start(db, state.run_id, "route")
         result = await self._router(state)
         total = len(state.raw_items)
-        details = f"total:{total}, github:{len(result['routed_github'])}, rss:{len(result['routed_rss'])}, feishu:{len(result['routed_feishu'])}, arxiv:{len(result['routed_arxiv'])}"
+        # 统计 RSS 子源
+        rss_by_source = {}
+        for item in state.raw_items:
+            if item.source == "rss" and item.source_detail:
+                rss_by_source[item.source_detail] = rss_by_source.get(item.source_detail, 0) + 1
+        rss_detail = ", ".join(f"{k}:{v}" for k, v in rss_by_source.items()) if rss_by_source else ""
+        details = f"total:{total}, github:{len(result['routed_github'])}, rss:{len(result['routed_rss'])}"
+        if rss_detail:
+            details += f" [{rss_detail}]"
         await record_phase_end(db, state.run_id, "route", "done", details)
         return result
 

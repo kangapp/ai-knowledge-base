@@ -64,7 +64,7 @@ async def collect_rss(source: SourceConfig) -> list[RawItem]:
             title=title,
             description=(summary or "")[:500],
             source="rss",
-            source_detail=cfg.get("url", ""),
+            source_detail=source.name,
             published_at=entry.get("published", ""),
             raw_metadata={"feed": cfg["url"]},
             collected_at=now,
