@@ -1,9 +1,30 @@
-import asyncio, json, shutil
+import asyncio, json, re, shutil
 from pathlib import Path
 from datetime import datetime
+from html import unescape
 from jinja2 import Environment, FileSystemLoader
 from ..core.database import Database
 from ..db.operations import search_articles, get_stats
+
+
+def clean_text(raw: str, length: int = 200) -> str:
+    """去掉 HTML 标签，解码 HTML 实体，截断到 length 字符（按单词边界）"""
+    if not raw:
+        return ""
+    # 去掉 HTML 标签
+    text = re.sub(r"<[^>]+>", " ", raw)
+    # 解码 HTML 实体
+    text = unescape(text)
+    # 合并多余空白
+    text = re.sub(r"\s+", " ", text).strip()
+    if len(text) <= length:
+        return text
+    # 按单词边界截断
+    truncated = text[:length]
+    last_space = truncated.rfind(" ")
+    if last_space > length * 0.7:
+        truncated = truncated[:last_space]
+    return truncated + "..."
 
 class SiteBuilder:
     def __init__(self, db: Database, output_dir: Path, template_dir: Path):
@@ -26,8 +47,10 @@ class SiteBuilder:
         all_articles = await search_articles(self.db, "", days=3650, limit=100000)
         stats = await get_stats(self.db, days=30)
 
-        # 首页 — Jinja2 预渲染最近 30 天
+        # 首页 — Jinja2 预渲染最近 30 天（description 已清理）
         recent = [a for a in all_articles[:100]]  # 实际按 collected_at 排序取前 100
+        for a in recent:
+            a["description"] = clean_text(a.get("description", "") or "", 200)
         index_html = self.env.get_template("index.html").render(
             articles=recent, stats=stats, updated=datetime.now().isoformat()
         )
@@ -43,7 +66,7 @@ class SiteBuilder:
             desc = a.get("description", "") or ""
             json_articles.append({
                 "id": a["id"], "title": a["title"], "url": a["url"],
-                "description": desc[:200],
+                "description": clean_text(desc, 200),
                 "source": a["source"], "source_detail": a.get("source_detail", ""),
                 "relevance_score": a["relevance_score"],
                 "tags": a.get("tags", []),
