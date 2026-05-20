@@ -100,10 +100,11 @@ class _RouterNode:
     async def __call__(self, state: PipelineState) -> dict:
         db = get_pipeline_db()
         await record_phase_start(db, state.run_id, "route")
-        try:
-            return await self._router(state)
-        finally:
-            await record_phase_end(db, state.run_id, "route", "done")
+        result = await self._router(state)
+        total = len(state.raw_items)
+        details = f"total:{total}, github:{len(result['routed_github'])}, rss:{len(result['routed_rss'])}, feishu:{len(result['routed_feishu'])}, arxiv:{len(result['routed_arxiv'])}"
+        await record_phase_end(db, state.run_id, "route", "done", details)
+        return result
 
 
 class _AnalyzerNode:
@@ -124,13 +125,16 @@ class _AnalyzerNode:
         if _analyzer_count == 1:
             await record_phase_start(db, state.run_id, "analyze")
 
-        try:
-            items, costs = await self._analyze(routed, self._registry)
-            return {"analyzed_items": items, "cost_records": costs}
-        finally:
-            _analyzer_count -= 1
-            if _analyzer_count == 0:
-                await record_phase_end(db, state.run_id, "analyze", "done")
+        items, costs = await self._analyze(routed, self._registry)
+        if _analyzer_count == 1:
+            total_cost = sum(c.cost for c in costs) if costs else 0
+            details = f"total:{len(routed)}, succeeded:{len(items)}, failed:{len(routed)-len(items)}, cost:${total_cost:.6f}"
+        else:
+            details = None
+        _analyzer_count -= 1
+        if _analyzer_count == 0:
+            await record_phase_end(db, state.run_id, "analyze", "done", details)
+        return {"analyzed_items": items, "cost_records": costs}
 
 
 class _AggregatorNode:
@@ -140,10 +144,10 @@ class _AggregatorNode:
     async def __call__(self, state: PipelineState) -> dict:
         db = get_pipeline_db()
         await record_phase_start(db, state.run_id, "aggregate")
-        try:
-            return await self._aggregator(state)
-        finally:
-            await record_phase_end(db, state.run_id, "aggregate", "done")
+        result = await self._aggregator(state)
+        details = f"total:{len(state.analyzed_items)}"
+        await record_phase_end(db, state.run_id, "aggregate", "done", details)
+        return result
 
 
 class _ReviewerNode:
@@ -154,10 +158,15 @@ class _ReviewerNode:
     async def __call__(self, state: PipelineState) -> dict:
         db = get_pipeline_db()
         await record_phase_start(db, state.run_id, "review")
-        try:
-            return await self._reviewer(state, self._registry)
-        finally:
-            await record_phase_end(db, state.run_id, "review", "done")
+        result = await self._reviewer(state, self._registry)
+        reviewed = result.get("reviewed_items", [])
+        total_cost = sum(c.cost for c in result.get("cost_records", []))
+        approved = sum(1 for r in reviewed if r.verdict == "approved")
+        retry = sum(1 for r in reviewed if r.verdict == "retry")
+        discarded = sum(1 for r in reviewed if r.verdict == "discarded")
+        details = f"approved:{approved}, retry:{retry}, discarded:{discarded}, cost:${total_cost:.6f}"
+        await record_phase_end(db, state.run_id, "review", "done", details)
+        return result
 
 
 def continue_to_analyzers(state: PipelineState):

@@ -157,9 +157,15 @@ async def get_pipeline_dag():
     for p in phases:
         time_str = p["started_at"][11:19] if p["started_at"] else ""
         if p["status"] == "done":
-            logs.append({"time": time_str, "message": f"{p['phase']} 完成", "level": "success"})
+            msg = f"{p['phase']} 完成"
+            if p.get("details"):
+                msg += f" ({p['details']})"
+            logs.append({"time": time_str, "message": msg, "level": "success"})
         elif p["status"] == "running":
-            logs.append({"time": time_str, "message": f"{p['phase']} 进行中", "level": "info"})
+            msg = f"{p['phase']} 进行中"
+            if p.get("details"):
+                msg += f" ({p['details']})"
+            logs.append({"time": time_str, "message": msg, "level": "info"})
 
     return envelope({
         "run_id": run_id,
