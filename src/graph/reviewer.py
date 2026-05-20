@@ -106,6 +106,14 @@ async def reviewer_node(state: PipelineState, registry: LLMRegistry) -> dict:
         "approved": sum(1 for r in reviewed_items if r.verdict == "approved"),
         "retry": sum(1 for r in reviewed_items if r.verdict == "retry"),
         "discarded": sum(1 for r in reviewed_items if r.verdict == "discarded"),
+        "tokens_in": sum(c.tokens_in for c in cost_records),
+        "tokens_out": sum(c.tokens_out for c in cost_records),
+        "cost_usd": round(sum(c.cost for c in cost_records), 6),
     })
+    for r, c in zip(reviewed_items, cost_records):
+        logger.debug("reviewer.item", extra={
+            "url": r.ref_url, "verdict": r.verdict,
+            "score": r.total_score, "tokens_in": c.tokens_in, "tokens_out": c.tokens_out,
+        })
 
     return {"reviewed_items": reviewed_items, "cost_records": cost_records}

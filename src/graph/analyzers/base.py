@@ -96,4 +96,19 @@ async def analyze_items(
                     logger.warning("analyzer.parse_failed", extra={"agent": agent_name, "url": item.url, "error": str(e)})
                     continue  # 继续处理下一个 item，而不是 raise
 
+    total_costs = sum(cost.cost for cost in costs) if costs else 0
+    total_tokens_in = sum(cost.tokens_in for cost in costs) if costs else 0
+    total_tokens_out = sum(cost.tokens_out for cost in costs) if costs else 0
+    failed = len(items) - len(results)
+
+    logger.info("analyzer.done", extra={
+        "agent": agent_name,
+        "total": len(items),
+        "succeeded": len(results),
+        "failed": failed,
+        "tokens_in": total_tokens_in,
+        "tokens_out": total_tokens_out,
+        "cost_usd": round(total_costs, 6),
+    })
+
     return results, costs
