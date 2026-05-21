@@ -1,6 +1,0 @@
-[     627ms] [ERROR] Failed to load resource: the server responded with a status of 404 (File not found) @ http://localhost:8001/css/style.css:0
-[     628ms] [ERROR] Failed to load resource: the server responded with a status of 404 (File not found) @ http://localhost:8001/js/app.js:0
-[    1570ms] [ERROR] Failed to load resource: the server responded with a status of 404 (File not found) @ http://localhost:8001/favicon.ico:0
-[ 2440270ms] [ERROR] Failed to load resource: the server responded with a status of 404 (File not found) @ http://localhost:8001/article.html?id=1:0
-[ 2441748ms] [ERROR] Failed to load resource: the server responded with a status of 404 (File not found) @ http://localhost:8001/css/style.css:0
-[ 2441748ms] [ERROR] Failed to load resource: the server responded with a status of 404 (File not found) @ http://localhost:8001/js/app.js:0
