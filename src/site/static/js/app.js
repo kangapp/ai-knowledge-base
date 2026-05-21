@@ -10,14 +10,30 @@
             return;
         }
         // RSS 显示 source_detail，其他显示 source
-        list.innerHTML = articles.map(a => {
-            const displaySource = (a.source === 'rss' && a.source_detail) ? a.source_detail : a.source;
-            return `
+        // RSS 源中文简称映射
+    const RSS_LABELS = {
+        'https://36kr.com/feed': '36氪',
+        'https://www.ithome.com/rss/': 'IT之家',
+        'https://techcrunch.com/feed/': 'TechCrunch',
+        'https://www.theverge.com/rss/index.xml': 'The Verge',
+        'https://feeds.arstechnica.com/arstechnica/index': 'Ars Technica',
+        'https://feeds.reuters.com/reuters/scienceNews': 'Reuters',
+        'https://www.huxiu.com/rss/feed': '虎嗅',
+        'https://api.juejin.cn/rss': '掘金',
+        'https://openai.com/blog/rss.xml': 'OpenAI',
+        'https://feeds.feedburner.com/producthunt': 'Product Hunt',
+    };
+    function getSourceLabel(source, sourceDetail) {
+        if (source === 'rss' && sourceDetail) {
+            return RSS_LABELS[sourceDetail] || sourceDetail.replace(/^https?:\/\//, '').split('/')[0];
+        }
+        return source;
+    }
+    list.innerHTML = articles.map(a => {
+        const label = getSourceLabel(a.source, a.source_detail);
+        return `
             <div class="article-card" data-score="${a.relevance_score}" data-source="${a.source}" data-source-detail="${a.source_detail || ''}">
-                <div class="card-header">
-                    <span class="source-badge">${displaySource}</span>
-                    ${(a.tags || []).length ? '<div class="tags">' + (a.tags || []).slice(0, 3).map(t => `<span class="tag">${escapeHtml(t)}</span>`).join('') + '</div>' : ''}
-                </div>
+                <div class="card-top"><span class="topic-tag">${escapeHtml(label)}</span></div>
                 <h3><a href="/article.html?id=${a.id}">${escapeHtml(a.title)}</a></h3>
                 <p>${escapeHtml(a.description || '')}</p>
                 <div class="meta">
