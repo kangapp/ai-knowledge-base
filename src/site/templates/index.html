@@ -13,17 +13,20 @@
 </div>
 <div id="article-list">
     {% for article in articles %}
-    <div class="article-card" data-score="{{ article.relevance_score }}" data-source="{{ article.source }}">
-        <div class="card-header">
-            <span class="source-badge">{{ article.source }}</span>
-            {% if article.tags %}
-            <div class="tags">
-                {% for tag in article.tags[:3] %}
-                <span class="tag">{{ tag }}</span>
-                {% endfor %}
-            </div>
-            {% endif %}
-        </div>
+    {% if article.source == 'rss' and article.source_detail %}
+        {% if article.source_detail == 'https://36kr.com/feed' %}{% set source_label = '36氪' %}
+        {% elif article.source_detail == 'https://www.ithome.com/rss/' %}{% set source_label = 'IT之家' %}
+        {% elif article.source_detail == 'https://techcrunch.com/feed/' %}{% set source_label = 'TechCrunch' %}
+        {% elif article.source_detail == 'https://www.theverge.com/rss/index.xml' %}{% set source_label = 'The Verge' %}
+        {% elif article.source_detail == 'https://feeds.arstechnica.com/arstechnica/index' %}{% set source_label = 'Ars Technica' %}
+        {% elif article.source_detail == 'https://feeds.reuters.com/reuters/scienceNews' %}{% set source_label = 'Reuters' %}
+        {% elif article.source_detail == 'https://www.huxiu.com/rss/feed' %}{% set source_label = '虎嗅' %}
+        {% elif article.source_detail == 'https://api.juejin.cn/rss' %}{% set source_label = '掘金' %}
+        {% elif article.source_detail == 'https://openai.com/blog/rss.xml' %}{% set source_label = 'OpenAI' %}
+        {% else %}{% set source_label = article.source_detail %}{% endif %}
+    {% else %}{% set source_label = article.source %}{% endif %}
+    <div class="article-card" data-score="{{ article.relevance_score }}" data-source="{{ article.source }}" data-source-detail="{{ article.source_detail or '' }}">
+        <div class="card-top"><span class="topic-tag">{{ source_label }}</span></div>
         <h3><a href="/article.html?id={{ article.id }}">{{ article.title }}</a></h3>
         <p>{{ article.description }}</p>
         <div class="meta">
