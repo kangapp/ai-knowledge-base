@@ -22,7 +22,12 @@
         'https://api.juejin.cn/rss': '掘金',
         'https://openai.com/blog/rss.xml': 'OpenAI',
         'https://feeds.feedburner.com/producthunt': 'Product Hunt',
-        'https://www.theverge.com/rss/index.xml': 'The Verge',
+        // 已汉化的 key 也加入映射
+        '36氪': '36氪',
+        'TechCrunch AI': 'TechCrunch',
+        'The Verge AI': 'The Verge',
+        'IT之家': 'IT之家',
+        'Ars Technica': 'Ars Technica',
     };
     function getSourceLabel(source, sourceDetail) {
         if (source === 'rss' && sourceDetail) {
@@ -34,7 +39,13 @@
         return source;
     }
     function getOptionLabel(s) {
+        // 优先检查 RSS_LABELS（URL 或已中文的 key）
         if (RSS_LABELS[s]) return RSS_LABELS[s];
+        // 如果是 URL 但不在映射里，提取域名部分
+        if (s.startsWith('http')) {
+            return s.replace(/^https?:\/\//, '').split('/')[0];
+        }
+        // source 值简称
         if (s === 'github') return 'GitHub';
         if (s === 'feishu') return '飞书';
         if (s === 'arxiv') return 'arXiv';
@@ -104,10 +115,14 @@
 
         const sourceFilter = document.getElementById('source-filter');
         if (sourceFilter) {
-            const sourceOptions = [...new Set(INIT.articles.map(a => {
-                if (a.source === 'rss' && a.source_detail) return a.source_detail;
-                return a.source;
-            }))].map(s => ({ value: s, label: getOptionLabel(s) }));
+            // 标准化 source_detail，将 URL 转为中文简称，去重
+            const sourceMap = {};
+            INIT.articles.forEach(a => {
+                const raw = a.source === 'rss' && a.source_detail ? a.source_detail : a.source;
+                const normalized = getOptionLabel(raw);
+                sourceMap[raw] = normalized; // raw 作为 key 确保唯一性，normalized 用于显示
+            });
+            const sourceOptions = Object.entries(sourceMap).map(([value, label]) => ({ value, label }));
             sourceOptions.forEach(opt => {
                 const el = document.createElement('option');
                 el.value = opt.value; el.textContent = opt.label;
