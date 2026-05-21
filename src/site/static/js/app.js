@@ -22,12 +22,23 @@
         'https://api.juejin.cn/rss': '掘金',
         'https://openai.com/blog/rss.xml': 'OpenAI',
         'https://feeds.feedburner.com/producthunt': 'Product Hunt',
+        'https://www.theverge.com/rss/index.xml': 'The Verge',
     };
     function getSourceLabel(source, sourceDetail) {
         if (source === 'rss' && sourceDetail) {
             return RSS_LABELS[sourceDetail] || sourceDetail.replace(/^https?:\/\//, '').split('/')[0];
         }
+        if (source === 'github') return 'GitHub';
+        if (source === 'feishu') return '飞书';
+        if (source === 'arxiv') return 'arXiv';
         return source;
+    }
+    function getOptionLabel(s) {
+        if (RSS_LABELS[s]) return RSS_LABELS[s];
+        if (s === 'github') return 'GitHub';
+        if (s === 'feishu') return '飞书';
+        if (s === 'arxiv') return 'arXiv';
+        return s;
     }
     list.innerHTML = articles.map(a => {
         const label = getSourceLabel(a.source, a.source_detail);
@@ -96,7 +107,7 @@
             const sourceOptions = [...new Set(INIT.articles.map(a => {
                 if (a.source === 'rss' && a.source_detail) return a.source_detail;
                 return a.source;
-            }))].map(s => ({ value: s, label: getSourceLabel(s.startsWith('http') ? 'rss' : s, s.startsWith('http') ? s : '') }));
+            }))].map(s => ({ value: s, label: getOptionLabel(s) }));
             sourceOptions.forEach(opt => {
                 const el = document.createElement('option');
                 el.value = opt.value; el.textContent = opt.label;
