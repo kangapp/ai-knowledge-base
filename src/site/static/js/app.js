@@ -115,14 +115,17 @@
 
         const sourceFilter = document.getElementById('source-filter');
         if (sourceFilter) {
-            // 标准化 source_detail，将 URL 转为中文简称，去重
+            // 按 label 分组去重，value 使用最后一个匹配的 raw
             const sourceMap = {};
             INIT.articles.forEach(a => {
                 const raw = a.source === 'rss' && a.source_detail ? a.source_detail : a.source;
                 const normalized = getOptionLabel(raw);
-                sourceMap[raw] = normalized; // raw 作为 key 确保唯一性，normalized 用于显示
+                if (!sourceMap[normalized]) {
+                    sourceMap[normalized] = { label: normalized, value: raw };
+                }
             });
-            const sourceOptions = Object.entries(sourceMap).map(([value, label]) => ({ value, label }));
+            const sourceOptions = Object.values(sourceMap);
+            sourceFilter.innerHTML = '<option value="">全部来源</option>';
             sourceOptions.forEach(opt => {
                 const el = document.createElement('option');
                 el.value = opt.value; el.textContent = opt.label;
