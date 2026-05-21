@@ -93,15 +93,14 @@
 
         const sourceFilter = document.getElementById('source-filter');
         if (sourceFilter) {
-            // RSS 显示 source_detail（具体子源名），其他显示 source
             const sourceOptions = [...new Set(INIT.articles.map(a => {
                 if (a.source === 'rss' && a.source_detail) return a.source_detail;
                 return a.source;
-            }))];
-            sourceOptions.forEach(s => {
-                const opt = document.createElement('option');
-                opt.value = s; opt.textContent = s;
-                sourceFilter.appendChild(opt);
+            }))].map(s => ({ value: s, label: getSourceLabel(s.startsWith('http') ? 'rss' : s, s.startsWith('http') ? s : '') }));
+            sourceOptions.forEach(opt => {
+                const el = document.createElement('option');
+                el.value = opt.value; el.textContent = opt.label;
+                sourceFilter.appendChild(el);
             });
             sourceFilter.addEventListener('change', e => {
                 state.source = e.target.value;
