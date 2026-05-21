@@ -28,6 +28,11 @@
         'The Verge AI': 'The Verge',
         'IT之家': 'IT之家',
         'Ars Technica': 'Ars Technica',
+        'Ars Technica AI': 'Ars Technica',
+        'OpenAI': 'OpenAI',
+        '虎嗅': '虎嗅',
+        '掘金': '掘金',
+        'Reuters': 'Reuters',
     };
     function getSourceLabel(source, sourceDetail) {
         if (source === 'rss' && sourceDetail) {
