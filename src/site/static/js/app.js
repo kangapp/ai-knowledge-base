@@ -2,15 +2,7 @@
     const INIT = window.__INIT__ || { articles: [], stats: {} };
     const state = { source: '', tag: '', days: 30, query: '' };
 
-    function render(articles) {
-        const list = document.getElementById('article-list');
-        if (!list) return;
-        if (articles.length === 0) {
-            list.innerHTML = '<p class="loading">暂无文章</p>';
-            return;
-        }
-        // RSS 显示 source_detail，其他显示 source
-        // RSS 源中文简称映射
+    // RSS 源中文简称映射（全局）
     const RSS_LABELS = {
         'https://36kr.com/feed': '36氪',
         'https://www.ithome.com/rss/': 'IT之家',
@@ -22,7 +14,6 @@
         'https://api.juejin.cn/rss': '掘金',
         'https://openai.com/blog/rss.xml': 'OpenAI',
         'https://feeds.feedburner.com/producthunt': 'Product Hunt',
-        // 已汉化的 key 也加入映射
         '36氪': '36氪',
         'TechCrunch AI': 'TechCrunch',
         'The Verge AI': 'The Verge',
@@ -33,7 +24,11 @@
         '虎嗅': '虎嗅',
         '掘金': '掘金',
         'Reuters': 'Reuters',
+        'github': 'GitHub',
+        'feishu': '飞书',
+        'arxiv': 'arXiv',
     };
+
     function getSourceLabel(source, sourceDetail) {
         if (source === 'rss' && sourceDetail) {
             return RSS_LABELS[sourceDetail] || sourceDetail.replace(/^https?:\/\//, '').split('/')[0];
@@ -43,22 +38,23 @@
         if (source === 'arxiv') return 'arXiv';
         return source;
     }
+
     function getOptionLabel(s) {
-        // 优先检查 RSS_LABELS（URL 或已中文的 key）
         if (RSS_LABELS[s]) return RSS_LABELS[s];
-        // 如果是 URL 但不在映射里，提取域名部分
-        if (s.startsWith('http')) {
-            return s.replace(/^https?:\/\//, '').split('/')[0];
-        }
-        // source 值简称
-        if (s === 'github') return 'GitHub';
-        if (s === 'feishu') return '飞书';
-        if (s === 'arxiv') return 'arXiv';
+        if (s.startsWith('http')) return s.replace(/^https?:\/\//, '').split('/')[0];
         return s;
     }
-    list.innerHTML = articles.map(a => {
-        const label = getSourceLabel(a.source, a.source_detail);
-        return `
+
+    function render(articles) {
+        const list = document.getElementById('article-list');
+        if (!list) return;
+        if (articles.length === 0) {
+            list.innerHTML = '<p class="loading">暂无文章</p>';
+            return;
+        }
+        list.innerHTML = articles.map(a => {
+            const label = getSourceLabel(a.source, a.source_detail);
+            return `
             <div class="article-card" data-score="${a.relevance_score}" data-source="${a.source}" data-source-detail="${a.source_detail || ''}">
                 <div class="card-top"><span class="topic-tag">${escapeHtml(label)}</span></div>
                 <h3><a href="/article.html?id=${a.id}">${escapeHtml(a.title)}</a></h3>
