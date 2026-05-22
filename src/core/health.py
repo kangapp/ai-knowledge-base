@@ -1,3 +1,4 @@
+import asyncio
 import time
 
 class HealthTracker:
@@ -5,8 +6,9 @@ class HealthTracker:
     MAX_COOLDOWN = 600
     FAILURE_THRESHOLD = 3
 
-    def __init__(self):
+    def __init__(self, db=None):
         self._state: dict[str, dict] = {}
+        self._db = db
 
     def _ensure(self, provider: str):
         if provider not in self._state:
@@ -52,7 +54,28 @@ class HealthTracker:
         s["status"] = "healthy"
         s["last_check"] = time.time()
         if s["circuit"] == "half_open":
+            try:
+                loop = asyncio.get_running_loop()
+                loop.create_task(self._record_event(provider, "close", "recovery"))
+            except RuntimeError:
+                pass
             s["circuit"] = "closed"
+
+    async def _record_event(self, provider: str, event: str, reason: str = ""):
+        if self._db:
+            try:
+                loop = asyncio.get_running_loop()
+            except RuntimeError:
+                return  # no event loop in sync test context
+            loop.create_task(self._do_record_event(provider, event, reason))
+
+    async def _do_record_event(self, provider: str, event: str, reason: str):
+        if self._db:
+            await self._db.execute(
+                "INSERT INTO circuit_events (provider, event, reason) VALUES (?,?,?)",
+                (provider, event, reason)
+            )
+            await self._db.commit()
 
     def record_failure(self, provider: str, error: str):
         self._ensure(provider)
@@ -66,7 +89,17 @@ class HealthTracker:
             s["cooldown_level"] += 1
             s["opened_at"] = time.time()
             s["status"] = "unhealthy"
+            try:
+                loop = asyncio.get_running_loop()
+                loop.create_task(self._record_event(provider, "open", "failure"))
+            except RuntimeError:
+                pass
         elif s["error_count"] >= self.FAILURE_THRESHOLD and s["circuit"] == "closed":
             s["circuit"] = "open"
             s["opened_at"] = time.time()
             s["status"] = "unhealthy"
+            try:
+                loop = asyncio.get_running_loop()
+                loop.create_task(self._record_event(provider, "open", "failure"))
+            except RuntimeError:
+                pass

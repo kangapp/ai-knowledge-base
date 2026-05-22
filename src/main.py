@@ -239,6 +239,7 @@ async def lifespan(app: FastAPI):
     llm_cfg = load_llm_config(CONFIG_DIR / "llm.yaml")
     agents_cfg = load_agents_config(CONFIG_DIR / "agents.yaml")
     _registry = LLMRegistry(llm_cfg, agents_cfg)
+    _registry.health._db = _db
     _graph = build_pipeline(_registry)
 
     set_db(_db)
