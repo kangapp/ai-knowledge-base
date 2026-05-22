@@ -5,146 +5,121 @@
     <header class="page-header">
         <h1>📈 仪表盘</h1>
         <div class="tabs">
-            <button class="tab active" data-view="day">天</button>
-            <button class="tab" data-view="week">周</button>
-            <button class="tab" data-view="month">月</button>
+            <button class="tab active" data-tab="quality">数据质量</button>
+            <button class="tab" data-tab="runtime">运行状态</button>
+            <button class="tab" data-tab="consumption">资源消耗</button>
         </div>
     </header>
 
-    <div class="kpi-cards">
+    <!-- 全局 KPI 卡片 -->
+    <div class="kpi-cards" id="global-kpis">
         <div class="kpi-card">
             <div class="kpi-label">总文章数</div>
             <div class="kpi-value" id="kpi-total">-</div>
-            <div class="kpi-sub"><span id="kpi-period" class="trend">-</span> 本周期新增</div>
+            <div class="kpi-sub" id="kpi-period">-</div>
         </div>
         <div class="kpi-card">
-            <div class="kpi-label">周期费用</div>
-            <div class="kpi-value" id="kpi-cost">-</div>
-            <div class="kpi-sub" id="kpi-cost-trend">-</div>
+            <div class="kpi-label">周期新增</div>
+            <div class="kpi-value" id="kpi-period-count">-</div>
+            <div class="kpi-sub">近 <span class="range-label">30</span> 天</div>
         </div>
         <div class="kpi-card">
-            <div class="kpi-label">日均采集</div>
-            <div class="kpi-value" id="kpi-daily">-</div>
-            <div class="kpi-sub">近 30 天</div>
+            <div class="kpi-label">通过率</div>
+            <div class="kpi-value" id="kpi-approve-rate">-</div>
+            <div class="kpi-sub">审核通过</div>
+        </div>
+        <div class="kpi-card">
+            <div class="kpi-label">平均分</div>
+            <div class="kpi-value" id="kpi-avg-score">-</div>
+            <div class="kpi-sub">质量评分</div>
         </div>
         <div class="kpi-card">
             <div class="kpi-label">活跃源</div>
-            <div class="kpi-value" id="kpi-sources">-</div>
-            <div class="kpi-sub" id="kpi-sources-sub">-</div>
+            <div class="kpi-value" id="kpi-active-sources">-</div>
+            <div class="kpi-sub">数据源</div>
         </div>
     </div>
 
-    <div class="charts-layout">
-        <div class="chart-card">
-            <h3>💰 成本趋势</h3>
-            <div class="chart-canvas-wrapper"><canvas id="cost-chart"></canvas></div>
-            <div class="chart-legend">
-                <span><span class="dot" style="background:#3b82f6"></span> 实际成本</span>
-                <span><span class="dot" style="background:#22c55e"></span> 滚动均值</span>
+    <!-- Tab 内容区 -->
+    <div id="tab-quality" class="tab-content active">
+        <div class="charts-layout">
+            <div class="chart-card">
+                <h3>评分分布</h3>
+                <div class="chart-canvas-wrapper"><canvas id="score-dist-chart"></canvas></div>
+            </div>
+            <div class="chart-card">
+                <h3>来源评分排行</h3>
+                <div class="source-score-list" id="source-score-list"></div>
             </div>
         </div>
+        <div class="chart-card" style="margin-top:1rem">
+            <h3>标签云</h3>
+            <div class="tag-cloud" id="tag-cloud"></div>
+        </div>
+    </div>
+
+    <div id="tab-runtime" class="tab-content">
+        <div class="kpi-row" style="display:flex;gap:1rem;margin-bottom:1rem">
+            <div class="kpi-card" style="flex:1">
+                <div class="kpi-label">上次运行</div>
+                <div class="kpi-value" id="rt-run-id">-</div>
+                <div class="kpi-sub" id="rt-run-time">-</div>
+            </div>
+            <div class="kpi-card" style="flex:1">
+                <div class="kpi-label">运行时长</div>
+                <div class="kpi-value" id="rt-duration">-</div>
+            </div>
+            <div class="kpi-card" style="flex:1">
+                <div class="kpi-label">成功率</div>
+                <div class="kpi-value" id="rt-success-rate">-</div>
+            </div>
+            <div class="kpi-card" style="flex:1">
+                <div class="kpi-label">失败数</div>
+                <div class="kpi-value" id="rt-fail-count">-</div>
+            </div>
+        </div>
+        <div class="chart-card" style="margin-bottom:1rem">
+            <h3>Pipeline DAG 状态</h3>
+            <div class="pipeline-flow" id="pipeline-flow"></div>
+        </div>
         <div class="chart-card">
-            <h3>📊 来源分布</h3>
-            <div class="source-list" id="source-list"></div>
+            <h3>失败日志</h3>
+            <div class="log-table-wrapper">
+                <table class="log-table">
+                    <thead><tr><th>时间</th><th>阶段</th><th>Provider</th><th>标题</th></tr></thead>
+                    <tbody id="failure-tbody"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div id="tab-consumption" class="tab-content">
+        <div class="kpi-row" style="display:flex;gap:1rem;margin-bottom:1rem">
+            <div class="kpi-card" style="flex:1">
+                <div class="kpi-label">周期花费</div>
+                <div class="kpi-value" id="cs-period-cost">-</div>
+            </div>
+            <div class="kpi-card" style="flex:1">
+                <div class="kpi-label">Token 效率</div>
+                <div class="kpi-value" id="cs-token-efficiency">-</div>
+                <div class="kpi-sub">$/M tokens</div>
+            </div>
+            <div class="kpi-card" style="flex:1">
+                <div class="kpi-label">预算进度</div>
+                <div class="kpi-value" id="cs-budget-progress">-</div>
+                <div class="progress-bar-wrapper"><div class="progress-bar" id="cs-progress-bar"></div></div>
+            </div>
+        </div>
+        <div class="charts-layout">
+            <div class="chart-card">
+                <h3>Provider 费用分解</h3>
+                <div class="chart-canvas-wrapper"><canvas id="provider-cost-chart"></canvas></div>
+            </div>
+            <div class="chart-card">
+                <h3>Agent 费用分解</h3>
+                <div class="chart-canvas-wrapper"><canvas id="agent-cost-chart"></canvas></div>
+            </div>
         </div>
     </div>
 </div>
-
-<script>
-let costChart = null;
-let currentView = 'day';
-let statsData = null;
-
-async function loadStats() {
-    const res = await fetch('/api/stats/enhanced');
-    const json = await res.json();
-    if (json.code !== 0) return;
-    statsData = json.data;
-    updateDashboard(statsData);
-}
-
-function updateDashboard(data) {
-    const s = data.summary;
-    document.getElementById('kpi-total').textContent = s.total_articles.toLocaleString();
-    document.getElementById('kpi-period').textContent = '↑ ' + s.period_articles;
-    document.getElementById('kpi-cost').textContent = '$' + s.period_cost.toFixed(2);
-    document.getElementById('kpi-daily').textContent = '~' + Math.round(s.period_articles / 30);
-    document.getElementById('kpi-sources').textContent = s.active_sources;
-    document.getElementById('kpi-sources-sub').textContent = '个活跃数据源';
-
-    const list = document.getElementById('source-list');
-    const max = Math.max(...data.source_distribution.map(s => s.count), 1);
-    list.innerHTML = data.source_distribution.map(src => `
-        <div class="source-item">
-            <div class="source-info">
-                <span class="source-name">${src.source}</span>
-                <span class="source-count">${src.count.toLocaleString()}</span>
-            </div>
-            <div class="source-bar"><div class="source-bar-fill" style="width:${(src.count/max*100).toFixed(0)}%"></div></div>
-        </div>
-    `).join('');
-
-    updateChart(data);
-}
-
-function updateChart(data) {
-    const ctx = document.getElementById('cost-chart').getContext('2d');
-    let labels, costData;
-
-    if (currentView === 'day') {
-        labels = data.daily_cost.map(d => d.date.slice(5));
-        costData = data.daily_cost.map(d => d.cost);
-    } else if (currentView === 'week') {
-        labels = data.weekly_cost.map(d => d.week);
-        costData = data.weekly_cost.map(d => d.cost);
-    } else {
-        labels = data.monthly_cost.map(d => d.month);
-        costData = data.monthly_cost.map(d => d.cost);
-    }
-
-    const windowSize = currentView === 'day' ? 7 : currentView === 'week' ? 4 : 3;
-    const avgData = costData.map((_, i) => {
-        const start = Math.max(0, i - windowSize + 1);
-        const slice = costData.slice(start, i + 1);
-        return slice.reduce((a, b) => a + b, 0) / slice.length;
-    });
-
-    if (costChart) costChart.destroy();
-    costChart = new Chart(ctx, {
-        type: 'line',
-        data: {
-            labels,
-            datasets: [
-                { label: '成本', data: costData, borderColor: '#3b82f6', backgroundColor: 'rgba(59,130,246,0.1)', fill: true, tension: 0.4 },
-                { label: '均值', data: avgData, borderColor: '#22c55e', borderDash: [5, 5], fill: false, tension: 0.4 }
-            ]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: { legend: { display: false } },
-            scales: {
-                x: { grid: { color: '#334155' }, ticks: { color: '#94a3b8' } },
-                y: {
-                    grid: { color: '#334155' },
-                    ticks: { color: '#94a3b8', callback: v => '$' + v.toFixed(2) },
-                    beginAtZero: true,
-                    grace: '0.5'
-                }
-            }
-        }
-    });
-}
-
-document.querySelectorAll('.tab').forEach(tab => {
-    tab.addEventListener('click', () => {
-        document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-        tab.classList.add('active');
-        currentView = tab.dataset.view;
-        if (statsData) updateChart(statsData);
-    });
-});
-
-document.addEventListener('DOMContentLoaded', loadStats);
-</script>
 {% endblock %}
