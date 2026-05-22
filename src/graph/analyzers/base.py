@@ -16,6 +16,24 @@ def load_prompt(agent_name: str, registry: LLMRegistry) -> str:
 
 
 def parse_and_validate(raw: str, ref_url: str = "") -> AnalyzedItem:
+    # 0. 容错：剥离所有 thinking tags（包括不完整的）
+    # 先剥离所有 ```json ... ``` 包裹（markdown 格式）
+    m = re.search(r'```(?:json)?\s*(.*?)\s*```', raw, re.DOTALL)
+    if m:
+        raw = m.group(1).strip()
+    else:
+        # MiniMax 的 thinking 标签格式：<think> ... (有时没有结束标签)
+        # 尝试剥离完整的<think>...】对
+        for _ in range(10):
+            new_raw = re.sub(r'<think>[\s\S]*?】', '', raw).strip()
+            if new_raw == raw:
+                break
+            raw = new_raw
+        # 如果没有找到有效的 JSON，尝试从第一个 { 开始提取
+        json_start = raw.find('{')
+        if json_start > 0:
+            raw = raw[json_start:]
+
     # 1. 尝试直接解析
     try:
         data = json.loads(raw)
