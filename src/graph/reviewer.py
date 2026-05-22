@@ -27,6 +27,16 @@ def _load_reviewer_prompt(registry: LLMRegistry) -> str:
 
 
 def parse_reviewer_output(raw: str) -> ReviewedItem:
+    # 容错：剥离 thinking tags
+    for _ in range(10):
+        new_raw = re.sub(r'\<result\>[\s\S]*?\</result\>', '', raw).strip()
+        if new_raw == raw:
+            break
+        raw = new_raw
+    json_start = raw.find('{')
+    if json_start > 0:
+        raw = raw[json_start:]
+
     try:
         data = json.loads(raw)
     except json.JSONDecodeError:
