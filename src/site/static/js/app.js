@@ -1,9 +1,6 @@
 (function() {
-    const INIT = window.__INIT__ || { articles: [], stats: {} };
-    const state = { source: '', tag: '', days: 30, query: '' };
-
-    // RSS 源中文简称映射（全局）
-    const RSS_LABELS = {
+    // RSS 源中文简称映射（挂载到 window供两个IIFE共用）
+    window.__RSS_LABELS__ = {
         'https://36kr.com/feed': '36氪',
         'https://www.ithome.com/rss/': 'IT之家',
         'https://techcrunch.com/feed/': 'TechCrunch',
@@ -29,9 +26,12 @@
         'arxiv': 'arXiv',
     };
 
+    const INIT = window.__INIT__ || { articles: [], stats: {} };
+    const state = { source: '', tag: '', days: 30, query: '' };
+
     function getSourceLabel(source, sourceDetail) {
         if (source === 'rss' && sourceDetail) {
-            return RSS_LABELS[sourceDetail] || sourceDetail.replace(/^https?:\/\//, '').split('/')[0];
+            return window.__RSS_LABELS__[sourceDetail] || sourceDetail.replace(/^https?:\/\//, '').split('/')[0];
         }
         if (source === 'github') return 'GitHub';
         if (source === 'feishu') return '飞书';
@@ -40,7 +40,7 @@
     }
 
     function getOptionLabel(s) {
-        if (RSS_LABELS[s]) return RSS_LABELS[s];
+        if (window.__RSS_LABELS__[s]) return window.__RSS_LABELS__[s];
         if (s.startsWith('http')) return s.replace(/^https?:\/\//, '').split('/')[0];
         return s;
     }
@@ -217,6 +217,8 @@
 
 // Dashboard Tab Controller
 (function() {
+    // 引用第一个IIFE定义的RSS_LABELS映射
+    const RSS_LABELS = window.__RSS_LABELS__ || {};
     let cachedData = { quality: null, runtime: null, consumption: null };
 
     async function loadTab(tab) {
@@ -433,8 +435,8 @@
             document.getElementById('kpi-active-sources').textContent = s.active_sources || 0;
             // 活跃源显示细分（使用RSS_LABELS映射中文）
             const details = json.data.active_source_details || [];
-            const rssSubs = details.filter(d => d.source === 'rss').map(d => RSS_LABELS[d.source_detail] || d.source_detail).filter(Boolean).slice(0, 5);
-            const subLabel = rssSubs.length > 0 ? 'RSS: ' + rssSubs.join(', ') : (details.length > 0 ? details.map(d => RSS_LABELS[d.source_detail] || d.source_detail || d.source).filter(Boolean).slice(0, 3).join(', ') : '无');
+            const rssSubs = details.filter(d => d.source === 'rss').map(d => window.__RSS_LABELS__[d.source_detail] || d.source_detail).filter(Boolean).slice(0, 5);
+            const subLabel = rssSubs.length > 0 ? 'RSS: ' + rssSubs.join(', ') : (details.length > 0 ? details.map(d => window.__RSS_LABELS__[d.source_detail] || d.source_detail || d.source).filter(Boolean).slice(0, 3).join(', ') : '无');
             document.getElementById('kpi-active-sources-sub').textContent = subLabel;
         }
 
