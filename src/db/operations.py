@@ -69,8 +69,8 @@ async def end_pipeline_run(db: Database, run_id: str, status: str, summary: str)
 
 
 async def save_cost_log(db: Database, run_id: str, record: CostRecord):
-    await db.execute("INSERT INTO cost_logs (run_id, agent, provider, model, tokens_in, tokens_out, cost) VALUES (?,?,?,?,?,?,?)",
-        (run_id, record.agent, record.provider, record.model, record.tokens_in, record.tokens_out, record.cost))
+    await db.execute("INSERT INTO cost_logs (run_id, agent, provider, model, tokens_in, tokens_out, cost, ref_url) VALUES (?,?,?,?,?,?,?,?)",
+        (run_id, record.agent, record.provider, record.model, record.tokens_in, record.tokens_out, record.cost, record.ref_url))
     await db.commit()
 
 

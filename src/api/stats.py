@@ -37,6 +37,7 @@ async def get_stats_enhanced(days: int = Query(default=30, ge=1, le=3650)):
         "SELECT COUNT(DISTINCT source) as c FROM articles WHERE status='approved' AND collected_at >= date('now', ?)",
         (f"-{days} days",)
     )
+    avg_score = await db.fetch_one("SELECT AVG(relevance_score) as avg FROM articles WHERE status='approved'")
 
     # Hourly (past 48 hours)
     hourly = await db.fetch_all("""
@@ -89,6 +90,7 @@ async def get_stats_enhanced(days: int = Query(default=30, ge=1, le=3650)):
                 "period_cost": round(cost_period["t"] if cost_period else 0, 4),
                 "total_cost": round(cost_total["t"] if cost_total else 0, 4),
                 "active_sources": active_sources["c"] if active_sources else 0,
+                "avg_score": round(avg_score["avg"], 1) if avg_score and avg_score["avg"] else 0,
             },
             "hourly_cost": [dict(r) for r in hourly],
             "daily_cost": [dict(r) for r in daily],

@@ -266,8 +266,8 @@
         }
 
         const cloud = document.getElementById('tag-cloud');
-        if (cloud && data.top_tags) {
-            const maxCount = Math.max(...data.top_tags.map(t => t.count), 1);
+        if (cloud && data.top_tags && data.top_tags.length > 0) {
+            const maxCount = Math.max(...data.top_tags.map(t => t.count));
             cloud.innerHTML = data.top_tags.map(t => {
                 const ratio = t.count / maxCount;
                 const size = ratio > 0.7 ? 'large' : ratio > 0.4 ? 'medium' : 'small';
