@@ -42,6 +42,14 @@
 
     <!-- Tab 内容区 -->
     <div id="tab-quality" class="tab-content active">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">
+            <h3 style="margin:0;font-size:0.875rem;color:#666;text-transform:uppercase">评分分布 & 来源分析</h3>
+            <div class="date-filters" id="quality-date-filters" style="display:flex;gap:0.25rem">
+                <button class="date-btn" data-days="7">近7天</button>
+                <button class="date-btn" data-days="30">近30天</button>
+                <button class="date-btn" data-days="90">近90天</button>
+            </div>
+        </div>
         <div class="charts-layout">
             <div class="chart-card">
                 <h3>评分分布</h3>
@@ -59,6 +67,14 @@
     </div>
 
     <div id="tab-runtime" class="tab-content">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">
+            <h3 style="margin:0;font-size:0.875rem;color:#666;text-transform:uppercase">Pipeline 运行监控</h3>
+            <div class="date-filters" id="runtime-date-filters" style="display:flex;gap:0.25rem">
+                <button class="date-btn" data-days="7">近7天</button>
+                <button class="date-btn" data-days="30">近30天</button>
+                <button class="date-btn" data-days="90">近90天</button>
+            </div>
+        </div>
         <div class="kpi-row" style="display:flex;gap:1rem;margin-bottom:1rem">
             <div class="kpi-card" style="flex:1">
                 <div class="kpi-label">上次运行</div>
@@ -94,6 +110,14 @@
     </div>
 
     <div id="tab-consumption" class="tab-content">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">
+            <h3 style="margin:0;font-size:0.875rem;color:#666;text-transform:uppercase">资源消耗分析</h3>
+            <div class="date-filters" id="consumption-date-filters" style="display:flex;gap:0.25rem">
+                <button class="date-btn" data-days="7">近7天</button>
+                <button class="date-btn" data-days="30">近30天</button>
+                <button class="date-btn" data-days="90">近90天</button>
+            </div>
+        </div>
         <div class="kpi-row" style="display:flex;gap:1rem;margin-bottom:1rem">
             <div class="kpi-card" style="flex:1">
                 <div class="kpi-label">周期花费</div>

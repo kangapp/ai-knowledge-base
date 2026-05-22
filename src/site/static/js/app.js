@@ -228,14 +228,41 @@
         'Ars Technica': 'Ars Technica', 'OpenAI': 'OpenAI', '虎嗅': '虎嗅',
     };
     let cachedData = { quality: null, runtime: null, consumption: null };
+    const state = { quality: 30, runtime: 7, consumption: 30 };
 
     async function loadTab(tab) {
-        if (cachedData[tab]) return cachedData[tab];
-        const res = await fetch(`/api/stats/${tab}`);
+        const days = state[tab] || 30;
+        const key = `${tab}_${days}`;
+        if (cachedData[key]) return cachedData[key];
+        const res = await fetch(`/api/stats/${tab}?days=${days}`);
         const json = await res.json();
         if (json.code !== 0) return null;
-        cachedData[tab] = json.data;
-        return cachedData[tab];
+        cachedData[key] = json.data;
+        return cachedData[key];
+    }
+
+    function invalidateCache(tab) {
+        const days = state[tab] || 30;
+        const key = `${tab}_${days}`;
+        delete cachedData[key];
+    }
+
+    function setupDateFilters() {
+        document.querySelectorAll('.date-filters').forEach(container => {
+            const tab = container.id.replace('-date-filters', '');
+            const defaultDays = tab === 'runtime' ? 7 : 30;
+            container.querySelectorAll('.date-btn').forEach(btn => {
+                const d = parseInt(btn.dataset.days) || defaultDays;
+                if (d === defaultDays) btn.classList.add('active');
+                btn.addEventListener('click', () => {
+                    container.querySelectorAll('.date-btn').forEach(b => b.classList.remove('active'));
+                    btn.classList.add('active');
+                    state[tab] = d;
+                    invalidateCache(tab);
+                    renderTab(tab);
+                });
+            });
+        });
     }
 
     function switchTab(tab) {
@@ -452,6 +479,9 @@
         document.querySelectorAll('.tab').forEach(tab => {
             tab.addEventListener('click', () => switchTab(tab.dataset.tab));
         });
+
+        // 日期筛选器
+        setupDateFilters();
 
         // 渲染默认 Tab
         renderTab('quality');
