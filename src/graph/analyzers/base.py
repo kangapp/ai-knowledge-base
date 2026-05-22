@@ -95,20 +95,26 @@ async def analyze_items(
 
                 response = await client.chat.completions.create(**kwargs)
                 content = response.choices[0].message.content or "{}"
-                analyzed = parse_and_validate(content, ref_url=item.url)
 
+                # 立即提取 tokens 并计算 cost，无论 parse 是否成功都记录
                 tokens_in = response.usage.prompt_tokens if response.usage else 0
                 tokens_out = response.usage.completion_tokens if response.usage else 0
                 cost = registry.calc_cost(provider, model_id, tokens_in, tokens_out)
 
+                # 先更新熔断统计（无论 parse 是否成功）
                 registry.budget.add_cost(provider, cost)
                 registry.health.record_success(provider, 0)
 
+                # 再 parse，parse 失败会抛出异常
+                analyzed = parse_and_validate(content, ref_url=item.url)
+
+                # parse 成功，记录 CostRecord 并 break
                 results.append(analyzed)
                 costs.append(CostRecord(agent=agent_name, provider=provider, model=model_id, tokens_in=tokens_in, tokens_out=tokens_out, cost=cost))
                 break
 
             except Exception as e:
+                # parse 失败，仍需记录熔断统计（cost 已在上方 try 块记录）
                 registry.health.record_failure(provider, str(e))
                 if attempt == 1:
                     logger.warning("analyzer.parse_failed", extra={"agent": agent_name, "url": item.url, "error": str(e)})
