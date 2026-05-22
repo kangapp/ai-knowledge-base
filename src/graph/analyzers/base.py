@@ -110,7 +110,7 @@ async def analyze_items(
 
                 # parse 成功，记录 CostRecord 并 break
                 results.append(analyzed)
-                costs.append(CostRecord(agent=agent_name, provider=provider, model=model_id, tokens_in=tokens_in, tokens_out=tokens_out, cost=cost))
+                costs.append(CostRecord(agent=agent_name, provider=provider, model=model_id, tokens_in=tokens_in, tokens_out=tokens_out, cost=cost, ref_url=item.url))
                 break
 
             except Exception as e:

@@ -100,7 +100,8 @@ async def reviewer_node(state: PipelineState, registry: LLMRegistry) -> dict:
                 reviewed.ref_url = item.ref_url
                 cost_records.append(CostRecord(
                     agent="reviewer", provider=provider, model=model_id,
-                    tokens_in=tokens_in, tokens_out=tokens_out, cost=cost
+                    tokens_in=tokens_in, tokens_out=tokens_out, cost=cost,
+                    ref_url=item.ref_url
                 ))
                 break
 
