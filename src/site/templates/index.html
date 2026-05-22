@@ -25,8 +25,14 @@
         {% elif article.source_detail == 'https://openai.com/blog/rss.xml' %}{% set source_label = 'OpenAI' %}
         {% else %}{% set source_label = article.source_detail %}{% endif %}
     {% else %}{% set source_label = article.source %}{% endif %}
+    {% set article_tags = article.tags[:3] if article.tags else [] %}
     <div class="article-card" data-score="{{ article.relevance_score }}" data-source="{{ article.source }}" data-source-detail="{{ article.source_detail or '' }}">
-        <div class="card-top"><span class="topic-tag">{{ source_label }}</span></div>
+        <div class="card-header">
+            <span class="topic-tag">{{ source_label }}</span>
+            {% if article_tags %}
+            <div class="tags">{% for tag in article_tags %}<span class="tag">{{ tag }}</span>{% endfor %}</div>
+            {% endif %}
+        </div>
         <h3><a href="/article.html?id={{ article.id }}">{{ article.title }}</a></h3>
         <p>{{ article.description }}</p>
         <div class="meta">

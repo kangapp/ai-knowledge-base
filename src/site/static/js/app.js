@@ -54,9 +54,13 @@
         }
         list.innerHTML = articles.map(a => {
             const label = getSourceLabel(a.source, a.source_detail);
+            const tagsHtml = (a.tags || []).slice(0, 3).map(t => `<span class="tag">${escapeHtml(t)}</span>`).join('');
             return `
             <div class="article-card" data-score="${a.relevance_score}" data-source="${a.source}" data-source-detail="${a.source_detail || ''}">
-                <div class="card-top"><span class="topic-tag">${escapeHtml(label)}</span></div>
+                <div class="card-header">
+                    <span class="topic-tag">${escapeHtml(label)}</span>
+                    ${tagsHtml ? `<div class="tags">${tagsHtml}</div>` : ''}
+                </div>
                 <h3><a href="/article.html?id=${a.id}">${escapeHtml(a.title)}</a></h3>
                 <p>${escapeHtml(a.description || '')}</p>
                 <div class="meta">
