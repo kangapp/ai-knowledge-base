@@ -631,3 +631,114 @@ _graph = build_pipeline(_registry)
 - `save_cost_log` 添加 commit
 
 **相关文件**: `src/main.py`, `src/db/operations.py`, `src/graph/pipeline.py`
+
+---
+
+## Bug 30: MiniMax `abab6.5s-chat` 模型已停用，导致全量分析失败
+
+**发现时间**: 2026-05-22
+**发现场景**: VPS 上 pipeline analyze 阶段全量失败，所有 item 返回 `LLM output is not valid JSON`
+**根因**: MiniMax API 已弃用 `abab6.5s-chat` 模型，API 返回错误 `"your current token plan not support model, abab6.5s-chat (2061)"`
+
+**错误日志**:
+```
+analyzer.parse_failed, agent=rss_analyzer, url=..., error="Error code: 500 - {'type': 'error', 'error': {'type': 'server_error', 'message': 'your current token plan not support model, abab6.5s-chat (2061)', 'http_code': '500'}}"
+```
+
+**处理**: 将 `config/agents.yaml` 中所有 analyzer 和 reviewer 的 `abab6.5s-chat` 替换为 `MiniMax-M2.7`
+
+**相关文件**: `config/agents.yaml`
+
+---
+
+## Bug 31: MiniMax thinking tags 导致 `parse_and_validate` JSON 解析失败
+
+**发现时间**: 2026-05-22
+**发现场景**: analyze 阶段全量失败，日志显示 `LLM output is not valid JSON`
+**根因**: MiniMax 返回内容包含 `<think> ... 】` 格式的 thinking tags（有时无结束标签），`parse_and_validate` 未处理导致 JSON 解析时包含干扰文本
+
+**处理**: 在 `parse_and_validate` 中添加 thinking tag 剥离逻辑：
+```python
+for _ in range(10):
+    new_raw = re.sub(r'<think>[\s\S]*?】', '', raw).strip()
+    if new_raw == raw:
+        break
+    raw = new_raw
+json_start = raw.find('{')
+if json_start > 0:
+    raw = raw[json_start:]
+```
+
+**相关文件**: `src/graph/analyzers/base.py`
+
+---
+
+## Bug 32: `parse_reviewer_output` 缺少 thinking tags 处理
+
+**发现时间**: 2026-05-22
+**发现场景**: reviewer 阶段全量失败，日志显示 `Reviewer output is not valid JSON`
+**根因**: `parse_reviewer_output` 只处理 markdown ```json 包裹，未处理 MiniMax thinking tags，导致解析失败后触发熔断
+
+**处理**: 添加与 `base.py` 一致的 thinking tag 剥离逻辑：
+```python
+for _ in range(10):
+    new_raw = re.sub(r'<think>[\s\S]*?(】|</think>)', '', raw).strip()
+    if new_raw == raw:
+        break
+    raw = new_raw
+```
+
+**相关文件**: `src/graph/reviewer.py`
+
+---
+
+## Bug 33: `parse_reviewer_output` markdown-first 顺序导致 markdown 包裹 JSON 解析失败
+
+**发现时间**: 2026-05-22
+**发现场景**: 本地测试 `test_parse_reviewer_output_markdown_wrapped` 失败
+**根因**: 原实现先剥离 thinking tag 再用 `find('{')` 截断，但对 `` ```json\n{...}\n``` `` 格式，`find('{')` 找到后 JSON 解析成功但留下尾部 `\n``` ` 导致 `Extra data` 错误
+
+**处理**: 优先用正则剥离 markdown 包裹，再处理 thinking tags：
+```python
+m = re.search(r'```(?:json)?\s*(.*?)\s*```', raw, re.DOTALL)
+if m:
+    return ReviewedItem.model_validate(json.loads(m.group(1)))
+# 然后再处理 thinking tags...
+```
+
+**相关文件**: `src/graph/reviewer.py`
+
+---
+
+## Bug 34: 本地 `config/agents.yaml` 模型名未同步
+
+**发现时间**: 2026-05-22
+**发现场景**: 本地代码中 `agents.yaml` 仍是 `abab6.5s-chat`，与 VPS 上的已修正版本不一致
+**根因**: VPS 上手动修改了 `/opt/ai-knowledge-base/config/agents.yaml`，但本地 git 仓库未同步更新
+
+**处理**: 将本地 `config/agents.yaml` 中 5 处 `abab6.5s-chat` 替换为 `MiniMax-M2.7`
+
+**相关文件**: `config/agents.yaml`
+
+---
+
+## Bug 35: 文章卡片右上角标签（AI/Agent 等）丢失
+
+**发现时间**: 2026-05-22
+**发现场景**: 首页文章卡片只剩左上角来源标签，右上角文章标签（AI、Agent、LLM）消失
+**根因**: `1c7e367` 重构 app.js 时将 `card-header`（含 `source-badge` 来源徽章 + `tags` 标签）替换为只有 `card-top`（来源标签），导致右上角标签丢失
+
+**错误日志**:
+```javascript
+// 重构后 render() 输出（丢失了标签）
+<div class="card-top"><span class="topic-tag">${label}</span></div>
+// 之前有右上角标签
+<div class="card-header"><span class="source-badge">${a.source}</span><div class="tags">...</div></div>
+```
+
+**处理**:
+1. `index.html` 模板添加 `article_tags` 变量和 `tags` 渲染逻辑
+2. `app.js` render() 用 `card-header` 布局替换 `card-top`（左侧来源 + 右侧标签）
+3. `style.css` 补充 `.card-header/.tags/.tag` 样式
+
+**相关文件**: `src/site/templates/index.html`, `src/site/static/js/app.js`, `src/site/static/css/style.css`
