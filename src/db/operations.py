@@ -146,3 +146,180 @@ async def backup_database(db: Database, backup_dir: str):
                 f.unlink()
         except ValueError:
             pass
+
+
+async def get_quality_stats(db: Database, days: int = 30) -> dict:
+    """数据质量 Tab 查询"""
+    # 评分分布
+    score_buckets = await db.fetch_all("""
+        SELECT
+            CASE
+                WHEN relevance_score <= 20 THEN '0-20'
+                WHEN relevance_score <= 40 THEN '20-40'
+                WHEN relevance_score <= 60 THEN '40-60'
+                WHEN relevance_score <= 80 THEN '60-80'
+                ELSE '80-100'
+            END as bucket,
+            COUNT(*) as count
+        FROM articles
+        WHERE status='approved' AND collected_at >= date('now', ?)
+        GROUP BY bucket
+    """, (f"-{days} days",))
+
+    # 来源细分评分
+    source_scores = await db.fetch_all("""
+        SELECT source, source_detail,
+               COUNT(*) as article_count,
+               AVG(relevance_score) as avg_score
+        FROM articles
+        WHERE status='approved' AND collected_at >= date('now', ?)
+        GROUP BY source, source_detail
+        ORDER BY avg_score DESC
+    """, (f"-{days} days",))
+
+    # 标签云
+    top_tags = await db.fetch_all("""
+        SELECT t.name, COUNT(*) as count
+        FROM tags t JOIN article_tags at ON t.id=at.tag_id
+        JOIN articles a ON a.id=at.article_id
+        WHERE a.status='approved' AND a.collected_at >= date('now', ?)
+        GROUP BY t.id
+        ORDER BY count DESC LIMIT 20
+    """, (f"-{days} days",))
+
+    # 本周 vs 上月同期
+    this_week = await db.fetch_one("""
+        SELECT COUNT(*) as c FROM articles
+        WHERE status='approved' AND collected_at >= date('now', '-7 days')
+    """)
+    last_week = await db.fetch_one("""
+        SELECT COUNT(*) as c FROM articles
+        WHERE collected_at >= date('now', '-14 days') AND collected_at < date('now', '-7 days')
+    """)
+
+    return {
+        "score_distribution": [{"bucket": r["bucket"], "count": r["count"]} for r in score_buckets],
+        "source_scores": [{"source": r["source"], "source_detail": r["source_detail"],
+                            "article_count": r["article_count"], "avg_score": round(r["avg_score"], 1)} for r in source_scores],
+        "top_tags": [{"name": r["name"], "count": r["count"]} for r in top_tags],
+        "freshness": {
+            "this_week": this_week["c"] if this_week else 0,
+            "last_week": last_week["c"] if last_week else 0,
+        }
+    }
+
+
+async def get_runtime_stats(db: Database, days: int = 7) -> dict:
+    """运行状态 Tab 查询"""
+    # 最新一次 pipeline run
+    last_run = await db.fetch_one(
+        "SELECT * FROM pipeline_runs ORDER BY started_at DESC LIMIT 1"
+    )
+
+    if not last_run:
+        return {"run": None, "phases": [], "failures": [], "providers": []}
+
+    run_id = last_run["id"]
+
+    # Phase logs
+    phases = await db.fetch_all("""
+        SELECT phase, status, started_at, ended_at, duration_ms, details
+        FROM pipeline_phase_logs WHERE run_id=? ORDER BY id
+    """, (run_id,))
+
+    # 失败日志（通过 ref_url JOIN articles 获取标题）
+    failures = await db.fetch_all("""
+        SELECT cl.created_at, cl.agent, cl.provider, cl.ref_url,
+               cl.cost, cl.tokens_in, cl.tokens_out,
+               a.title as article_title
+        FROM cost_logs cl
+        LEFT JOIN articles a ON a.url = cl.ref_url
+        WHERE cl.run_id=? AND cl.cost = 0
+        ORDER BY cl.created_at DESC LIMIT 50
+    """, (run_id,))
+
+    # Provider 健康状态（从 circuit_events 最近）
+    provider_events = await db.fetch_all("""
+        SELECT provider, event, reason, created_at
+        FROM circuit_events ORDER BY created_at DESC LIMIT 20
+    """)
+
+    provider_latest = {}
+    for e in provider_events:
+        p = e["provider"]
+        if p not in provider_latest:
+            provider_latest[p] = e
+
+    return {
+        "run": dict(last_run) if last_run else None,
+        "phases": [dict(p) for p in phases],
+        "failures": [{
+            "time": f["created_at"][11:19] if f["created_at"] else "",
+            "stage": f["agent"],
+            "provider": f["provider"],
+            "url": f["ref_url"] or "",
+            "title": f["article_title"] or "",
+        } for f in failures],
+        "providers": [{
+            "name": p,
+            "last_event": e["event"],
+            "last_reason": e["reason"] or "",
+            "last_time": e["created_at"] or "",
+        } for p, e in provider_latest.items()]
+    }
+
+
+async def get_consumption_stats(db: Database, days: int = 30) -> dict:
+    """资源消耗 Tab 查询"""
+    # Provider 费用分解（按日）
+    provider_daily = await db.fetch_all("""
+        SELECT date(created_at) as date, provider,
+               SUM(cost) as cost, SUM(tokens_in+tokens_out) as tokens
+        FROM cost_logs
+        WHERE created_at >= date('now', ?)
+        GROUP BY date(created_at), provider
+        ORDER BY date
+    """, (f"-{days} days",))
+
+    # Agent 费用分解（按日）
+    agent_daily = await db.fetch_all("""
+        SELECT date(created_at) as date, agent,
+               SUM(cost) as cost, SUM(tokens_in+tokens_out) as tokens
+        FROM cost_logs
+        WHERE created_at >= date('now', ?)
+        GROUP BY date(created_at), agent
+        ORDER BY date
+    """, (f"-{days} days",))
+
+    # 周期总花费
+    period_cost = await db.fetch_one("""
+        SELECT COALESCE(SUM(cost), 0) as total FROM cost_logs
+        WHERE created_at >= date('now', ?)
+    """, (f"-{days} days",))
+
+    # 周期总 token
+    period_tokens = await db.fetch_one("""
+        SELECT COALESCE(SUM(tokens_in + tokens_out), 0) as total FROM cost_logs
+        WHERE created_at >= date('now', ?)
+    """, (f"-{days} days",))
+
+    # per-provider 汇总
+    provider_summary = await db.fetch_all("""
+        SELECT provider, SUM(cost) as total_cost,
+               SUM(tokens_in) as total_in, SUM(tokens_out) as total_out
+        FROM cost_logs WHERE created_at >= date('now', ?)
+        GROUP BY provider
+    """, (f"-{days} days",))
+
+    return {
+        "provider_daily": [dict(r) for r in provider_daily],
+        "agent_daily": [dict(r) for r in agent_daily],
+        "period_cost": round(period_cost["total"], 4) if period_cost else 0,
+        "period_tokens": period_tokens["total"] if period_tokens else 0,
+        "provider_summary": [{
+            "provider": r["provider"],
+            "total_cost": round(r["total_cost"], 4),
+            "total_in": r["total_in"],
+            "total_out": r["total_out"],
+        } for r in provider_summary],
+    }
