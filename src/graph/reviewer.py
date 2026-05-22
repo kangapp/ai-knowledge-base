@@ -27,25 +27,28 @@ def _load_reviewer_prompt(registry: LLMRegistry) -> str:
 
 
 def parse_reviewer_output(raw: str) -> ReviewedItem:
-    # 容错：剥离 thinking tags
+    # 0. 容错：剥离 markdown ```json 包裹（优先，防止干扰后续 thinking tag 剥离）
+    m = re.search(r'```(?:json)?\s*(.*?)\s*```', raw, re.DOTALL)
+    if m:
+        return ReviewedItem.model_validate(json.loads(m.group(1)))
+
+    # 1. 容错：剥离 thinking tags（包括不完整的）
     for _ in range(10):
-        new_raw = re.sub(r'\<result\>[\s\S]*?\</result\>', '', raw).strip()
+        new_raw = re.sub(r'<think>[\s\S]*?(】|</think>)', '', raw).strip()
         if new_raw == raw:
             break
         raw = new_raw
+
+    # 2. 尝试从第一个 { 开始提取内容
     json_start = raw.find('{')
     if json_start > 0:
         raw = raw[json_start:]
 
+    # 3. 直接解析
     try:
-        data = json.loads(raw)
+        return ReviewedItem.model_validate(json.loads(raw))
     except json.JSONDecodeError:
-        m = re.search(r'```(?:json)?\s*(.*?)\s*```', raw, re.DOTALL)
-        if m:
-            data = json.loads(m.group(1))
-        else:
-            raise ValueError("Reviewer output is not valid JSON")
-    return ReviewedItem.model_validate(data)
+        raise ValueError("Reviewer output is not valid JSON")
 
 
 async def reviewer_node(state: PipelineState, registry: LLMRegistry) -> dict:
