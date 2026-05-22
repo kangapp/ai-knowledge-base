@@ -217,8 +217,16 @@
 
 // Dashboard Tab Controller
 (function() {
-    // 引用第一个IIFE定义的RSS_LABELS映射
-    const RSS_LABELS = window.__RSS_LABELS__ || {};
+    // RSS 中文简称本地映射（避免跨 IIFE 作用域问题）
+    const RSS_LABELS_LOCAL = {
+        'https://36kr.com/feed': '36氪', 'https://www.ithome.com/rss/': 'IT之家',
+        'https://techcrunch.com/feed/': 'TechCrunch', 'https://www.theverge.com/rss/index.xml': 'The Verge',
+        'https://feeds.arstechnica.com/arstechnica/index': 'Ars Technica', 'https://feeds.reuters.com/reuters/scienceNews': 'Reuters',
+        'https://www.huxiu.com/rss/feed': '虎嗅', 'https://api.juejin.cn/rss': '掘金',
+        'https://openai.com/blog/rss.xml': 'OpenAI', 'https://feeds.feedburner.com/producthunt': 'Product Hunt',
+        '36氪': '36氪', 'TechCrunch AI': 'TechCrunch', 'IT之家': 'IT之家',
+        'Ars Technica': 'Ars Technica', 'OpenAI': 'OpenAI', '虎嗅': '虎嗅',
+    };
     let cachedData = { quality: null, runtime: null, consumption: null };
 
     async function loadTab(tab) {
@@ -435,8 +443,8 @@
             document.getElementById('kpi-active-sources').textContent = s.active_sources || 0;
             // 活跃源显示细分（使用RSS_LABELS映射中文）
             const details = json.data.active_source_details || [];
-            const rssSubs = details.filter(d => d.source === 'rss').map(d => window.__RSS_LABELS__[d.source_detail] || d.source_detail).filter(Boolean).slice(0, 5);
-            const subLabel = rssSubs.length > 0 ? 'RSS: ' + rssSubs.join(', ') : (details.length > 0 ? details.map(d => window.__RSS_LABELS__[d.source_detail] || d.source_detail || d.source).filter(Boolean).slice(0, 3).join(', ') : '无');
+            const rssSubs = details.filter(d => d.source === 'rss').map(d => RSS_LABELS_LOCAL[d.source_detail] || d.source_detail).filter(Boolean).slice(0, 5);
+            const subLabel = rssSubs.length > 0 ? 'RSS: ' + rssSubs.join(', ') : (details.length > 0 ? details.map(d => RSS_LABELS_LOCAL[d.source_detail] || d.source_detail || d.source).filter(Boolean).slice(0, 3).join(', ') : '无');
             document.getElementById('kpi-active-sources-sub').textContent = subLabel;
         }
 
