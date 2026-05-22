@@ -87,21 +87,22 @@ main { max-width: 1200px; margin: 2rem auto; padding: 0 1rem; }
 .log-entry.success .log-msg { color: #22c55e; }
 .log-entry.info .log-msg { color: #1a73e8; }
 
-/* ===== Enhanced Dashboard ===== */
-.dashboard-page .page-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem; }
-.dashboard-page .tabs { display: flex; gap: 0.5rem; background: #1e293b; padding: 0.25rem; border-radius: 8px; }
-.dashboard-page .tab { padding: 0.5rem 1rem; border-radius: 6px; font-size: 0.875rem; cursor: pointer; color: #94a3b8; border: none; background: none; }
-.dashboard-page .tab.active { background: #3b82f6; color: white; }
-.kpi-cards { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; margin-bottom: 2rem; }
-.kpi-card { background: #1e293b; border-radius: 12px; padding: 1.5rem; border: 1px solid #334155; }
-.kpi-label { font-size: 0.75rem; color: #94a3b8; text-transform: uppercase; margin-bottom: 0.5rem; }
-.kpi-value { font-size: 2rem; font-weight: 700; }
-.kpi-sub { font-size: 0.75rem; color: #64748b; margin-top: 0.25rem; }
+/* ===== Enhanced Dashboard (Light Theme) ===== */
+.dashboard-page .page-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; }
+.dashboard-page .tabs { display: flex; gap: 0.25rem; background: #fff; padding: 0.25rem; border-radius: 8px; border: 1px solid #e0e0e0; }
+.dashboard-page .tab { padding: 0.5rem 1rem; border-radius: 6px; font-size: 0.875rem; cursor: pointer; color: #666; border: none; background: none; transition: all 0.2s; }
+.dashboard-page .tab.active { background: #1a1a2e; color: #fff; }
+.dashboard-page .tab:hover:not(.active) { background: #f5f5f5; }
+.kpi-cards { display: grid; grid-template-columns: repeat(5, 1fr); gap: 1rem; margin-bottom: 1.5rem; }
+.kpi-card { background: #fff; border-radius: 12px; padding: 1.25rem; border: 1px solid #e0e0e0; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+.kpi-label { font-size: 0.75rem; color: #666; text-transform: uppercase; margin-bottom: 0.5rem; }
+.kpi-value { font-size: 1.75rem; font-weight: 700; color: #1a1a2e; }
+.kpi-sub { font-size: 0.75rem; color: #999; margin-top: 0.25rem; }
 .kpi-sub .trend { color: #22c55e; }
 .kpi-sub .trend.down { color: #ef4444; }
 .charts-layout { display: grid; grid-template-columns: 2fr 1fr; gap: 1.5rem; }
-.chart-card { background: #1e293b; border-radius: 12px; padding: 1.5rem; border: 1px solid #334155; }
-.chart-card h3 { font-size: 0.875rem; color: #94a3b8; margin-bottom: 1rem; text-transform: uppercase; }
+.chart-card { background: #fff; border-radius: 12px; padding: 1.5rem; border: 1px solid #e0e0e0; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+.chart-card h3 { font-size: 0.875rem; color: #666; margin-bottom: 1rem; text-transform: uppercase; }
 .chart-canvas-wrapper { position: relative; height: 350px; width: 100%; }
 .chart-legend { display: flex; gap: 1.5rem; margin-top: 1rem; font-size: 0.75rem; color: #94a3b8; }
 .chart-legend .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; margin-right: 0.5rem; }
@@ -111,11 +112,6 @@ main { max-width: 1200px; margin: 2rem auto; padding: 0 1rem; }
 .source-count { font-size: 0.875rem; color: #94a3b8; }
 .source-bar { height: 4px; background: #334155; border-radius: 2px; overflow: hidden; }
 .source-bar-fill { height: 100%; background: #3b82f6; border-radius: 2px; transition: width 0.3s; }
-/* ===== Dashboard Tabs ===== */
-.dashboard-page .tabs { display: flex; gap: 0.5rem; background: #1e293b; padding: 0.25rem; border-radius: 8px; margin-bottom: 1.5rem; }
-.dashboard-page .tab { padding: 0.5rem 1rem; border-radius: 6px; font-size: 0.875rem; cursor: pointer; color: #94a3b8; border: none; background: none; }
-.dashboard-page .tab.active { background: #3b82f6; color: white; }
-.dashboard-page .tab:hover:not(.active) { background: #334155; color: #fff; }
 .tab-content { display: none; }
 .tab-content.active { display: block; }
 
@@ -152,7 +148,7 @@ main { max-width: 1200px; margin: 2rem auto; padding: 0 1rem; }
 .log-table tr:hover { background: #f8f8f8; }
 
 /* Progress bar */
-.progress-bar-wrapper { height: 6px; background: #334155; border-radius: 3px; margin-top: 0.5rem; overflow: hidden; }
+.progress-bar-wrapper { height: 6px; background: #e0e0e0; border-radius: 3px; margin-top: 0.5rem; overflow: hidden; }
 .progress-bar { height: 100%; background: #3b82f6; border-radius: 3px; transition: width 0.3s; }
 .progress-bar.warning { background: #f97316; }
 .progress-bar.danger { background: #ef4444; }

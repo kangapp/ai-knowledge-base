@@ -1,0 +1,278 @@
+- generic [ref=e2]:
+  - region "Skip to main content":
+    - link "Skip to main content" [ref=e3] [cursor=pointer]:
+      - /url: "#__docusaurus_skipToContent_fallback"
+  - navigation "Main" [ref=e4]:
+    - generic [ref=e5]:
+      - link "DeepSeek API Docs Logo DeepSeek API Docs" [ref=e7] [cursor=pointer]:
+        - /url: /
+        - img "DeepSeek API Docs Logo" [ref=e9]
+        - generic [ref=e10]: DeepSeek API Docs
+      - generic [ref=e11]:
+        - button "English" [ref=e13] [cursor=pointer]:
+          - img [ref=e14]
+          - text: English
+        - link "DeepSeek Platform" [ref=e16] [cursor=pointer]:
+          - /url: https://platform.deepseek.com/
+          - text: DeepSeek Platform
+          - img [ref=e17]
+        - button "Switch between dark and light mode (currently light mode)" [disabled] [ref=e20]:
+          - img [ref=e21]
+  - generic [ref=e25]:
+    - complementary [ref=e26]:
+      - navigation "Docs sidebar" [ref=e29]:
+        - list [ref=e30]:
+          - listitem [ref=e31]:
+            - link "Quick Start" [expanded] [ref=e33] [cursor=pointer]:
+              - /url: /
+            - list [ref=e34]:
+              - listitem [ref=e35]:
+                - link "Your First API Call" [ref=e36] [cursor=pointer]:
+                  - /url: /
+              - listitem [ref=e37]:
+                - link "Models & Pricing" [ref=e38] [cursor=pointer]:
+                  - /url: /quick_start/pricing
+              - listitem [ref=e39]:
+                - link "Token & Token Usage" [ref=e40] [cursor=pointer]:
+                  - /url: /quick_start/token_usage
+              - listitem [ref=e41]:
+                - link "Rate Limit & Isolation" [ref=e42] [cursor=pointer]:
+                  - /url: /quick_start/rate_limit
+              - listitem [ref=e43]:
+                - link "Error Codes" [ref=e44] [cursor=pointer]:
+                  - /url: /quick_start/error_codes
+              - listitem [ref=e45]:
+                - link "Agent Integrations" [ref=e47] [cursor=pointer]:
+                  - /url: /quick_start/agent_integrations/claude_code
+          - listitem [ref=e48]:
+            - link "API Guides" [expanded] [ref=e50] [cursor=pointer]:
+              - /url: /guides/thinking_mode
+            - list [ref=e51]:
+              - listitem [ref=e52]:
+                - link "Thinking Mode" [ref=e53] [cursor=pointer]:
+                  - /url: /guides/thinking_mode
+              - listitem [ref=e54]:
+                - link "Multi-round Conversation" [ref=e55] [cursor=pointer]:
+                  - /url: /guides/multi_round_chat
+              - listitem [ref=e56]:
+                - link "Chat Prefix Completion (Beta)" [ref=e57] [cursor=pointer]:
+                  - /url: /guides/chat_prefix_completion
+              - listitem [ref=e58]:
+                - link "FIM Completion (Beta)" [ref=e59] [cursor=pointer]:
+                  - /url: /guides/fim_completion
+              - listitem [ref=e60]:
+                - link "JSON Output" [ref=e61] [cursor=pointer]:
+                  - /url: /guides/json_mode
+              - listitem [ref=e62]:
+                - link "Tool Calls" [ref=e63] [cursor=pointer]:
+                  - /url: /guides/tool_calls
+              - listitem [ref=e64]:
+                - link "Context Caching" [ref=e65] [cursor=pointer]:
+                  - /url: /guides/kv_cache
+              - listitem [ref=e66]:
+                - link "Anthropic API" [ref=e67] [cursor=pointer]:
+                  - /url: /guides/anthropic_api
+          - listitem [ref=e68]:
+            - link "API Reference" [ref=e70] [cursor=pointer]:
+              - /url: /api/deepseek-api
+          - listitem [ref=e71]:
+            - link "News" [ref=e73] [cursor=pointer]:
+              - /url: /news/news260424
+          - listitem [ref=e74]:
+            - link "Other Resources" [ref=e76] [cursor=pointer]:
+              - /url: https://github.com/deepseek-ai/awesome-deepseek-integration/tree/main
+          - listitem [ref=e77]:
+            - link "FAQ" [ref=e78] [cursor=pointer]:
+              - /url: /faq
+          - listitem [ref=e79]:
+            - link "Change Log" [ref=e80] [cursor=pointer]:
+              - /url: /updates
+    - main [ref=e81]:
+      - generic [ref=e83]:
+        - generic [ref=e85]:
+          - article [ref=e86]:
+            - navigation "Breadcrumbs" [ref=e87]:
+              - list [ref=e88]:
+                - listitem [ref=e89]:
+                  - link "Home page" [ref=e90] [cursor=pointer]:
+                    - /url: /
+                    - img [ref=e91]
+                - listitem [ref=e93]:
+                  - generic [ref=e94]: Quick Start
+                - listitem [ref=e95]:
+                  - generic [ref=e96]: Models & Pricing
+            - generic [ref=e99]:
+              - heading "Models & Pricing" [level=1] [ref=e100]
+              - paragraph [ref=e101]: The prices listed below are in units of per 1M tokens. A token, the smallest unit of text that the model recognizes, can be a word, a number, or even a punctuation mark. We will bill based on the total number of input and output tokens by the model.
+              - separator [ref=e102]
+              - heading "Model DetailsDirect link to Model Details" [level=2] [ref=e103]:
+                - text: Model Details
+                - link "Direct link to Model Details" [ref=e104] [cursor=pointer]:
+                  - /url: "#model-details"
+                  - text: "#"
+              - table [ref=e107]:
+                - rowgroup [ref=e108]:
+                  - row "MODEL deepseek-v4-flash(1) deepseek-v4-pro" [ref=e109]:
+                    - cell "MODEL" [ref=e110]
+                    - cell "deepseek-v4-flash(1)" [ref=e111]:
+                      - text: deepseek-v4-flash
+                      - superscript [ref=e112]: (1)
+                    - cell "deepseek-v4-pro" [ref=e113]
+                  - row "BASE URL (OpenAI Format) https://api.deepseek.com" [ref=e114]:
+                    - cell "BASE URL (OpenAI Format)" [ref=e115]
+                    - cell "https://api.deepseek.com" [ref=e116]:
+                      - link "https://api.deepseek.com" [ref=e117] [cursor=pointer]:
+                        - /url: https://api.deepseek.com
+                  - row "BASE URL (Anthropic Format) https://api.deepseek.com/anthropic" [ref=e118]:
+                    - cell "BASE URL (Anthropic Format)" [ref=e119]
+                    - cell "https://api.deepseek.com/anthropic" [ref=e120]:
+                      - link "https://api.deepseek.com/anthropic" [ref=e121] [cursor=pointer]:
+                        - /url: https://api.deepseek.com/anthropic
+                  - row "MODEL VERSION DeepSeek-V4-Flash DeepSeek-V4-Pro" [ref=e122]:
+                    - cell "MODEL VERSION" [ref=e123]
+                    - cell "DeepSeek-V4-Flash" [ref=e124]
+                    - cell "DeepSeek-V4-Pro" [ref=e125]
+                  - row "THINKING MODE Supports both non-thinking and thinking (default) modes See Thinking Mode for how to switch" [ref=e126]:
+                    - cell "THINKING MODE" [ref=e127]
+                    - cell "Supports both non-thinking and thinking (default) modes See Thinking Mode for how to switch" [ref=e128]:
+                      - text: Supports both non-thinking and thinking (default) modes
+                      - text: See
+                      - link "Thinking Mode" [ref=e129] [cursor=pointer]:
+                        - /url: /guides/thinking_mode
+                      - text: for how to switch
+                  - row "CONTEXT LENGTH 1M" [ref=e130]:
+                    - cell "CONTEXT LENGTH" [ref=e131]
+                    - cell "1M" [ref=e132]
+                  - 'row "MAX OUTPUT MAXIMUM: 384K" [ref=e133]':
+                    - cell "MAX OUTPUT" [ref=e134]
+                    - 'cell "MAXIMUM: 384K" [ref=e135]'
+                  - row "FEATURES Json Output ✓ ✓" [ref=e136]:
+                    - cell "FEATURES" [ref=e137]
+                    - cell "Json Output" [ref=e138]:
+                      - link "Json Output" [ref=e139] [cursor=pointer]:
+                        - /url: /guides/json_mode
+                    - cell "✓" [ref=e140]
+                    - cell "✓" [ref=e141]
+                  - row "Tool Calls ✓ ✓" [ref=e142]:
+                    - cell "Tool Calls" [ref=e143]:
+                      - link "Tool Calls" [ref=e144] [cursor=pointer]:
+                        - /url: /guides/tool_calls
+                    - cell "✓" [ref=e145]
+                    - cell "✓" [ref=e146]
+                  - row "Chat Prefix Completion（Beta） ✓ ✓" [ref=e147]:
+                    - cell "Chat Prefix Completion（Beta）" [ref=e148]:
+                      - link "Chat Prefix Completion（Beta）" [ref=e149] [cursor=pointer]:
+                        - /url: /guides/chat_prefix_completion
+                    - cell "✓" [ref=e150]
+                    - cell "✓" [ref=e151]
+                  - row "FIM Completion（Beta） Non-thinking mode only Non-thinking mode only" [ref=e152]:
+                    - cell "FIM Completion（Beta）" [ref=e153]:
+                      - link "FIM Completion（Beta）" [ref=e154] [cursor=pointer]:
+                        - /url: /guides/fim_completion
+                    - cell "Non-thinking mode only" [ref=e155]
+                    - cell "Non-thinking mode only" [ref=e156]
+                  - row "PRICING 1M INPUT TOKENS (CACHE HIT)(2) $0.0028 $0.003625 (75% off(3))$0.0145" [ref=e157]:
+                    - cell "PRICING" [ref=e158]
+                    - cell "1M INPUT TOKENS (CACHE HIT)(2)" [ref=e159]:
+                      - text: 1M INPUT TOKENS (CACHE HIT)
+                      - superscript [ref=e160]: (2)
+                    - cell "$0.0028" [ref=e161]
+                    - cell "$0.003625 (75% off(3))$0.0145" [ref=e162]:
+                      - text: $0.003625 (75% off
+                      - superscript [ref=e163]: (3)
+                      - text: )
+                      - deletion [ref=e164]: $0.0145
+                  - row "1M INPUT TOKENS (CACHE MISS) $0.14 $0.435 (75% off(3))$1.74" [ref=e165]:
+                    - cell "1M INPUT TOKENS (CACHE MISS)" [ref=e166]
+                    - cell "$0.14" [ref=e167]
+                    - cell "$0.435 (75% off(3))$1.74" [ref=e168]:
+                      - text: $0.435 (75% off
+                      - superscript [ref=e169]: (3)
+                      - text: )
+                      - deletion [ref=e170]: $1.74
+                  - row "1M OUTPUT TOKENS $0.28 $0.87 (75% off(3))$3.48" [ref=e171]:
+                    - cell "1M OUTPUT TOKENS" [ref=e172]
+                    - cell "$0.28" [ref=e173]
+                    - cell "$0.87 (75% off(3))$3.48" [ref=e174]:
+                      - text: $0.87 (75% off
+                      - superscript [ref=e175]: (3)
+                      - text: )
+                      - deletion [ref=e176]: $3.48
+                  - row "Concurrency Limit(4) 2500 500" [ref=e177]:
+                    - cell "Concurrency Limit(4)" [ref=e178]:
+                      - text: Concurrency Limit
+                      - superscript [ref=e179]: (4)
+                    - cell "2500" [ref=e180]
+                    - cell "500" [ref=e181]
+              - paragraph [ref=e182]:
+                - text: (1) The model names
+                - code [ref=e183]: deepseek-chat
+                - text: and
+                - code [ref=e184]: deepseek-reasoner
+                - text: will be deprecated in the future. For compatibility, they correspond to the non-thinking mode and thinking mode of
+                - code [ref=e185]: deepseek-v4-flash
+                - text: ", respectively."
+                - text: (2) For all models, the input cache hit price has been reduced to 1/10 of the launch price. This price adjustment takes effect from 2026/4/26 12:15 UTC.
+                - text: (3) The deepseek-v4-pro model API pricing will be officially adjusted to 1/4 of the original price after the 75% discount promotion ends on 2026/05/31 15:59 UTC.
+                - text: (4) For more details on concurrency limits, please refer to
+                - link "Rate Limit & Isolation" [ref=e186] [cursor=pointer]:
+                  - /url: /quick_start/rate_limit
+              - separator [ref=e187]
+              - heading "Deduction RulesDirect link to Deduction Rules" [level=2] [ref=e188]:
+                - text: Deduction Rules
+                - link "Direct link to Deduction Rules" [ref=e189] [cursor=pointer]:
+                  - /url: "#deduction-rules"
+                  - text: "#"
+              - paragraph [ref=e190]: The expense = number of tokens × price. The corresponding fees will be directly deducted from your topped-up balance or granted balance, with a preference for using the granted balance first when both balances are available.
+              - paragraph [ref=e191]: Product prices may vary and DeepSeek reserves the right to adjust them. We recommend topping up based on your actual usage and regularly checking this page for the most recent pricing information.
+          - navigation "Docs pages" [ref=e193]:
+            - link "Previous « Your First API Call" [ref=e194] [cursor=pointer]:
+              - /url: /
+              - generic [ref=e195]: Previous
+              - generic [ref=e196]: « Your First API Call
+            - link "Next Token & Token Usage »" [ref=e197] [cursor=pointer]:
+              - /url: /quick_start/token_usage
+              - generic [ref=e198]: Next
+              - generic [ref=e199]: Token & Token Usage »
+        - list [ref=e202]:
+          - listitem [ref=e203]:
+            - link "Model Details" [ref=e204] [cursor=pointer]:
+              - /url: "#model-details"
+          - listitem [ref=e205]:
+            - link "Deduction Rules" [ref=e206] [cursor=pointer]:
+              - /url: "#deduction-rules"
+  - contentinfo [ref=e207]:
+    - generic [ref=e208]:
+      - generic [ref=e209]:
+        - generic [ref=e210]:
+          - generic [ref=e211]: WeChat Official Account
+          - list [ref=e212]:
+            - listitem [ref=e213]:
+              - img "WeChat QRcode" [ref=e214]
+        - generic [ref=e215]:
+          - generic [ref=e216]: Community
+          - list [ref=e217]:
+            - listitem [ref=e218]:
+              - link "Email" [ref=e219] [cursor=pointer]:
+                - /url: mailto:api-service@deepseek.com
+                - text: Email
+                - img [ref=e220]
+            - listitem [ref=e222]:
+              - link "Discord" [ref=e223] [cursor=pointer]:
+                - /url: https://discord.gg/Tc7c45Zzu5
+                - text: Discord
+                - img [ref=e224]
+            - listitem [ref=e226]:
+              - link "Twitter" [ref=e227] [cursor=pointer]:
+                - /url: https://twitter.com/deepseek_ai
+                - text: Twitter
+                - img [ref=e228]
+        - generic [ref=e230]:
+          - generic [ref=e231]: More
+          - list [ref=e232]:
+            - listitem [ref=e233]:
+              - link "GitHub" [ref=e234] [cursor=pointer]:
+                - /url: https://github.com/deepseek-ai
+                - text: GitHub
+                - img [ref=e235]
+      - generic [ref=e238]: Copyright © 2026 DeepSeek, Inc.

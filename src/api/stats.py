@@ -74,12 +74,21 @@ async def get_stats_enhanced(days: int = Query(default=30, ge=1, le=3650)):
         GROUP BY month ORDER BY month
     """)
 
-    # Source distribution
+    # Source distribution (grouped by source)
     source_dist = await db.fetch_all("""
         SELECT source, COUNT(*) as count
         FROM articles WHERE status='approved'
         GROUP BY source ORDER BY count DESC
     """)
+
+    # Active source details (RSS细分 + 其他大类)
+    active_detail = await db.fetch_all("""
+        SELECT source, source_detail, COUNT(*) as count
+        FROM articles
+        WHERE status='approved' AND collected_at >= date('now', ?)
+        GROUP BY source, source_detail
+        ORDER BY count DESC
+    """, (f"-{days} days",))
 
     return {
         "code": 0,
@@ -97,6 +106,7 @@ async def get_stats_enhanced(days: int = Query(default=30, ge=1, le=3650)):
             "weekly_cost": [dict(r) for r in weekly],
             "monthly_cost": [dict(r) for r in monthly],
             "source_distribution": [dict(r) for r in source_dist],
+            "active_source_details": [dict(r) for r in active_detail],
         },
         "message": "ok"
     }

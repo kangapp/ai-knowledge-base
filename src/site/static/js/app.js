@@ -425,8 +425,17 @@
             document.getElementById('kpi-total').textContent = (s.total_articles || 0).toLocaleString();
             document.getElementById('kpi-period').textContent = '↑ ' + (s.period_articles || 0);
             document.getElementById('kpi-period-count').textContent = s.period_articles || 0;
+            // 通过率
+            const total = s.total_articles || 0;
+            const rate = total > 0 ? ((s.period_articles || 0) / total * 100).toFixed(0) + '%' : '-';
+            document.getElementById('kpi-approve-rate').textContent = rate;
             document.getElementById('kpi-avg-score').textContent = s.avg_score ? s.avg_score.toFixed(0) : '-';
             document.getElementById('kpi-active-sources').textContent = s.active_sources || 0;
+            // 活跃源显示细分（使用RSS_LABELS映射中文）
+            const details = json.data.active_source_details || [];
+            const rssSubs = details.filter(d => d.source === 'rss').map(d => RSS_LABELS[d.source_detail] || d.source_detail).filter(Boolean).slice(0, 5);
+            const subLabel = rssSubs.length > 0 ? 'RSS: ' + rssSubs.join(', ') : (details.length > 0 ? details.map(d => RSS_LABELS[d.source_detail] || d.source_detail || d.source).filter(Boolean).slice(0, 3).join(', ') : '无');
+            document.getElementById('kpi-active-sources-sub').textContent = subLabel;
         }
 
         // Tab 切换
