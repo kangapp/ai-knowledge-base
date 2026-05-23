@@ -17,6 +17,7 @@ from .graph.router import router_node  # retry 循环中手动路由 retry items
 from .api.routes import router, set_db, set_run_pipeline, set_builder
 from .api.config import router as config_router
 from .api.stats import router as stats_router
+from .api.sources import router as sources_router
 from .scheduler.source_scheduler import setup_source_scheduler
 from .db.operations import (
     start_pipeline_run, end_pipeline_run, save_article, save_tags,
@@ -284,6 +285,7 @@ def create_app() -> FastAPI:
     app.include_router(router)
     app.include_router(config_router)
     app.include_router(stats_router)
+    app.include_router(sources_router)
     app.add_exception_handler(HTTPException, http_exception_handler)
     app.add_exception_handler(Exception, general_exception_handler)
     return app
