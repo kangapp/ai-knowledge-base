@@ -103,12 +103,20 @@ async def reviewer_node(state: PipelineState, registry: LLMRegistry) -> dict:
                     tokens_in=tokens_in, tokens_out=tokens_out, cost=cost,
                     ref_url=item.ref_url
                 ))
+                logger.debug("reviewer.item", extra={
+                    "url": item.ref_url,
+                    "input_prompt": user_prompt,
+                    "raw_output": content,
+                })
                 break
 
             except Exception as e:
                 registry.health.record_failure(provider, str(e))
                 if attempt == 1:
-                    logger.warning("reviewer.parse_failed", extra={"url": item.ref_url, "error": str(e)})
+                    logger.warning("reviewer.parse_failed", extra={
+                        "url": item.ref_url, "error": str(e),
+                        "input_prompt": user_prompt, "raw_output": content,
+                    })
                     reviewed_items.append(ReviewedItem(
                         ref_url=item.ref_url, total_score=0, dimensions={},
                         verdict="discarded",

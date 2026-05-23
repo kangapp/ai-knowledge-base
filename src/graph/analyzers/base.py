@@ -111,13 +111,22 @@ async def analyze_items(
                 # parse 成功，记录 CostRecord 并 break
                 results.append(analyzed)
                 costs.append(CostRecord(agent=agent_name, provider=provider, model=model_id, tokens_in=tokens_in, tokens_out=tokens_out, cost=cost, ref_url=item.url))
+                logger.debug("analyzer.item", extra={
+                    "agent": agent_name,
+                    "url": item.url,
+                    "input_prompt": user_prompt,
+                    "raw_output": content,
+                })
                 break
 
             except Exception as e:
                 # parse 失败，仍需记录熔断统计（cost 已在上方 try 块记录）
                 registry.health.record_failure(provider, str(e))
                 if attempt == 1:
-                    logger.warning("analyzer.parse_failed", extra={"agent": agent_name, "url": item.url, "error": str(e)})
+                    logger.warning("analyzer.parse_failed", extra={
+                        "agent": agent_name, "url": item.url, "error": str(e),
+                        "input_prompt": user_prompt, "raw_output": content,
+                    })
                     continue  # 继续处理下一个 item，而不是 raise
 
     total_costs = sum(cost.cost for cost in costs) if costs else 0
