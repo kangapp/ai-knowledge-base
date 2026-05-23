@@ -34,7 +34,9 @@ async def test_collector_single_source_failure_isolated():
     async def ok(src):
         return [RawItem(url="x", title="x", source="rss", collected_at="")]
 
+    mock_db = AsyncMock()
     results, errors = await collect_all(
+        mock_db,
         [mock_source("rss"), mock_source("feishu")],
         collectors={"rss": ok, "feishu": fail}
     )

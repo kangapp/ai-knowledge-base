@@ -60,3 +60,13 @@ class PipelineState(BaseModel):
     error_log: list[dict] = []
     run_id: str = ""
     trigger: str = "cron"
+
+
+class CollectResult(BaseModel):
+    """采集结果，用于健康记录"""
+    source_id: str
+    total: int = 0
+    approved: int = 0
+    rejected: int = 0
+    failed: int = 0
+    avg_score: float | None = None

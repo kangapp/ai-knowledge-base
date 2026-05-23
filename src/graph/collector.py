@@ -6,8 +6,9 @@ from datetime import datetime, timedelta, timezone
 import httpx
 import feedparser
 
-from .state import RawItem
+from .state import RawItem, CollectResult
 from ..core.config import SourceConfig
+from ..db.operations import record_source_health
 
 logger = logging.getLogger("pipeline")
 
@@ -187,7 +188,15 @@ COLLECTOR_MAP = {
 }
 
 
-async def collect_all(sources: list[SourceConfig], collectors: dict | None = None) -> tuple[list[RawItem], list[dict]]:
+async def _record_health_failure(db, src_id: str):
+    await record_source_health(db, CollectResult(source_id=src_id, failed=1))
+
+
+async def _record_health_success(db, src_id: str, count: int):
+    await record_source_health(db, CollectResult(source_id=src_id, total=count))
+
+
+async def collect_all(db, sources: list[SourceConfig], collectors: dict | None = None) -> tuple[list[RawItem], list[dict]]:
     """并行采集所有启用的源，单个源失败不影响其余。返回 (all_items, error_log)。"""
     cmap = collectors or COLLECTOR_MAP
     tasks = {}
@@ -206,7 +215,9 @@ async def collect_all(sources: list[SourceConfig], collectors: dict | None = Non
         if isinstance(result, Exception):
             logger.warning("collector.error", extra={"source": src_id, "error": str(result)})
             error_log.append({"source": src_id, "error": str(result), "retry_in": "next cron"})
+            await _record_health_failure(db, src_id)
         elif isinstance(result, list):
             all_items.extend(result)
+            await _record_health_success(db, src_id, len(result))
 
     return all_items, error_log

@@ -323,3 +323,21 @@ async def get_consumption_stats(db: Database, days: int = 30) -> dict:
             "total_out": r["total_out"],
         } for r in provider_summary],
     }
+
+
+async def record_source_health(db: Database, record: "CollectResult"):
+    """记录数据源健康数据"""
+    from ..graph.state import CollectResult as CR
+    today = datetime.now().strftime("%Y-%m-%d")
+    await db.execute("""
+        INSERT INTO source_health (source_id, date, total_collected, approved, rejected, failed, avg_score)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(source_id, date) DO UPDATE SET
+            total_collected=excluded.total_collected,
+            approved=excluded.approved,
+            rejected=excluded.rejected,
+            failed=excluded.failed,
+            avg_score=excluded.avg_score,
+            recorded_at=datetime('now')
+    """, (record.source_id, today, record.total, record.approved, record.rejected, record.failed, record.avg_score))
+    await db.commit()
