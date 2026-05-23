@@ -39,6 +39,81 @@
 └─────────────────────────────────────────────────────────────────────┘
 ```
 
+## 完整数据流程
+
+```mermaid
+flowchart TD
+    subgraph Scheduler["定时调度"]
+        A["APScheduler\ncron 触发"] --> B["skip_if_running\n防重叠"]
+    end
+
+    subgraph Collection["采集阶段"]
+        B --> C["Collector\n按源并行采集"]
+        C --> D["DB 批量查重\nWHERE url IN (...)"]
+        D --> E["采集完成回调\n写入 health log"]
+    end
+
+    subgraph Analysis["分析阶段"]
+        E --> F["Router\n100% 规则分流"]
+        F --> G["Analyzer Fan-out\n4 并行"]
+        G --> H["Aggregator\n汇总 + 校验"]
+    end
+
+    subgraph Review["审核阶段"]
+        H --> I["Reviewer\n四维评分"]
+        I --> J{"评分结果"}
+        J -->|≥80| K["approved → 入库"]
+        J -->|50-79| L["retry (≤2轮)"]
+        J -->|<50| M["discarded"]
+    end
+
+    subgraph Storage["存储阶段"]
+        K --> N["SQLite 入库\narticles + tags + cost_logs"]
+        N --> O["Site Builder\n去抖构建"]
+    end
+
+    O --> P["静态站点上线"]
+
+    subgraph Maintenance["数据源健康维护（每周）"]
+        Q["每周一 09:00"] --> R["SourceHealthTracker\n检查并淘汰低质量源"]
+        Q --> S["SourceDiscovery\nGitHub Topic 扩展"]
+        Q --> T["SourceDiscovery\nRSS 友链扫描"]
+        R --> U{"approved率<30%\n连续3次?"]
+        U -->|是| V["SourceManager.remove\n自动删除数据源"]
+        U -->|否| W["跳过"]
+        S --> X["新 topic → 添加 github 源"]
+        T --> Y["新 RSS → 添加 rss 源"]
+    end
+```
+
+### 数据源健康管理系统
+
+```mermaid
+flowchart LR
+    subgraph HealthLog["健康记录"]
+        H1["每次采集完成\nrecord health"] --> H2["source_health 表\n存储每日快照"]
+    end
+
+    subgraph WeeklyJob["周维护 Job"]
+        J1["淘汰检查"] --> J2{"连续3次\napproved率<30%?"}
+        J2 -->|是| J3["自动删除源"]
+        J2 -->|否| J4["保留"]
+        J5["GitHub Topic 发现"] --> J6["新 topic → 添加源"]
+        J7["RSS 友链扫描"] --> J8["新 RSS → 添加源"]
+    end
+
+    subgraph Dashboard["仪表盘"]
+        D1["/api/sources"] --> D2["数据源列表\n含健康分"]
+        D2 --> D3["Approved 率趋势\n折线图"]
+        D3 --> D4["贡献分布\n柱状图"]
+    end
+
+    H2 --> J1
+    J3 --> D2
+    J6 --> D2
+    J8 --> D2
+```
+
 ## 数据流程
 
 ```mermaid
@@ -120,7 +195,10 @@ ai-knowledge-base/
 │   │   ├── config.py          #   YAML → Pydantic 配置
 │   │   ├── llm_client.py     #   TrackedClient (记账 + 熔断 + fallback)
 │   │   ├── budget.py          #   全局预算熔断
-│   │   └── health.py          #   Provider 健康检查
+│   │   ├── health.py          #   Provider 健康检查
+│   │   ├── source_health.py   #   数据源健康追踪 + 淘汰逻辑
+│   │   ├── source_manager.py  #   sources.yaml 读写 + 增删操作
+│   │   └── source_discovery.py #   发现策略 (GitHub Topic / RSS 友链)
 │   │
 │   ├── graph/                 # LangGraph 工作流
 │   │   ├── pipeline.py        #   DAG 编排
@@ -136,14 +214,18 @@ ai-knowledge-base/
 │   │   ├── articles.py        #   文章 CRUD + FTS5 搜索
 │   │   ├── tags.py           #   标签 CRUD
 │   │   ├── queries.py         #   仪表盘聚合
-│   │   └── migrations/        #   版本化 SQL
+│   │   └── migrations/        #   版本化 SQL (001-004)
 │   │
 │   ├── api/                   # FastAPI 路由
 │   │   ├── health.py          #   /api/health
 │   │   ├── search.py          #   /api/search
 │   │   ├── article.py         #   /api/articles/{id}
 │   │   ├── cost.py           #   /api/cost
-│   │   └── pipeline.py        #   /api/pipeline
+│   │   ├── pipeline.py        #   /api/pipeline
+│   │   └── sources.py         #   /api/sources (数据源健康)
+│   │
+│   ├── scheduler/             # 定时任务
+│   │   └── source_scheduler.py #   每周数据源健康维护 Job
 │   │
 │   └── site/                  # 静态站点生成
 │       ├── builder.py         #   去抖构建 + 原子切换
@@ -283,10 +365,17 @@ docker compose restart pipeline
 
 ### 扩展数据源
 
-1. 在 `config/sources.yaml` 添加新数据源
-2. 在 `src/graph/analyzers/` 创建对应的 Analyzer 文件
-3. 在 `pipeline.py` 注册新 Analyzer 到 Router
-4. 重启服务
+数据源支持手动和自动两种扩展方式：
+
+**手动添加**：编辑 `config/sources.yaml`
+
+**自动发现（每周维护）**：
+1. **GitHub Topic 扩展** — 扫描 Trending 仓库的新 topic，自动添加为 github 类型数据源
+2. **RSS 友链扫描** — 解析已配置 RSS 源的 HTML 首页，发现新的 RSS 链接并自动添加
+
+**自动淘汰**：
+- 连续 3 次采集 approved 率 < 30% 的数据源会自动删除
+- 新添加的数据源有保护期（前 3 次采集不计入淘汰计算）
 
 ## API 接口
 
@@ -300,6 +389,10 @@ docker compose restart pipeline
 | `GET /api/cost/summary` | 花费统计 |
 | `POST /api/pipeline/run` | 手动触发采集 |
 | `POST /api/pipeline/build` | 强制构建站点 |
+| `GET /api/sources` | 数据源列表（含健康状态） |
+| `GET /api/sources/stats` | 数据源健康统计 |
+| `GET /api/sources/discovered` | 已发现待审核的数据源 |
+| `POST /api/sources/{id}/action` | 数据源操作（enable/disable/remove） |
 
 响应格式：
 
