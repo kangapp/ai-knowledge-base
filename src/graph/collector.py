@@ -48,7 +48,7 @@ async def collect_github(source: SourceConfig) -> list[RawItem]:
             source="github",
             source_detail=repo["full_name"],
             published_at=repo.get("pushed_at", ""),
-            raw_metadata={"stars": repo.get("stargazers_count", 0), "forks": repo.get("forks_count", 0), "watchers": repo.get("watchers_count", 0), "language": repo.get("language", ""), "topics": repo.get("topics", [])},
+            raw_metadata={"stars": repo.get("stargazers_count", 0), "forks": repo.get("forks_count", 0), "watchers": repo.get("watchers_count", 0), "language": repo.get("language", ""), "topics": repo.get("topics", []), "source_id": source.id},
             collected_at=now,
         ))
     return items

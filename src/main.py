@@ -198,7 +198,14 @@ async def run_pipeline(trigger: str = "cron", source_filter: str | None = None):
             if reviewed.verdict == "approved":
                 article_id = await save_article(_db, raw, analyzed, reviewed, 0, 0)
                 if article_id:
-                    await save_tags(_db, article_id, analyzed.tags)
+                    tags = list(analyzed.tags)
+                    if raw.source == "github" and raw.raw_metadata.get("source_id"):
+                        src_id = raw.raw_metadata["source_id"]
+                        if "hot" in src_id or "trending_hot" in src_id:
+                            tags.append("热门")
+                        elif "velocity" in src_id or "trending_velocity" in src_id:
+                            tags.append("趋势")
+                    await save_tags(_db, article_id, tags)
                 passed_count += 1
             elif reviewed.verdict == "retry":
                 if analyzed.retry_count >= 2:
