@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>仪表盘</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+    <nav>
+    <a href="/">首页</a> |
+    <a href="/dashboard.html">仪表盘</a> |
+    <a href="/dag.html">DAG</a> |
+    <a href="/config.html">配置</a>
+</nav>
+    <main>
+<div class="dashboard-page">
+    <header class="page-header">
+        <h1>📈 仪表盘</h1>
+        <div class="tabs">
+            <button class="tab active" data-tab="quality">数据质量</button>
+            <button class="tab" data-tab="runtime">运行状态</button>
+            <button class="tab" data-tab="consumption">资源消耗</button>
+            <button class="tab" data-tab="sources">数据源健康</button>
+        </div>
+    </header>
+
+    <!-- 全局 KPI 卡片 -->
+    <div class="kpi-cards" id="global-kpis">
+        <div class="kpi-card">
+            <div class="kpi-label">总文章数</div>
+            <div class="kpi-value" id="kpi-total">-</div>
+            <div class="kpi-sub" id="kpi-period">-</div>
+        </div>
+        <div class="kpi-card">
+            <div class="kpi-label">周期新增</div>
+            <div class="kpi-value" id="kpi-period-count">-</div>
+            <div class="kpi-sub">近 <span class="range-label">30</span> 天</div>
+        </div>
+        <div class="kpi-card">
+            <div class="kpi-label">通过率</div>
+            <div class="kpi-value" id="kpi-approve-rate">-</div>
+            <div class="kpi-sub">审核通过</div>
+        </div>
+        <div class="kpi-card">
+            <div class="kpi-label">平均分</div>
+            <div class="kpi-value" id="kpi-avg-score">-</div>
+            <div class="kpi-sub">质量评分</div>
+        </div>
+        <div class="kpi-card">
+            <div class="kpi-label">活跃源</div>
+            <div class="kpi-value" id="kpi-active-sources">-</div>
+            <div class="kpi-sub" id="kpi-active-sources-sub">-</div>
+        </div>
+    </div>
+
+    <!-- Tab 内容区 -->
+    <div id="tab-quality" class="tab-content active">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">
+            <h3 style="margin:0;font-size:0.875rem;color:#666;text-transform:uppercase">评分分布 & 来源分析</h3>
+            <div class="date-filters" id="quality-date-filters" style="display:flex;gap:0.25rem">
+                <button class="date-btn" data-days="7">近7天</button>
+                <button class="date-btn" data-days="30">近30天</button>
+                <button class="date-btn" data-days="90">近90天</button>
+            </div>
+        </div>
+        <div class="charts-layout">
+            <div class="chart-card">
+                <h3>评分分布</h3>
+                <div class="chart-canvas-wrapper"><canvas id="score-dist-chart"></canvas></div>
+            </div>
+            <div class="chart-card">
+                <h3>来源评分排行</h3>
+                <div class="source-score-list" id="source-score-list"></div>
+            </div>
+        </div>
+        <div class="chart-card" style="margin-top:1rem">
+            <h3>标签云</h3>
+            <div class="tag-cloud" id="tag-cloud"></div>
+        </div>
+    </div>
+
+    <div id="tab-runtime" class="tab-content">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">
+            <h3 style="margin:0;font-size:0.875rem;color:#666;text-transform:uppercase">Pipeline 运行监控</h3>
+            <div class="date-filters" id="runtime-date-filters" style="display:flex;gap:0.25rem">
+                <button class="date-btn" data-days="7">近7天</button>
+                <button class="date-btn" data-days="30">近30天</button>
+                <button class="date-btn" data-days="90">近90天</button>
+            </div>
+        </div>
+        <div class="kpi-row" style="display:flex;gap:1rem;margin-bottom:1rem">
+            <div class="kpi-card" style="flex:1">
+                <div class="kpi-label">上次运行</div>
+                <div class="kpi-value" id="rt-run-id">-</div>
+                <div class="kpi-sub" id="rt-run-time">-</div>
+            </div>
+            <div class="kpi-card" style="flex:1">
+                <div class="kpi-label">运行时长</div>
+                <div class="kpi-value" id="rt-duration">-</div>
+            </div>
+            <div class="kpi-card" style="flex:1">
+                <div class="kpi-label">成功率</div>
+                <div class="kpi-value" id="rt-success-rate">-</div>
+            </div>
+            <div class="kpi-card" style="flex:1">
+                <div class="kpi-label">失败数</div>
+                <div class="kpi-value" id="rt-fail-count">-</div>
+            </div>
+        </div>
+        <div class="chart-card" style="margin-bottom:1rem">
+            <h3>Pipeline DAG 状态</h3>
+            <div class="pipeline-flow" id="pipeline-flow"></div>
+        </div>
+        <div class="chart-card">
+            <h3>失败日志</h3>
+            <div class="log-table-wrapper">
+                <table class="log-table">
+                    <thead><tr><th>时间</th><th>阶段</th><th>Provider</th><th>标题</th></tr></thead>
+                    <tbody id="failure-tbody"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div id="tab-consumption" class="tab-content">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">
+            <h3 style="margin:0;font-size:0.875rem;color:#666;text-transform:uppercase">资源消耗分析</h3>
+            <div class="date-filters" id="consumption-date-filters" style="display:flex;gap:0.25rem">
+                <button class="date-btn" data-days="7">近7天</button>
+                <button class="date-btn" data-days="30">近30天</button>
+                <button class="date-btn" data-days="90">近90天</button>
+            </div>
+        </div>
+        <div class="kpi-row" style="display:flex;gap:1rem;margin-bottom:1rem">
+            <div class="kpi-card" style="flex:1">
+                <div class="kpi-label">周期花费</div>
+                <div class="kpi-value" id="cs-period-cost">-</div>
+            </div>
+            <div class="kpi-card" style="flex:1">
+                <div class="kpi-label">Token 效率</div>
+                <div class="kpi-value" id="cs-token-efficiency">-</div>
+                <div class="kpi-sub">$/M tokens</div>
+            </div>
+            <div class="kpi-card" style="flex:1">
+                <div class="kpi-label">预算进度</div>
+                <div class="kpi-value" id="cs-budget-progress">-</div>
+                <div class="progress-bar-wrapper"><div class="progress-bar" id="cs-progress-bar"></div></div>
+            </div>
+        </div>
+        <div class="charts-layout">
+            <div class="chart-card">
+                <h3>Provider 费用分解</h3>
+                <div class="chart-canvas-wrapper"><canvas id="provider-cost-chart"></canvas></div>
+            </div>
+            <div class="chart-card">
+                <h3>Agent 费用分解</h3>
+                <div class="chart-canvas-wrapper"><canvas id="agent-cost-chart"></canvas></div>
+            </div>
+        </div>
+    </div>
+
+    <div id="tab-sources" class="tab-content">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">
+            <h3 style="margin:0;font-size:0.875rem;color:#666;text-transform:uppercase">数据源健康监控</h3>
+            <div class="date-filters" id="sources-date-filters" style="display:flex;gap:0.25rem">
+                <button class="date-btn" data-days="7">近7天</button>
+                <button class="date-btn" data-days="30">近30天</button>
+            </div>
+        </div>
+        <div class="kpi-row" style="display:flex;gap:1rem;margin-bottom:1rem">
+            <div class="kpi-card" style="flex:1">
+                <div class="kpi-label">活跃数据源</div>
+                <div class="kpi-value" id="src-active-count">-</div>
+            </div>
+            <div class="kpi-card" style="flex:1">
+                <div class="kpi-label">平均通过率</div>
+                <div class="kpi-value" id="src-avg-rate">-</div>
+            </div>
+            <div class="kpi-card" style="flex:1">
+                <div class="kpi-label">总采集量</div>
+                <div class="kpi-value" id="src-total-collected">-</div>
+            </div>
+            <div class="kpi-card" style="flex:1">
+                <div class="kpi-label">平均评分</div>
+                <div class="kpi-value" id="src-avg-score">-</div>
+            </div>
+        </div>
+        <div class="charts-layout" style="margin-bottom:1rem">
+            <div class="chart-card">
+                <h3>各数据源 Approved 率</h3>
+                <div class="chart-canvas-wrapper"><canvas id="src-approved-rate-chart"></canvas></div>
+            </div>
+            <div class="chart-card">
+                <h3>贡献分布</h3>
+                <div class="chart-canvas-wrapper"><canvas id="src-contribution-chart"></canvas></div>
+            </div>
+        </div>
+        <div class="chart-card">
+            <h3>质量排行</h3>
+            <div class="source-quality-table" id="src-quality-table"></div>
+        </div>
+    </div>
+</div>
+</main>
+    <script defer src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+    <script defer src="/static/js/app.js"></script>
+</body>
+</html>

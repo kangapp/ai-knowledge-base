@@ -1,0 +1,2 @@
+[      75ms] TypeError: Cannot set properties of null (setting 'textContent')
+    at HTMLDocument.<anonymous> (http://8.134.176.187:8090/static/js/app.js:555:62)
