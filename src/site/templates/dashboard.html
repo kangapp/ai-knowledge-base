@@ -8,6 +8,7 @@
             <button class="tab active" data-tab="quality">数据质量</button>
             <button class="tab" data-tab="runtime">运行状态</button>
             <button class="tab" data-tab="consumption">资源消耗</button>
+            <button class="tab" data-tab="sources">数据源健康</button>
         </div>
     </header>
 
@@ -143,6 +144,48 @@
                 <h3>Agent 费用分解</h3>
                 <div class="chart-canvas-wrapper"><canvas id="agent-cost-chart"></canvas></div>
             </div>
+        </div>
+    </div>
+
+    <div id="tab-sources" class="tab-content">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">
+            <h3 style="margin:0;font-size:0.875rem;color:#666;text-transform:uppercase">数据源健康监控</h3>
+            <div class="date-filters" id="sources-date-filters" style="display:flex;gap:0.25rem">
+                <button class="date-btn" data-days="7">近7天</button>
+                <button class="date-btn" data-days="30">近30天</button>
+            </div>
+        </div>
+        <div class="kpi-row" style="display:flex;gap:1rem;margin-bottom:1rem">
+            <div class="kpi-card" style="flex:1">
+                <div class="kpi-label">活跃数据源</div>
+                <div class="kpi-value" id="src-active-count">-</div>
+            </div>
+            <div class="kpi-card" style="flex:1">
+                <div class="kpi-label">平均通过率</div>
+                <div class="kpi-value" id="src-avg-rate">-</div>
+            </div>
+            <div class="kpi-card" style="flex:1">
+                <div class="kpi-label">总采集量</div>
+                <div class="kpi-value" id="src-total-collected">-</div>
+            </div>
+            <div class="kpi-card" style="flex:1">
+                <div class="kpi-label">平均评分</div>
+                <div class="kpi-value" id="src-avg-score">-</div>
+            </div>
+        </div>
+        <div class="charts-layout" style="margin-bottom:1rem">
+            <div class="chart-card">
+                <h3>各数据源 Approved 率</h3>
+                <div class="chart-canvas-wrapper"><canvas id="src-approved-rate-chart"></canvas></div>
+            </div>
+            <div class="chart-card">
+                <h3>贡献分布</h3>
+                <div class="chart-canvas-wrapper"><canvas id="src-contribution-chart"></canvas></div>
+            </div>
+        </div>
+        <div class="chart-card">
+            <h3>质量排行</h3>
+            <div class="source-quality-table" id="src-quality-table"></div>
         </div>
     </div>
 </div>

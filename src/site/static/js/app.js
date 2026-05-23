@@ -227,8 +227,8 @@
         '36氪': '36氪', 'TechCrunch AI': 'TechCrunch', 'IT之家': 'IT之家',
         'Ars Technica': 'Ars Technica', 'OpenAI': 'OpenAI', '虎嗅': '虎嗅',
     };
-    let cachedData = { quality: null, runtime: null, consumption: null };
-    const state = { quality: 30, runtime: 7, consumption: 30 };
+    let cachedData = { quality: null, runtime: null, consumption: null, sources: null };
+    const state = { quality: 30, runtime: 7, consumption: 30, sources: 7 };
 
     async function loadTab(tab) {
         const days = state[tab] || 30;
@@ -274,11 +274,28 @@
     }
 
     async function renderTab(tab) {
+        if (tab === 'sources') {
+            const days = state.sources || 7;
+            const data = await loadSourcesTab(days);
+            if (!data) return;
+            renderSources(data);
+            return;
+        }
         const data = await loadTab(tab);
         if (!data) return;
         if (tab === 'quality') renderQuality(data);
         else if (tab === 'runtime') renderRuntime(data);
         else if (tab === 'consumption') renderConsumption(data);
+    }
+
+    async function loadSourcesTab(days) {
+        const key = `sources_${days}`;
+        if (cachedData[key]) return cachedData[key];
+        const res = await fetch(`/api/sources/stats?period=${days === 7 ? 'week' : 'month'}`);
+        const json = await res.json();
+        if (json.code !== 0) return null;
+        cachedData[key] = json.data;
+        return cachedData[key];
     }
 
     function renderQuality(data) {
@@ -450,6 +467,82 @@
             type: 'bar',
             data: { labels, datasets },
             options: { responsive: true, maintainAspectRatio: false }
+        });
+    }
+
+    function renderSources(data) {
+        if (!data || !data.sources) return;
+
+        const sources = data.sources || [];
+        const activeCount = sources.length;
+        const totalCollected = sources.reduce((sum, s) => sum + (s.total_collected || 0), 0);
+        const avgRate = sources.length > 0
+            ? (sources.reduce((sum, s) => sum + (s.approved_rate || 0), 0) / sources.length * 100).toFixed(0) + '%'
+            : '-';
+        const avgScore = sources.length > 0
+            ? (sources.reduce((sum, s) => sum + (s.avg_score || 0), 0) / sources.length).toFixed(1)
+            : '-';
+
+        document.getElementById('src-active-count').textContent = activeCount;
+        document.getElementById('src-avg-rate').textContent = avgRate;
+        document.getElementById('src-total-collected').textContent = totalCollected;
+        document.getElementById('src-avg-score').textContent = avgScore;
+
+        // Approved 率折线图
+        const labels = sources.map(s => s.id);
+        const approvedRates = sources.map(s => ((s.approved_rate || 0) * 100).toFixed(1));
+        renderLineChart('src-approved-rate-chart', labels, approvedRates, '#22c55e');
+
+        // 贡献分布柱状图（total_collected）
+        const collected = sources.map(s => s.total_collected || 0);
+        renderBarChart('src-contribution-chart', labels, collected, '#3b82f6');
+
+        // 质量排行表格
+        const table = document.getElementById('src-quality-table');
+        if (table) {
+            const sorted = [...sources].sort((a, b) => (b.avg_score || 0) - (a.avg_score || 0));
+            table.innerHTML = `
+                <table class="log-table">
+                    <thead><tr><th>数据源</th><th>采集量</th><th>通过率</th><th>平均分</th><th>趋势</th></tr></thead>
+                    <tbody>
+                        ${sorted.map(s => `
+                            <tr>
+                                <td>${s.id}</td>
+                                <td>${s.total_collected || 0}</td>
+                                <td>${((s.approved_rate || 0) * 100).toFixed(1)}%</td>
+                                <td>${(s.avg_score || 0).toFixed(1)}</td>
+                                <td>${getTrendIcon(s.trend)}</td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            `;
+        }
+    }
+
+    function getTrendIcon(trend) {
+        if (trend === 'rising') return '↑';
+        if (trend === 'falling') return '↓';
+        return '→';
+    }
+
+    function renderLineChart(canvasId, labels, data, color) {
+        const ctx = document.getElementById(canvasId);
+        if (!ctx) return;
+        if (ctx._chart) ctx._chart.destroy();
+        ctx._chart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels,
+                datasets: [{
+                    data,
+                    borderColor: color,
+                    backgroundColor: color + '20',
+                    fill: true,
+                    tension: 0.3,
+                }]
+            },
+            options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } }
         });
     }
 

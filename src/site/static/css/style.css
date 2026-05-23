@@ -157,3 +157,10 @@ main { max-width: 1200px; margin: 2rem auto; padding: 0 1rem; }
 .progress-bar { height: 100%; background: #3b82f6; border-radius: 3px; transition: width 0.3s; }
 .progress-bar.warning { background: #f97316; }
 .progress-bar.danger { background: #ef4444; }
+
+/* Source quality table */
+.source-quality-table { overflow-x: auto; }
+.source-quality-table table { width: 100%; border-collapse: collapse; }
+.source-quality-table th, .source-quality-table td { padding: 0.5rem; text-align: left; border-bottom: 1px solid #eee; }
+.source-quality-table th { font-size: 0.75rem; color: #999; text-transform: uppercase; }
+.source-quality-table td { font-size: 0.85rem; }
