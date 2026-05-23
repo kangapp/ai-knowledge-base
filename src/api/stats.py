@@ -22,13 +22,17 @@ def envelope(data=None, message="ok", code=0):
 async def get_stats_enhanced(days: int = Query(default=30, ge=1, le=3650)):
     db = get_db()
 
-    # Basic stats
-    total = await db.fetch_one("SELECT COUNT(*) as c FROM articles WHERE status='approved'")
-    period = await db.fetch_one(
+    # Basic stats — pass_rate = approved / total collected (入库/采集)
+    period_total = await db.fetch_one(
+        "SELECT COUNT(*) as c FROM articles WHERE collected_at >= date('now', ?)",
+        (f"-{days} days",)
+    )
+    period_approved = await db.fetch_one(
         "SELECT COUNT(*) as c FROM articles WHERE status='approved' AND collected_at >= date('now', ?)",
         (f"-{days} days",)
     )
-    cost_period = await db.fetch_one(
+    total = await db.fetch_one("SELECT COUNT(*) as c FROM articles WHERE status='approved'")
+    period_cost = await db.fetch_one(
         "SELECT COALESCE(SUM(cost),0) as t FROM cost_logs WHERE created_at >= date('now', ?)",
         (f"-{days} days",)
     )
@@ -38,6 +42,8 @@ async def get_stats_enhanced(days: int = Query(default=30, ge=1, le=3650)):
         (f"-{days} days",)
     )
     avg_score = await db.fetch_one("SELECT AVG(relevance_score) as avg FROM articles WHERE status='approved'")
+
+    pass_rate = (period_approved["c"] / period_total["c"]) if period_total and period_total["c"] > 0 else 0
 
     # Hourly (past 48 hours)
     hourly = await db.fetch_all("""
@@ -95,11 +101,13 @@ async def get_stats_enhanced(days: int = Query(default=30, ge=1, le=3650)):
         "data": {
             "summary": {
                 "total_articles": total["c"] if total else 0,
-                "period_articles": period["c"] if period else 0,
-                "period_cost": round(cost_period["t"] if cost_period else 0, 4),
+                "period_articles": period_approved["c"] if period_approved else 0,
+                "period_cost": round(period_cost["t"] if period_cost else 0, 4),
                 "total_cost": round(cost_total["t"] if cost_total else 0, 4),
                 "active_sources": active_sources["c"] if active_sources else 0,
                 "avg_score": round(avg_score["avg"], 1) if avg_score and avg_score["avg"] else 0,
+                "pass_rate": round(pass_rate, 3),
+                "period_total_collected": period_total["c"] if period_total else 0,
             },
             "hourly_cost": [dict(r) for r in hourly],
             "daily_cost": [dict(r) for r in daily],

@@ -185,16 +185,21 @@ class _ReviewerNode:
         from .state import CollectResult
         from ..db.operations import record_source_health
 
-        # 建立 ref_url -> (source, source_detail) 映射，同时统计每个 source 的数量
+        # 建立 ref_url -> (source, source_detail, src_id) 映射，同时统计每个 source 的数量
         ref_source_map = {}
         routed_counts = {}  # src_id -> count of items entering review
         for key in ("routed_github", "routed_rss", "routed_feishu", "routed_arxiv"):
             routed_items = getattr(state, key, [])
             for item in routed_items:
-                # RSS 子源用 source_detail 作为 src_id，其余用 source
-                src_id = item.source_detail if item.source == "rss" else item.source
+                # GitHub 用 source.id（存在 raw_metadata.source_id），其余用 source_detail
+                if item.source == "github":
+                    src_id = item.raw_metadata.get("source_id", item.source)
+                elif item.source == "rss":
+                    src_id = item.source_detail  # RSS 子源用 feed URL
+                else:
+                    src_id = item.source_detail
                 routed_counts[src_id] = routed_counts.get(src_id, 0) + 1
-                ref_source_map[item.url] = (item.source, item.source_detail)
+                ref_source_map[item.url] = (item.source, item.source_detail, src_id)
 
         # 按 source_id 汇总 verdicts（src_id 与 routed_counts 一致）
         source_stats = {}  # src_id -> {approved, rejected, failed, scores}
@@ -202,9 +207,7 @@ class _ReviewerNode:
             mapping = ref_source_map.get(r.ref_url)
             if not mapping:
                 continue
-            source, source_detail = mapping
-            # RSS 子源用 source_detail 作为 src_id，其余用 source
-            src_id = source_detail if source == "rss" else source
+            source, source_detail, src_id = mapping
             if src_id not in source_stats:
                 source_stats[src_id] = {"approved": 0, "rejected": 0, "failed": 0, "scores": []}
             if r.verdict == "approved":

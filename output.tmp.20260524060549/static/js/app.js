@@ -555,8 +555,9 @@
             document.getElementById('kpi-total').textContent = (s.total_articles || 0).toLocaleString();
             document.getElementById('kpi-period').textContent = '↑ ' + (s.period_articles || 0);
             document.getElementById('kpi-period-count').textContent = s.period_articles || 0;
-            // 通过率 = approved / total collected (由后端 pass_rate 字段提供)
-            const rate = s.pass_rate != null ? (s.pass_rate * 100).toFixed(0) + '%' : '-';
+            // 通过率
+            const total = s.total_articles || 0;
+            const rate = total > 0 ? ((s.period_articles || 0) / total * 100).toFixed(0) + '%' : '-';
             document.getElementById('kpi-approve-rate').textContent = rate;
             document.getElementById('kpi-avg-score').textContent = s.avg_score ? s.avg_score.toFixed(0) : '-';
             document.getElementById('kpi-active-sources').textContent = s.active_sources || 0;

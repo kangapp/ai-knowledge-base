@@ -1,0 +1,154 @@
+- generic [ref=e1]:
+  - navigation [ref=e2]:
+    - link "首页" [ref=e3] [cursor=pointer]:
+      - /url: /
+    - text: "|"
+    - link "仪表盘" [ref=e4] [cursor=pointer]:
+      - /url: /dashboard.html
+    - text: "|"
+    - link "DAG" [ref=e5] [cursor=pointer]:
+      - /url: /dag.html
+    - text: "|"
+    - link "配置" [ref=e6] [cursor=pointer]:
+      - /url: /config.html
+  - main [ref=e7]:
+    - generic [ref=e8]:
+      - generic [ref=e9]:
+        - heading "📈 仪表盘" [level=1] [ref=e10]
+        - generic [ref=e11]:
+          - button "数据质量" [ref=e12] [cursor=pointer]
+          - button "运行状态" [ref=e13] [cursor=pointer]
+          - button "资源消耗" [ref=e14] [cursor=pointer]
+          - button "数据源健康" [active] [ref=e15] [cursor=pointer]
+      - generic [ref=e16]:
+        - generic [ref=e17]:
+          - generic [ref=e18]: 总文章数
+          - generic [ref=e19]: "125"
+          - generic [ref=e20]: ↑ 125
+        - generic [ref=e21]:
+          - generic [ref=e22]: 周期新增
+          - generic [ref=e23]: "125"
+          - generic [ref=e24]: 近 30 天
+        - generic [ref=e25]:
+          - generic [ref=e26]: 通过率
+          - generic [ref=e27]: 100%
+          - generic [ref=e28]: 审核通过
+        - generic [ref=e29]:
+          - generic [ref=e30]: 平均分
+          - generic [ref=e31]: "78"
+          - generic [ref=e32]: 质量评分
+        - generic [ref=e33]:
+          - generic [ref=e34]: 活跃源
+          - generic [ref=e35]: "2"
+          - generic [ref=e36]: "RSS: 36氪, 36氪, TechCrunch, TechCrunch, The Verge AI"
+      - generic [ref=e315]:
+        - generic [ref=e316]:
+          - heading "数据源健康监控" [level=3] [ref=e317]
+          - generic [ref=e318]:
+            - button "近7天" [ref=e319] [cursor=pointer]
+            - button "近30天" [ref=e320] [cursor=pointer]
+        - generic [ref=e321]:
+          - generic [ref=e322]:
+            - generic [ref=e323]: 活跃数据源
+            - generic [ref=e324]: "13"
+          - generic [ref=e325]:
+            - generic [ref=e326]: 平均通过率
+            - generic [ref=e327]: 0%
+          - generic [ref=e328]:
+            - generic [ref=e329]: 总采集量
+            - generic [ref=e330]: "75"
+          - generic [ref=e331]:
+            - generic [ref=e332]: 平均评分
+            - generic [ref=e333]: "0.0"
+        - generic [ref=e334]:
+          - heading "各数据源 Approved 率" [level=3] [ref=e336]
+          - heading "贡献分布" [level=3] [ref=e340]
+        - generic [ref=e343]:
+          - heading "质量排行" [level=3] [ref=e344]
+          - table [ref=e346]:
+            - rowgroup [ref=e347]:
+              - row "数据源 采集量 通过率 平均分 趋势" [ref=e348]:
+                - columnheader "数据源" [ref=e349]
+                - columnheader "采集量" [ref=e350]
+                - columnheader "通过率" [ref=e351]
+                - columnheader "平均分" [ref=e352]
+                - columnheader "趋势" [ref=e353]
+            - rowgroup [ref=e354]:
+              - row "github_trending 9 0.0% 0.0 →" [ref=e355]:
+                - cell "github_trending" [ref=e356]
+                - cell "9" [ref=e357]
+                - cell "0.0%" [ref=e358]
+                - cell "0.0" [ref=e359]
+                - cell "→" [ref=e360]
+              - row "github_trending_hot 10 0.0% 0.0 →" [ref=e361]:
+                - cell "github_trending_hot" [ref=e362]
+                - cell "10" [ref=e363]
+                - cell "0.0%" [ref=e364]
+                - cell "0.0" [ref=e365]
+                - cell "→" [ref=e366]
+              - row "github_trending_velocity 10 0.0% 0.0 →" [ref=e367]:
+                - cell "github_trending_velocity" [ref=e368]
+                - cell "10" [ref=e369]
+                - cell "0.0%" [ref=e370]
+                - cell "0.0" [ref=e371]
+                - cell "→" [ref=e372]
+              - row "rss_36kr 8 0.0% 0.0 →" [ref=e373]:
+                - cell "rss_36kr" [ref=e374]
+                - cell "8" [ref=e375]
+                - cell "0.0%" [ref=e376]
+                - cell "0.0" [ref=e377]
+                - cell "→" [ref=e378]
+              - row "rss_arstechnica 2 0.0% 0.0 →" [ref=e379]:
+                - cell "rss_arstechnica" [ref=e380]
+                - cell "2" [ref=e381]
+                - cell "0.0%" [ref=e382]
+                - cell "0.0" [ref=e383]
+                - cell "→" [ref=e384]
+              - row "rss_arxiv 19 0.0% 0.0 →" [ref=e385]:
+                - cell "rss_arxiv" [ref=e386]
+                - cell "19" [ref=e387]
+                - cell "0.0%" [ref=e388]
+                - cell "0.0" [ref=e389]
+                - cell "→" [ref=e390]
+              - row "rss_huxiu 0 0.0% 0.0 →" [ref=e391]:
+                - cell "rss_huxiu" [ref=e392]
+                - cell "0" [ref=e393]
+                - cell "0.0%" [ref=e394]
+                - cell "0.0" [ref=e395]
+                - cell "→" [ref=e396]
+              - row "rss_ithome 4 0.0% 0.0 →" [ref=e397]:
+                - cell "rss_ithome" [ref=e398]
+                - cell "4" [ref=e399]
+                - cell "0.0%" [ref=e400]
+                - cell "0.0" [ref=e401]
+                - cell "→" [ref=e402]
+              - row "rss_juejin 0 0.0% 0.0 →" [ref=e403]:
+                - cell "rss_juejin" [ref=e404]
+                - cell "0" [ref=e405]
+                - cell "0.0%" [ref=e406]
+                - cell "0.0" [ref=e407]
+                - cell "→" [ref=e408]
+              - row "rss_producthunt 0 0.0% 0.0 →" [ref=e409]:
+                - cell "rss_producthunt" [ref=e410]
+                - cell "0" [ref=e411]
+                - cell "0.0%" [ref=e412]
+                - cell "0.0" [ref=e413]
+                - cell "→" [ref=e414]
+              - row "rss_reuters 0 0.0% 0.0 →" [ref=e415]:
+                - cell "rss_reuters" [ref=e416]
+                - cell "0" [ref=e417]
+                - cell "0.0%" [ref=e418]
+                - cell "0.0" [ref=e419]
+                - cell "→" [ref=e420]
+              - row "rss_techcrunch 6 0.0% 0.0 →" [ref=e421]:
+                - cell "rss_techcrunch" [ref=e422]
+                - cell "6" [ref=e423]
+                - cell "0.0%" [ref=e424]
+                - cell "0.0" [ref=e425]
+                - cell "→" [ref=e426]
+              - row "rss_verge 7 0.0% 0.0 →" [ref=e427]:
+                - cell "rss_verge" [ref=e428]
+                - cell "7" [ref=e429]
+                - cell "0.0%" [ref=e430]
+                - cell "0.0" [ref=e431]
+                - cell "→" [ref=e432]
