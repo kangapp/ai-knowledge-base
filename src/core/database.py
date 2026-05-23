@@ -43,7 +43,11 @@ class Database:
                 sql = (mig_dir / filename).read_text()
                 await self._conn.executescript(sql)
                 await self._conn.commit()
-                await self._conn.execute("UPDATE schema_version SET version = ?", (num,))
+                # INSERT OR REPLACE 确保版本号被写入
+                await self._conn.execute(
+                    "INSERT OR REPLACE INTO schema_version (version) VALUES (?)",
+                    (num,)
+                )
                 await self._conn.commit()
 
     async def fetch_one(self, sql: str, params: tuple = ()) -> aiosqlite.Row | None:
