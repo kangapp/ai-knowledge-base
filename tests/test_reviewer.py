@@ -90,7 +90,7 @@ async def test_reviewer_node_mocked():
     registry._clients["deepseek"] = mock_client
 
     state = PipelineState(analyzed_items=[
-        AnalyzedItem(ref_url="https://example.com/1", title="Test Agent", summary="A new agent framework", tags=["Agent", "Framework"], language="zh", relevance_score=0, retry_count=0)
+        AnalyzedItem(ref_url="https://example.com/1", title="Test Agent", summary="A new agent framework", tags=["Agent", "Framework"], language="zh", retry_count=0)
     ])
     result = await reviewer_node(state, registry)
 

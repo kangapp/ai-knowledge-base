@@ -7,12 +7,11 @@ from tests.fixtures.llm_responses import GITHUB_ANALYZE_RESPONSE
 @pytest.mark.asyncio
 async def test_parse_and_validate_success():
     from src.graph.analyzers.base import parse_and_validate
-    raw = json.dumps({"title": "Test", "summary": "A test", "tags": ["AI"], "language": "zh", "relevance_score": 75})
+    raw = json.dumps({"title": "Test", "summary": "A test", "tags": ["AI"], "language": "zh"})
     result = parse_and_validate(raw, ref_url="https://example.com/test")
     assert result.title == "Test"
     assert result.ref_url == "https://example.com/test"
     assert result.tags == ["AI"]
-    assert result.relevance_score == 75
     assert result.retry_count == 0
 
 def test_parse_markdown_wrapped_json():
