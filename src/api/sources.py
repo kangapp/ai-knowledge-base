@@ -30,7 +30,7 @@ def _source_to_dict(source: SourceConfig, health: dict | None = None) -> dict:
 @router.get("/")
 async def list_sources():
     """数据源列表（含状态）"""
-    db = Database("data/knowledge.db")
+    db = Database("data/kb.db")
     await db.initialize()
     try:
         sources = SourceManager.load()
@@ -50,7 +50,7 @@ async def get_source_stats(period: str = "week"):
     valid_periods = {"day": 1, "week": 7, "month": 30}
     days = valid_periods.get(period, 7)
 
-    db = Database("data/knowledge.db")
+    db = Database("data/kb.db")
     await db.initialize()
     try:
         tracker = SourceHealthTracker(db)
@@ -124,7 +124,7 @@ async def source_action(source_id: str, action: str):
 @router.get("/discovered")
 async def list_discovered():
     """已发现待审核的数据源"""
-    db = Database("data/knowledge.db")
+    db = Database("data/kb.db")
     await db.initialize()
     try:
         rows = await db.fetch_all("""
