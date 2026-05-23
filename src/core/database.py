@@ -27,9 +27,10 @@ class Database:
             "INSERT OR IGNORE INTO schema_version (version) VALUES (0)"
         )
         await self._conn.commit()
-        row = await self._conn.execute("SELECT version FROM schema_version")
+        # Read current version
+        row = await self._conn.execute("SELECT MAX(version) as v FROM schema_version")
         result = await row.fetchone()
-        current = result["version"] if result else 0
+        current = result["v"] if result and result["v"] is not None else 0
 
         if not self.migrations_dir:
             return
@@ -49,17 +50,21 @@ class Database:
                 sql = (mig_dir / filename).read_text()
                 await self._conn.executescript(sql)
                 await self._conn.commit()
-                # Only UPDATE if current < num (avoid conflict when 001 already set version=1)
-                if current < num:
+                # Re-read version after migration (migration may have updated it)
+                row = await self._conn.execute("SELECT MAX(version) as v FROM schema_version")
+                result = await row.fetchone()
+                new_version = result["v"] if result and result["v"] is not None else 0
+                # Only UPDATE if migration didn't already set the version
+                if new_version < num:
                     await self._conn.execute(
                         "UPDATE schema_version SET version = ?",
                         (num,)
                     )
                     await self._conn.commit()
-                # Re-read version
-                row = await self._conn.execute("SELECT version FROM schema_version")
+                # Re-read for next iteration
+                row = await self._conn.execute("SELECT MAX(version) as v FROM schema_version")
                 result = await row.fetchone()
-                current = result["version"] if result else 0
+                current = result["v"] if result and result["v"] is not None else 0
 
     async def fetch_one(self, sql: str, params: tuple = ()) -> aiosqlite.Row | None:
         cursor = await self._conn.execute(sql, params)
