@@ -21,7 +21,8 @@ class Database:
         await self._conn.execute(
             "CREATE TABLE IF NOT EXISTS schema_version (version INTEGER PRIMARY KEY)"
         )
-        # Ensure there's at least one row for UPDATE to work
+        await self._conn.commit()
+        # Ensure there's at least one row with version 0
         await self._conn.execute(
             "INSERT OR IGNORE INTO schema_version (version) VALUES (0)"
         )
@@ -48,12 +49,13 @@ class Database:
                 sql = (mig_dir / filename).read_text()
                 await self._conn.executescript(sql)
                 await self._conn.commit()
-                # Use UPDATE since we know a row exists
-                await self._conn.execute(
-                    "UPDATE schema_version SET version = ?",
-                    (num,)
-                )
-                await self._conn.commit()
+                # Only UPDATE if current < num (avoid conflict when 001 already set version=1)
+                if current < num:
+                    await self._conn.execute(
+                        "UPDATE schema_version SET version = ?",
+                        (num,)
+                    )
+                    await self._conn.commit()
                 # Re-read version
                 row = await self._conn.execute("SELECT version FROM schema_version")
                 result = await row.fetchone()
