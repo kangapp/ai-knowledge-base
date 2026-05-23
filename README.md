@@ -546,52 +546,112 @@ Reviewer 采用四维评分，总分 0-100：
 
 ## LLM 交互流程
 
-### Prompt 模板清单
+### Prompt 模板内容
 
-| Agent | Prompt 文件 | 用途 | Primary Model | Fallback |
-|-------|------------|------|---------------|----------|
-| `github_analyzer` | `prompts/github_analyzer.md` | 分析 GitHub 仓库 | MiniMax-M2.7 | deepseek-chat |
-| `rss_analyzer` | `prompts/rss_analyzer.md` | 分析 RSS 文章 | MiniMax-M2.7 | — |
-| `feishu_analyzer` | `prompts/feishu_analyzer.md` | 分析飞书文档 | MiniMax-M2.7 | — |
-| `arxiv_analyzer` | `prompts/arxiv_analyzer.md` | 分析 arXiv 论文 | MiniMax-M2.7 | deepseek-chat |
-| `reviewer` | `prompts/reviewer.md` | 四维评分审核 | MiniMax-M2.7 | — |
-
-### Prompt 加载机制
-
+#### github_analyzer.md
 ```
-prompts/*.md 文件 ──load_prompt()──▶ {title} {description} {url} {metadata} {schema} 占位符填充
-                                              │
-                                              ▼
-                              system_prompt: "你是一个技术分析助手。只输出 JSON，格式：{schema}"
-                                              │
-                                              ▼
-                                    LLM Chat Completions API
+分析以下 GitHub 仓库，输出 JSON（不要 markdown 包裹）。
+
+仓库: {title}
+描述: {description}
+URL: {url}
+元数据: {metadata}
+
+输出 JSON (schema={schema})
+标签从 AI/LLM/Agent/MCP/RAG/Open Source/Tool/Framework/Benchmark 中选择，也可建议新标签。relevance_score 评估文章与 AI 领域的相关度和质量（0-100）。
+注意：schema 中的 relevance_score 是你评估的相关度分数（0-100），不是 schema 的示例值。
 ```
 
-所有 Analyzer 共享同一套 `analyze_items()` 基础设施（`src/graph/analyzers/base.py`），区别仅在于加载的 prompt 模板不同。
+#### rss_analyzer.md
+```
+分析以下技术文章，输出 JSON（不要 markdown 包裹）。
 
-### 数据流
+文章: {title}
+摘要: {description}
+链接: {url}
+来源: {metadata}
+
+输出 JSON (schema={schema})
+注意：schema 中的 relevance_score 是你评估的相关度分数（0-100），不是 schema 的示例值。
+```
+
+#### feishu_analyzer.md
+```
+分析以下飞书文档，输出 JSON（不要 markdown 包裹）。
+
+飞书文档: {title}
+内容: {description}
+元数据: {metadata}
+
+输出 JSON (schema={schema})
+注意：schema 中的 relevance_score 是你评估的相关度分数（0-100），不是 schema 的示例值。
+```
+
+#### arxiv_analyzer.md
+```
+分析以下学术论文摘要，输出 JSON（不要 markdown 包裹）。
+
+论文: {title}
+摘要: {description}
+URL: {url}
+分类: {metadata}
+
+输出 JSON (schema={schema})
+注意：schema 中的 relevance_score 是你评估的相关度分数（0-100），不是 schema 的示例值。
+```
+
+#### reviewer.md
+```
+你是内容审核员。对文章按四维评分（0-100）:
+- AI相关度(0-40): 核心AI/LLM/Agent/MCP/RAG=35-40, AI基础设施=25-34, 泛技术提及=10-24, 无关=0-9
+- 内容深度(0-30): 深度原创=25-30, 有细节=15-24, 简要=5-14, 空内容=0-4
+- 信息密度(0-15): 新颖独家=12-15, 有信息量=7-11, 重复营销=0-6
+- 时效性(0-15): 本周内=12-15, 本月=7-11, 较早=0-6
+
+输出 JSON:
+{ "total_score": 85, "dimensions": { "ai_relevance": {"score": 35, "reason": "..."}, ... }, "verdict": "approved"|"retry"|"discarded", "retry_feedback": null|{"suggestions": ["..."]} }
+```
+
+### Agent 配置
+
+| Agent | Prompt 文件 | Primary Model | Fallback | temperature | max_tokens |
+|-------|------------|---------------|----------|-------------|------------|
+| `github_analyzer` | `prompts/github_analyzer.md` | MiniMax-M2.7 | deepseek-chat | 0.3 | 2048 |
+| `rss_analyzer` | `prompts/rss_analyzer.md` | MiniMax-M2.7 | — | 0.3 | 2048 |
+| `feishu_analyzer` | `prompts/feishu_analyzer.md` | MiniMax-M2.7 | — | 0.3 | 2048 |
+| `arxiv_analyzer` | `prompts/arxiv_analyzer.md` | MiniMax-M2.7 | deepseek-chat | 0.3 | 4096 |
+| `reviewer` | `prompts/reviewer.md` | MiniMax-M2.7 | — | 0.0 | 1024 |
+
+### 完整数据流
 
 ```
-Collector（采集）
+采集阶段（Collector）
     │
     ▼
-Router（100% 规则分流）
+路由阶段（Router）── 100% 规则分流
     │
-    ├──▶ github_analyzer ──prompts/github_analyzer.md──▶
-    ├──▶ rss_analyzer    ──prompts/rss_analyzer.md──────▶  Aggregator（汇总）
-    ├──▶ feishu_analyzer  ──prompts/feishu_analyzer.md──▶        │
-    └──▶ arxiv_analyzer   ──prompts/arxiv_analyzer.md───▶        │
+    ├── github ──▶ github_analyzer ──prompts/github_analyzer.md──┐
+    ├── rss    ──▶ rss_analyzer    ──prompts/rss_analyzer.md─────┤
+    ├── feishu ──▶ feishu_analyzer ──prompts/feishu_analyzer.md─┤──▶ Aggregator（汇总）
+    └── arxiv  ──▶ arxiv_analyzer  ──prompts/arxiv_analyzer.md─┘
                                                                   │
                                                                   ▼
                                                               Reviewer
                                                         ──prompts/reviewer.md──▶ 四维评分
                                                                   │
-                                    ┌─────────────────────┬───────┴───────┐
-                                    ▼                     ▼               ▼
-                                ≥80: 入库         50-79: retry        <50: discarded
-                                                   (最多 2 轮)
+                                        ┌──────────────────┬─────┴─────┐
+                                        ▼                  ▼            ▼
+                                    ≥80: 入库      50-79: retry     <50: discarded
+                                                     (最多 2 轮)
 ```
+
+### Prompt 填充与调用
+
+1. `load_prompt(agent_name, registry)` 从 `config/agents.yaml` 读取 `prompt` 路径，加载 `prompts/*.md` 文件
+2. 用户消息用 Python `.format()` 填充占位符：`{title}` `{description}` `{url}` `{metadata}` `{schema}`
+3. System prompt 默认：`"你是一个技术分析助手。只输出 JSON，格式：{schema}"`
+4. 调用 `Chat Completions API`，`response_format={"type": "json_object"}`（仅对支持 json_mode 的 provider 传入）
+5. 响应通过 `parse_and_validate()` 解析：剥离 markdown 包裹、思考标签，提取 JSON
 
 ### Analyzer 输出 Schema
 
@@ -599,7 +659,7 @@ Router（100% 规则分流）
 {
   "title": "string - 标题",
   "summary": "string - 100-200字中文摘要",
-  "tags": ["标签1", "标签2"] - 最多3个",
+  "tags": ["标签1", "标签2"] - 最多3个，从 AI/LLM/Agent/MCP/RAG/Open Source/Tool/Framework/Benchmark 选择",
   "language": "zh|en - 文章语言",
   "relevance_score": 85 - 相关度评分 0-100"
 }
@@ -623,9 +683,12 @@ Router（100% 规则分流）
 
 ### 错误处理与重试
 
-- **Analyzer parse 失败**：记录 cost + 熔断统计，重试一次
-- **Reviewer retry verdict**：返回修改建议，下一轮采集时重新分析
-- **LLM Provider 熔断**：自动切换 fallback provider，无 fallback 则跳过
+| 场景 | 处理方式 |
+|------|---------|
+| Analyzer parse 失败 | 重试一次（最多 2 轮），仍失败则跳过该条，记录 warning |
+| LLM Provider 熔断 | 自动切换 fallback provider，无 fallback 则跳过 |
+| Reviewer verdict=retry | 返回修改建议，重新进入 analyzer 处理，最多 2 轮 |
+| Reviewer verdict=discarded | 直接丢弃，不入库 |
 
 ### Prompt 扩展
 
