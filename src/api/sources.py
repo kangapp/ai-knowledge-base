@@ -31,6 +31,7 @@ def _source_to_dict(source: SourceConfig, health: dict | None = None) -> dict:
 async def list_sources():
     """数据源列表（含状态）"""
     db = Database("data/knowledge.db")
+    await db.initialize()
     try:
         sources = SourceManager.load()
         tracker = SourceHealthTracker(db)
@@ -50,6 +51,7 @@ async def get_source_stats(period: str = "week"):
     days = valid_periods.get(period, 7)
 
     db = Database("data/knowledge.db")
+    await db.initialize()
     try:
         tracker = SourceHealthTracker(db)
         health_data = await tracker.get_all_sources_health(limit=days)
@@ -123,6 +125,7 @@ async def source_action(source_id: str, action: str):
 async def list_discovered():
     """已发现待审核的数据源"""
     db = Database("data/knowledge.db")
+    await db.initialize()
     try:
         rows = await db.fetch_all("""
             SELECT * FROM discovered_sources
