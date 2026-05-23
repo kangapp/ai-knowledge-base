@@ -50,17 +50,12 @@ class Database:
                 sql = (mig_dir / filename).read_text()
                 await self._conn.executescript(sql)
                 await self._conn.commit()
-                # Re-read version after migration (migration may have updated it)
-                row = await self._conn.execute("SELECT MAX(version) as v FROM schema_version")
-                result = await row.fetchone()
-                new_version = result["v"] if result and result["v"] is not None else 0
-                # Only UPDATE if migration didn't already set the version
-                if new_version < num:
-                    await self._conn.execute(
-                        "UPDATE schema_version SET version = ?",
-                        (num,)
-                    )
-                    await self._conn.commit()
+                # Always update to the migration number (idempotent)
+                await self._conn.execute(
+                    "UPDATE schema_version SET version = ?",
+                    (num,)
+                )
+                await self._conn.commit()
                 # Re-read for next iteration
                 row = await self._conn.execute("SELECT MAX(version) as v FROM schema_version")
                 result = await row.fetchone()
