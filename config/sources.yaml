@@ -15,7 +15,7 @@ sources:
       lookback_days: 7
 
   - id: github_trending_hot
-    name: GitHub Trending 热门
+    name: GitHub 持续热门
     type: github
     enabled: false
     priority: 1
@@ -23,10 +23,11 @@ sources:
     max_items: 10
     config:
       topics: [ai, llm, agent, machine-learning, rag, mcp]
-      min_stars: 100
-      min_forks: 20
-      min_watchers: 50
-      lookback_days: 7
+      lookback_type: pushed      # 用 pushed_at 而非 created：查询 90 天内有活跃 push 的仓库
+      lookback_days: 90
+      min_stars: 500
+      min_forks: 50
+      min_watchers: 100
       trend_mode: false
 
   - id: github_trending_velocity

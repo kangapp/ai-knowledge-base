@@ -16,9 +16,16 @@ logger = logging.getLogger("pipeline")
 async def collect_github(source: SourceConfig) -> list[RawItem]:
     cfg = source.config
     topics = " OR ".join(cfg.get("topics", ["ai"]))
-    since = (datetime.now(timezone.utc) - timedelta(days=cfg.get("lookback_days", 7))).strftime("%Y-%m-%d")
+    lookback_days = cfg.get("lookback_days", 7)
+    lookback_type = cfg.get("lookback_type", "created")  # "created" 或 "pushed"
+    since = (datetime.now(timezone.utc) - timedelta(days=lookback_days)).strftime("%Y-%m-%d")
+    # 构建查询：pushed:> 查最近活跃仓库，created:> 查新建仓库
+    if lookback_type == "pushed":
+        q = f"{topics} pushed:>{since}"
+    else:
+        q = f"{topics} created:>{since}"
     url = "https://api.github.com/search/repositories"
-    params = {"q": f"{topics} created:>{since}", "sort": "stars", "order": "desc", "per_page": source.max_items}
+    params = {"q": q, "sort": "stars", "order": "desc", "per_page": source.max_items}
     headers = {"Accept": "application/vnd.github.v3+json"}
     import os
     if token := os.environ.get("GITHUB_TOKEN"):
