@@ -8,7 +8,7 @@ sources:
     cron: "0 */6 * * *"
     max_items: 10
     config:
-      topics: [ai, llm, agent, machine-learning, rag, mcp]
+      topics: [ai, llm, agent, machine-learning, rag, mcp, skill]
       min_stars: 50
       min_forks: 10
       min_watchers: 20
@@ -17,12 +17,12 @@ sources:
   - id: github_trending_hot
     name: GitHub 持续热门
     type: github
-    enabled: false
+    enabled: true
     priority: 1
     cron: "0 */6 * * *"
     max_items: 10
     config:
-      topics: [ai, llm, agent, machine-learning, rag, mcp]
+      topics: [ai, llm, agent, machine-learning, rag, mcp, skill]
       lookback_type: pushed      # 用 pushed_at 而非 created：查询 90 天内有活跃 push 的仓库
       lookback_days: 90
       min_stars: 2000
@@ -33,12 +33,12 @@ sources:
   - id: github_trending_velocity
     name: GitHub 趋势增速
     type: github
-    enabled: false
+    enabled: true
     priority: 1
     cron: "0 */6 * * *"
     max_items: 10
     config:
-      topics: [ai, llm, agent, machine-learning, rag, mcp]
+      topics: [ai, llm, agent, machine-learning, rag, mcp, skill]
       min_stars: 10
       lookback_days: 30
       trend_mode: true
@@ -148,7 +148,7 @@ sources:
   - id: rss_arxiv
     name: arXiv AI/ML
     type: arxiv
-    enabled: false
+    enabled: true
     priority: 3
     cron: "0 11 * * 1"
     max_items: 10
