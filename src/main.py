@@ -50,7 +50,8 @@ class JSONFormatter(logging.Formatter):
 
 handler = logging.StreamHandler(sys.stdout)
 handler.setFormatter(JSONFormatter())
-logging.basicConfig(level=logging.INFO, handlers=[handler])
+log_level = os.environ.get("LOG_LEVEL", "INFO").upper()
+logging.basicConfig(level=getattr(logging, log_level, logging.INFO), handlers=[handler])
 logger = logging.getLogger("pipeline")
 
 BASE_DIR = Path(__file__).resolve().parent.parent
