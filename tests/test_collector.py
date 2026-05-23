@@ -15,7 +15,7 @@ def make_source(**kw):
 @pytest.mark.asyncio
 async def test_collect_github_mock():
     source = make_source(type="github", config={"topics": ["ai"], "min_stars": 1, "lookback_days": 7})
-    mock_resp = AsyncMock(status_code=200, json=lambda: {"items": [{"full_name": "test/x", "name": "x", "html_url": "https://github.com/test/x", "description": "desc", "stargazers_count": 100, "language": "Python", "topics": ["ai"], "pushed_at": "2026-05-15T10:00:00Z"}]})
+    mock_resp = AsyncMock(status_code=200, json=lambda: {"items": [{"full_name": "test/x", "name": "x", "html_url": "https://github.com/test/x", "description": "desc", "stargazers_count": 100, "forks_count": 50, "watchers_count": 30, "language": "Python", "topics": ["ai"], "pushed_at": "2026-05-15T10:00:00Z"}]})
     mock_resp.raise_for_status = lambda: None
 
     with patch("httpx.AsyncClient.get", return_value=mock_resp):
@@ -24,6 +24,37 @@ async def test_collect_github_mock():
     assert len(items) == 1
     assert items[0].source == "github"
     assert items[0].url == "https://github.com/test/x"
+
+
+@pytest.mark.asyncio
+async def test_collect_github_multi_threshold_filter():
+    """多维阈值过滤：stars/forks/watchers 全部达标才通过"""
+    source = make_source(type="github", config={
+        "topics": ["ai"],
+        "min_stars": 50,
+        "min_forks": 20,
+        "min_watchers": 10,
+        "lookback_days": 7,
+    })
+
+    repos = [
+        {"full_name": "a/x", "name": "x", "html_url": "https://github.com/a/x", "description": "ok", "stargazers_count": 100, "forks_count": 50, "watchers_count": 30, "language": "Python", "topics": [], "pushed_at": "2026-05-15T10:00:00Z"},
+        {"full_name": "b/y", "name": "y", "html_url": "https://github.com/b/y", "description": "low forks", "stargazers_count": 100, "forks_count": 5, "watchers_count": 30, "language": "Python", "topics": [], "pushed_at": "2026-05-15T10:00:00Z"},
+        {"full_name": "c/z", "name": "z", "html_url": "https://github.com/c/z", "description": "low watchers", "stargazers_count": 100, "forks_count": 50, "watchers_count": 3, "language": "Python", "topics": [], "pushed_at": "2026-05-15T10:00:00Z"},
+        {"full_name": "d/w", "name": "w", "html_url": "https://github.com/d/w", "description": "low stars", "stargazers_count": 10, "forks_count": 50, "watchers_count": 30, "language": "Python", "topics": [], "pushed_at": "2026-05-15T10:00:00Z"},
+        {"full_name": "e/v", "name": "v", "html_url": "https://github.com/e/v", "description": "all ok", "stargazers_count": 80, "forks_count": 25, "watchers_count": 15, "language": "Python", "topics": [], "pushed_at": "2026-05-15T10:00:00Z"},
+    ]
+    mock_resp = AsyncMock(status_code=200, json=lambda: {"items": repos})
+    mock_resp.raise_for_status = lambda: None
+
+    with patch("httpx.AsyncClient.get", return_value=mock_resp):
+        items = await collect_github(source)
+
+    assert len(items) == 2
+    assert items[0].raw_metadata["forks"] == 50
+    assert items[0].raw_metadata["watchers"] == 30
+    assert items[1].raw_metadata["forks"] == 25
+    assert items[1].raw_metadata["watchers"] == 15
 
 
 @pytest.mark.asyncio

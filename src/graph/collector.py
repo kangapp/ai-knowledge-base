@@ -32,8 +32,14 @@ async def collect_github(source: SourceConfig) -> list[RawItem]:
     items = []
     now = datetime.now(timezone.utc).isoformat()
     min_stars = cfg.get("min_stars", 0)
+    min_forks = cfg.get("min_forks", 0)
+    min_watchers = cfg.get("min_watchers", 0)
     for repo in data.get("items", []):
         if repo.get("stargazers_count", 0) < min_stars:
+            continue
+        if repo.get("forks_count", 0) < min_forks:
+            continue
+        if repo.get("watchers_count", 0) < min_watchers:
             continue
         items.append(RawItem(
             url=repo["html_url"],
@@ -42,7 +48,7 @@ async def collect_github(source: SourceConfig) -> list[RawItem]:
             source="github",
             source_detail=repo["full_name"],
             published_at=repo.get("pushed_at", ""),
-            raw_metadata={"stars": repo.get("stargazers_count", 0), "language": repo.get("language", ""), "topics": repo.get("topics", [])},
+            raw_metadata={"stars": repo.get("stargazers_count", 0), "forks": repo.get("forks_count", 0), "watchers": repo.get("watchers_count", 0), "language": repo.get("language", ""), "topics": repo.get("topics", [])},
             collected_at=now,
         ))
     return items

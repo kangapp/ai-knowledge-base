@@ -10,6 +10,8 @@ sources:
     config:
       topics: [ai, llm, agent, machine-learning, rag, mcp]
       min_stars: 50
+      min_forks: 10
+      min_watchers: 20
       lookback_days: 7
 
   # ===== 中文科技媒体 =====
