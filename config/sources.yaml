@@ -8,7 +8,7 @@ sources:
     cron: "0 */6 * * *"
     max_items: 10
     config:
-      topics: [ai, llm, agent, machine-learning]
+      topics: [ai, llm, agent, machine-learning, rag, mcp, skill]
       min_stars: 50
       min_forks: 10
       min_watchers: 20
@@ -22,7 +22,7 @@ sources:
     cron: "0 */6 * * *"
     max_items: 10
     config:
-      topics: [ai, llm, agent, machine-learning]
+      topics: [ai, llm, agent, machine-learning, rag, mcp, skill]
       lookback_type: pushed      # 用 pushed_at 而非 created：查询 90 天内有活跃 push 的仓库
       lookback_days: 90
       min_stars: 2000
@@ -38,7 +38,7 @@ sources:
     cron: "0 */6 * * *"
     max_items: 10
     config:
-      topics: [ai, llm, agent, machine-learning]
+      topics: [ai, llm, agent, machine-learning, rag, mcp, skill]
       min_stars: 10
       lookback_days: 30
       trend_mode: true
