@@ -44,7 +44,12 @@ function formatBJTime(isoStr) {
         const dt = new Date(isoStr);
         const bj = new Date(dt.getTime() + 8 * 3600000);
         const pad = n => String(n).padStart(2, '0');
-        return `${pad(bj.getHours())}:${pad(bj.getMinutes())}:${pad(bj.getSeconds())}`;
+        const month = pad(bj.getMonth() + 1);
+        const day = pad(bj.getDate());
+        const hours = pad(bj.getHours());
+        const mins = pad(bj.getMinutes());
+        const secs = pad(bj.getSeconds());
+        return `${month}-${day} ${hours}:${mins}:${secs}`;
     } catch { return isoStr; }
 }
 
