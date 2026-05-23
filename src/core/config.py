@@ -38,6 +38,17 @@ class SourceConfig(BaseModel):
     config: dict = {}
 
 
+class SourceHealthRecord(BaseModel):
+    source_id: str
+    date: str
+    total_collected: int = 0
+    approved: int = 0
+    rejected: int = 0
+    failed: int = 0
+    avg_score: float | None = None
+    recorded_at: str = ""
+
+
 class SourcesConfig(BaseModel):
     sources: list[SourceConfig]
 
