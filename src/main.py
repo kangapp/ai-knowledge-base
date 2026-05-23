@@ -17,6 +17,7 @@ from .graph.router import router_node  # retry 循环中手动路由 retry items
 from .api.routes import router, set_db, set_run_pipeline, set_builder
 from .api.config import router as config_router
 from .api.stats import router as stats_router
+from .scheduler.source_scheduler import setup_source_scheduler
 from .db.operations import (
     start_pipeline_run, end_pipeline_run, save_article, save_tags,
     save_cost_log, batch_check_existing_urls, backup_database,
@@ -93,7 +94,7 @@ async def run_pipeline(trigger: str = "cron", source_filter: str | None = None):
             active_sources = [s for s in active_sources if s.id == source_filter]
 
         # ====== 图外：Collector + DB 查重（需要 DB 连接） ======
-        raw_items, error_log = await collect_all(active_sources)
+        raw_items, error_log = await collect_all(_db, active_sources)
         await record_phase_end(_db, run_id, "collect", "done", f"collected {len(raw_items)} items")
         logger.info("collector.done", extra={"total": len(raw_items), "errors": len(error_log)})
 
@@ -266,6 +267,7 @@ async def lifespan(app: FastAPI):
             id=f"collect-{source.id}",
         )
     _scheduler.start()
+    setup_source_scheduler(_scheduler)
 
     yield
 
