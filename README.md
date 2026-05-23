@@ -544,6 +544,97 @@ Reviewer 采用四维评分，总分 0-100：
 - **50-79 分**: retry (最多 2 轮，带修改建议)
 - **<50 分**: discarded
 
+## LLM 交互流程
+
+### Prompt 模板清单
+
+| Agent | Prompt 文件 | 用途 | Primary Model | Fallback |
+|-------|------------|------|---------------|----------|
+| `github_analyzer` | `prompts/github_analyzer.md` | 分析 GitHub 仓库 | MiniMax-M2.7 | deepseek-chat |
+| `rss_analyzer` | `prompts/rss_analyzer.md` | 分析 RSS 文章 | MiniMax-M2.7 | — |
+| `feishu_analyzer` | `prompts/feishu_analyzer.md` | 分析飞书文档 | MiniMax-M2.7 | — |
+| `arxiv_analyzer` | `prompts/arxiv_analyzer.md` | 分析 arXiv 论文 | MiniMax-M2.7 | deepseek-chat |
+| `reviewer` | `prompts/reviewer.md` | 四维评分审核 | MiniMax-M2.7 | — |
+
+### Prompt 加载机制
+
+```
+prompts/*.md 文件 ──load_prompt()──▶ {title} {description} {url} {metadata} {schema} 占位符填充
+                                              │
+                                              ▼
+                              system_prompt: "你是一个技术分析助手。只输出 JSON，格式：{schema}"
+                                              │
+                                              ▼
+                                    LLM Chat Completions API
+```
+
+所有 Analyzer 共享同一套 `analyze_items()` 基础设施（`src/graph/analyzers/base.py`），区别仅在于加载的 prompt 模板不同。
+
+### 数据流
+
+```
+Collector（采集）
+    │
+    ▼
+Router（100% 规则分流）
+    │
+    ├──▶ github_analyzer ──prompts/github_analyzer.md──▶
+    ├──▶ rss_analyzer    ──prompts/rss_analyzer.md──────▶  Aggregator（汇总）
+    ├──▶ feishu_analyzer  ──prompts/feishu_analyzer.md──▶        │
+    └──▶ arxiv_analyzer   ──prompts/arxiv_analyzer.md───▶        │
+                                                                  │
+                                                                  ▼
+                                                              Reviewer
+                                                        ──prompts/reviewer.md──▶ 四维评分
+                                                                  │
+                                    ┌─────────────────────┬───────┴───────┐
+                                    ▼                     ▼               ▼
+                                ≥80: 入库         50-79: retry        <50: discarded
+                                                   (最多 2 轮)
+```
+
+### Analyzer 输出 Schema
+
+```json
+{
+  "title": "string - 标题",
+  "summary": "string - 100-200字中文摘要",
+  "tags": ["标签1", "标签2"] - 最多3个",
+  "language": "zh|en - 文章语言",
+  "relevance_score": 85 - 相关度评分 0-100"
+}
+```
+
+### Reviewer 输出 Schema
+
+```json
+{
+  "total_score": 85,
+  "dimensions": {
+    "ai_relevance": {"score": 35, "reason": "..."},
+    "depth": {"score": 25, "reason": "..."},
+    "info_density": {"score": 15, "reason": "..."},
+    "timeliness": {"score": 10, "reason": "..."}
+  },
+  "verdict": "approved|retry|discarded",
+  "retry_feedback": null | {"suggestions": ["..."]}
+}
+```
+
+### 错误处理与重试
+
+- **Analyzer parse 失败**：记录 cost + 熔断统计，重试一次
+- **Reviewer retry verdict**：返回修改建议，下一轮采集时重新分析
+- **LLM Provider 熔断**：自动切换 fallback provider，无 fallback 则跳过
+
+### Prompt 扩展
+
+新增 Analyzer 步骤：
+1. 在 `prompts/` 添加 `xxx_analyzer.md`，使用 `{title}` `{description}` `{url}` `{metadata}` `{schema}` 占位符
+2. 在 `config/agents.yaml` 注册 agent，指定 `prompt: prompts/xxx_analyzer.md`
+3. 在 `src/graph/analyzers/` 添加 `xxx.py`，调用 `load_prompt("xxx_analyzer", registry)`
+4. 在 `pipeline.py` 的 `continue_to_analyzers()` 中添加路由分支
+
 ## 扩展与优化方向
 
 ### 短期优化
