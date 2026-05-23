@@ -17,10 +17,15 @@ class Database:
         await self._run_migrations()
 
     async def _run_migrations(self):
-        # 确保 schema_version 表存在（最简 bootstrap）
+        # Ensure schema_version table exists (minimal bootstrap)
         await self._conn.execute(
             "CREATE TABLE IF NOT EXISTS schema_version (version INTEGER PRIMARY KEY)"
         )
+        # Ensure there's at least one row for UPDATE to work
+        await self._conn.execute(
+            "INSERT OR IGNORE INTO schema_version (version) VALUES (0)"
+        )
+        await self._conn.commit()
         row = await self._conn.execute("SELECT version FROM schema_version")
         result = await row.fetchone()
         current = result["version"] if result else 0
@@ -43,12 +48,16 @@ class Database:
                 sql = (mig_dir / filename).read_text()
                 await self._conn.executescript(sql)
                 await self._conn.commit()
-                # INSERT OR REPLACE 确保版本号被写入
+                # Use UPDATE since we know a row exists
                 await self._conn.execute(
-                    "INSERT OR REPLACE INTO schema_version (version) VALUES (?)",
+                    "UPDATE schema_version SET version = ?",
                     (num,)
                 )
                 await self._conn.commit()
+                # Re-read version
+                row = await self._conn.execute("SELECT version FROM schema_version")
+                result = await row.fetchone()
+                current = result["version"] if result else 0
 
     async def fetch_one(self, sql: str, params: tuple = ()) -> aiosqlite.Row | None:
         cursor = await self._conn.execute(sql, params)
