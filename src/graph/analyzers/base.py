@@ -6,7 +6,7 @@ from ..state import RawItem, AnalyzedItem, CostRecord
 from ...core.llm_client import LLMRegistry
 
 logger = logging.getLogger("pipeline")
-ANALYZED_SCHEMA_DESC = '{"title": "string", "summary": "100-200字中文", "tags": ["标签1", "标签2"], "language": "zh|en", "relevance_score": 85}'
+ANALYZED_SCHEMA_DESC = '{"title": "string", "summary": "100-200字中文", "tags": ["标签1", "标签2"], "language": "zh|en"}'
 
 
 def load_prompt(agent_name: str, registry: LLMRegistry) -> str:

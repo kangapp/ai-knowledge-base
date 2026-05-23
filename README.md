@@ -558,8 +558,7 @@ URL: {url}
 元数据: {metadata}
 
 输出 JSON (schema={schema})
-标签从 AI/LLM/Agent/MCP/RAG/Open Source/Tool/Framework/Benchmark 中选择，也可建议新标签。relevance_score 评估文章与 AI 领域的相关度和质量（0-100）。
-注意：schema 中的 relevance_score 是你评估的相关度分数（0-100），不是 schema 的示例值。
+标签从 AI/LLM/Agent/MCP/RAG/Open Source/Tool/Framework/Benchmark 中选择，也可建议新标签。
 ```
 
 #### rss_analyzer.md
@@ -572,7 +571,6 @@ URL: {url}
 来源: {metadata}
 
 输出 JSON (schema={schema})
-注意：schema 中的 relevance_score 是你评估的相关度分数（0-100），不是 schema 的示例值。
 ```
 
 #### feishu_analyzer.md
@@ -584,7 +582,6 @@ URL: {url}
 元数据: {metadata}
 
 输出 JSON (schema={schema})
-注意：schema 中的 relevance_score 是你评估的相关度分数（0-100），不是 schema 的示例值。
 ```
 
 #### arxiv_analyzer.md
@@ -597,7 +594,6 @@ URL: {url}
 分类: {metadata}
 
 输出 JSON (schema={schema})
-注意：schema 中的 relevance_score 是你评估的相关度分数（0-100），不是 schema 的示例值。
 ```
 
 #### reviewer.md
@@ -660,10 +656,11 @@ URL: {url}
   "title": "string - 标题",
   "summary": "string - 100-200字中文摘要",
   "tags": ["标签1", "标签2"] - 最多3个，从 AI/LLM/Agent/MCP/RAG/Open Source/Tool/Framework/Benchmark 选择",
-  "language": "zh|en - 文章语言",
-  "relevance_score": 85 - 相关度评分 0-100"
+  "language": "zh|en - 文章语言"
 }
 ```
+
+> relevance_score 已移除 — Analyzer 不生成相关度分数，分数由 Reviewer 的四维评分决定
 
 ### Reviewer 输出 Schema
 

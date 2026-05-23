@@ -23,7 +23,6 @@ class AnalyzedItem(BaseModel):
     summary: str
     tags: list[str] = Field(default_factory=list, max_length=3)
     language: Literal["zh", "en"] = "zh"
-    relevance_score: int = Field(default=0, ge=0, le=100)
     retry_count: int = Field(default=0, ge=0)
 
 
