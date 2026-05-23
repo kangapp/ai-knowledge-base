@@ -121,6 +121,31 @@ async def source_action(source_id: str, action: str):
         return {"code": 0, "data": {"message": f"Source {source_id} enabled"}, "message": "ok"}
 
 
+@router.post("/maintenance/clear-health")
+async def clear_source_health():
+    """清除所有 source_health 数据，下次采集自动重建（修正旧格式数据）"""
+    db = Database("data/kb.db")
+    await db.initialize()
+    try:
+        await db.execute("DELETE FROM source_health")
+        await db.commit()
+        logger.info("api.source_health.cleared")
+        return {"code": 0, "data": {"message": "source_health cleared, will rebuild on next pipeline run"}, "message": "ok"}
+    finally:
+        await db.close()
+
+    if action == "remove":
+        SourceManager.remove(source_id)
+        logger.info(f"api.source.remove", extra={"source_id": source_id})
+        return {"code": 0, "data": {"message": f"Source {source_id} removed"}, "message": "ok"}
+    elif action == "disable":
+        SourceManager.update(source_id, enabled=False)
+        return {"code": 0, "data": {"message": f"Source {source_id} disabled"}, "message": "ok"}
+    elif action == "enable":
+        SourceManager.update(source_id, enabled=True)
+        return {"code": 0, "data": {"message": f"Source {source_id} enabled"}, "message": "ok"}
+
+
 @router.get("/discovered")
 async def list_discovered():
     """已发现待审核的数据源"""
