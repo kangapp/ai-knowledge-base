@@ -50,9 +50,10 @@ class Database:
                 sql = (mig_dir / filename).read_text()
                 await self._conn.executescript(sql)
                 await self._conn.commit()
-                # Always update to the migration number (idempotent)
+                # Delete all rows and insert new version (handles multiple rows case)
+                await self._conn.execute("DELETE FROM schema_version")
                 await self._conn.execute(
-                    "UPDATE schema_version SET version = ?",
+                    "INSERT INTO schema_version (version) VALUES (?)",
                     (num,)
                 )
                 await self._conn.commit()
