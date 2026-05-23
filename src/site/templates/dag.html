@@ -73,7 +73,7 @@ function updateDag(data) {
     statusDot.className = 'status-dot ' + data.status;
     statusText.textContent = data.status === 'running' ? '运行中' : data.status === 'completed' ? '已完成' : data.status === 'failed' ? '失败' : '空闲';
     phaseText.textContent = data.current_phase ? `阶段: ${PHASE_NAMES[data.current_phase] || data.current_phase}` : '';
-    runInfo.innerHTML = data.run_id ? `<div>${data.run_id}</div><div class="run-time">${formatBJTime(data.phases[0]?.started_at)}</div>` : '';
+    runInfo.innerHTML = data.run_id ? `<div>${data.run_id_bj || data.run_id}</div><div class="run-time">${formatBJTime(data.phases[0]?.started_at)}</div>` : '';
 
     const phases = data.phases || [];
     const phaseMap = {};

@@ -175,8 +175,13 @@ async def get_pipeline_dag():
                 msg += f" ({p['details']})"
             logs.append({"time": time_str, "message": msg, "level": "info"})
 
+    # run_id 显示用北京时间
+    bj_now = datetime.now(timezone.utc) + timedelta(hours=8)
+    bj_run_id = f"run_{bj_now.strftime('%Y%m%d_%H%M%S')}"
+
     return envelope({
         "run_id": run_id,
+        "run_id_bj": bj_run_id,
         "status": last_run["status"],
         "current_phase": phases[-1]["phase"] if phases and phases[-1]["status"] == "running" else None,
         "phases": [dict(p) for p in phases],
