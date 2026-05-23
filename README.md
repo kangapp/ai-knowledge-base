@@ -237,6 +237,77 @@ ai-knowledge-base/
 └── docs/                       # 设计文档
 ```
 
+## 数据模型
+
+### 数据库表
+
+| 表名 | 说明 | 关键字段 |
+|------|------|----------|
+| `articles` | 文章主表 | title, url (UNIQUE), description, summary, source, relevance_score, status, collected_at |
+| `tags` | 标签字典 | name (UNIQUE) |
+| `article_tags` | 文章-标签关联 | article_id → articles.id, tag_id → tags.id |
+| `pipeline_runs` | 流水线运行记录 | id, started_at, ended_at, status, trigger, summary (JSON) |
+| `cost_logs` | LLM 调用花费 | run_id, agent, provider, model, tokens_in, tokens_out, cost, **ref_url** |
+| `provider_health` | Provider 健康状态 | provider, status, latency_ms, circuit (closed/open/half_open) |
+| `circuit_events` | 熔断事件记录 | provider, event, reason, created_at |
+| `source_health` | 数据源健康快照 | source_id, date, total_collected, approved, rejected, avg_score |
+| `discovered_sources` | 已发现待审核的数据源 | url, name, type, status (candidate/added/rejected) |
+
+**FTS5 全文索引**：`articles_fts` over (title, summary, description)
+
+### 采集流程产生的数据
+
+```
+每次采集产生一条 pipeline_runs 记录
+    └── cost_logs: 每次 LLM 调用产生一条记录（记录 ref_url 用于追踪来源）
+    └── articles: 入库时产生记录，status = approved/retry/discarded
+    └── source_health: 每周一 09:00 汇总上周数据源表现
+```
+
+### sources.yaml 配置结构
+
+```yaml
+sources:
+  - id: github_trending
+    name: GitHub Trending
+    type: github
+    enabled: true
+    priority: 1
+    cron: "0 */6 * * *"
+    max_items: 10
+    config:
+      languages: [python, typescript]
+      topics: [ai, llm, agent]
+
+  - id: rss_the_batch
+    name: The Batch
+    type: rss
+    enabled: true
+    cron: "0 9 * * 1"        # 周刊
+    max_items: 5
+    config:
+      url: "https://www.deeplearning.ai/the-batch/feed/"
+```
+
+### agents.yaml 配置结构
+
+```yaml
+budget:
+  monthly: 10.0          # 月预算 ($)
+  soft_limit: 0.8        # 80% 触发软熔断
+
+agents:
+  github_analyzer:
+    primary:
+      provider: deepseek
+      model: deepseek-chat
+    fallback:
+      - provider: minimax
+        model: MiniMax-M2.7
+    prompt: prompts/github.md
+    budget_weight: 1.0
+```
+
 ## 快速开始
 
 ### 本地开发
@@ -284,16 +355,27 @@ curl http://localhost:8090/api/health
 ### 手动触发采集
 
 ```bash
-# 触发采集
+# 全量采集（所有已启用的数据源）
 curl -X POST http://localhost:8000/api/pipeline/run
 
-# 检查状态
-curl http://localhost:8000/api/pipeline/status
+# 指定数据源采集（按 source id）
+curl -X POST "http://localhost:8000/api/pipeline/run?source=github_trending"
+
+# 指定多个源（多次调用）
+curl -X POST "http://localhost:8000/api/pipeline/run?source=rss_hackernews_ai"
 ```
 
-### 查看日志
+**查看已配置的数据源 ID：**
+```bash
+curl http://localhost:8000/api/sources
+```
+
+### 查看状态和日志
 
 ```bash
+# 查看 DAG 状态（当前运行阶段和日志）
+curl http://localhost:8000/api/pipeline/dag
+
 # 查看 pipeline 日志 (JSON 格式)
 docker logs pipeline --since 24h | grep '"event"' | jq .
 
@@ -304,11 +386,31 @@ docker logs pipeline --since 24h | grep '"error"'
 docker logs pipeline --since 24h | grep '"run_id": "20260523-0900"'
 ```
 
+### 数据源管理
+
+```bash
+# 查看所有数据源（含健康状态）
+curl http://localhost:8000/api/sources
+
+# 查看数据源健康统计
+curl http://localhost:8000/api/sources/stats
+
+# 查看已发现待审核的数据源
+curl http://localhost:8000/api/sources/discovered
+
+# 启用/禁用数据源
+curl -X POST "http://localhost:8000/api/sources/{source_id}/action?action=enable"
+curl -X POST "http://localhost:8000/api/sources/{source_id}/action?action=disable"
+```
+
 ### 查看统计数据
 
 ```bash
-# 仪表盘 KPI
+# 仪表盘 KPI（30天）
 curl http://localhost:8000/api/stats
+
+# 指定天数
+curl http://localhost:8000/api/stats?days=7
 
 # 花费统计
 curl http://localhost:8000/api/cost/summary?days=30
@@ -316,8 +418,18 @@ curl http://localhost:8000/api/cost/summary?days=30
 # 搜索文章
 curl "http://localhost:8000/api/search?q=LLM&limit=20"
 
-# 文章列表
-curl "http://localhost:8000/api/articles?page=1&page_size=20"
+# 文章列表（支持分页、来源筛选）
+curl "http://localhost:8000/api/articles?page=1&page_size=20&source=github"
+
+# 按来源筛选
+curl "http://localhost:8000/api/articles?source=rss"
+```
+
+### 强制构建站点
+
+```bash
+# 强制重新构建静态站点（跳过去抖）
+curl -X POST http://localhost:8000/api/pipeline/build
 ```
 
 ## 运维指南

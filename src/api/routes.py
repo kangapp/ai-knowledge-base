@@ -1,3 +1,4 @@
+from datetime import timedelta
 from fastapi import APIRouter, Query, HTTPException, Request
 from fastapi.responses import JSONResponse
 from ..core.database import Database
@@ -155,7 +156,14 @@ async def get_pipeline_dag():
     # Generate logs from phase transitions
     logs = []
     for p in phases:
-        time_str = p["started_at"][11:19] if p["started_at"] else ""
+        started_at = p["started_at"]
+        # 转换为北京时间，格式化为 HH:mm:ss
+        if started_at:
+            dt = datetime.fromisoformat(started_at.replace("Z", "+00:00"))
+            bj = dt + timedelta(hours=8)
+            time_str = bj.strftime("%H:%M:%S")
+        else:
+            time_str = ""
         if p["status"] == "done":
             msg = f"{p['phase']} 完成"
             if p["details"]:

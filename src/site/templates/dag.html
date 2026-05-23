@@ -38,6 +38,16 @@
 <script>
 const PHASE_NAMES = {collect:'采集', route:'路由', analyze:'分析', aggregate:'汇总', review:'审核'};
 
+function formatBJTime(isoStr) {
+    if (!isoStr) return '-';
+    try {
+        const dt = new Date(isoStr);
+        const bj = new Date(dt.getTime() + 8 * 3600000);
+        const pad = n => String(n).padStart(2, '0');
+        return `${pad(bj.getHours())}:${pad(bj.getMinutes())}:${pad(bj.getSeconds())}`;
+    } catch { return isoStr; }
+}
+
 async function fetchDag() {
     try {
         const res = await fetch('/api/pipeline/dag');
@@ -58,7 +68,7 @@ function updateDag(data) {
     statusDot.className = 'status-dot ' + data.status;
     statusText.textContent = data.status === 'running' ? '运行中' : data.status === 'completed' ? '已完成' : data.status === 'failed' ? '失败' : '空闲';
     phaseText.textContent = data.current_phase ? `阶段: ${PHASE_NAMES[data.current_phase] || data.current_phase}` : '';
-    runInfo.innerHTML = data.run_id ? `<div>${data.run_id}</div><div class="run-time">${data.phases[0]?.started_at || ''}</div>` : '';
+    runInfo.innerHTML = data.run_id ? `<div>${data.run_id}</div><div class="run-time">${formatBJTime(data.phases[0]?.started_at)}</div>` : '';
 
     const phases = data.phases || [];
     const phaseMap = {};
