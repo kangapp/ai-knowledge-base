@@ -341,3 +341,33 @@ async def record_source_health(db: Database, record: "CollectResult"):
             recorded_at=datetime('now')
     """, (record.source_id, today, record.total, record.approved, record.rejected, record.failed, record.avg_score))
     await db.commit()
+
+
+async def batch_save_github_snapshots(db: Database, items: list[RawItem]):
+    """批量写入 GitHub repo 快照（同一 repo_url + date 唯一）"""
+    today = datetime.now().strftime("%Y-%m-%d")
+    for item in items:
+        if item.source != "github":
+            continue
+        meta = item.raw_metadata
+        await db.execute("""
+            INSERT OR REPLACE INTO github_repo_snapshots
+            (repo_url, repo_name, stars, forks, watchers, snapshot_date)
+            VALUES (?, ?, ?, ?, ?, ?)
+        """, (item.url, item.source_detail, meta.get("stars", 0),
+              meta.get("forks", 0), meta.get("watchers", 0), today))
+    await db.commit()
+
+
+async def get_trending_repo_urls(db: Database, min_velocity: float, days: int = 7) -> set[str]:
+    """计算 repos 在过去 N 天内的 star 增速，返回增速 >= min_velocity 的 repo_url 集合"""
+    rows = await db.fetch_all("""
+        SELECT s1.repo_url,
+               (s1.stars - s0.stars) / (:days * 1.0) AS velocity
+        FROM github_repo_snapshots s1
+        JOIN github_repo_snapshots s0
+          ON s0.repo_url = s1.repo_url
+         AND s0.snapshot_date = date(s1.snapshot_date, '-' || :days || ' days')
+        WHERE (s1.stars - s0.stars) / (:days * 1.0) >= :min_velocity
+    """, {"days": days, "min_velocity": min_velocity})
+    return {r["repo_url"] for r in rows}

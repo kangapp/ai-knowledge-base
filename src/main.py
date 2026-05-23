@@ -22,6 +22,7 @@ from .scheduler.source_scheduler import setup_source_scheduler
 from .db.operations import (
     start_pipeline_run, end_pipeline_run, save_article, save_tags,
     save_cost_log, batch_check_existing_urls, backup_database,
+    batch_save_github_snapshots, get_trending_repo_urls,
 )
 from .site.builder import SiteBuilder, DebouncedBuilder
 
@@ -98,6 +99,19 @@ async def run_pipeline(trigger: str = "cron", source_filter: str | None = None):
         raw_items, error_log = await collect_all(_db, active_sources)
         await record_phase_end(_db, run_id, "collect", "done", f"collected {len(raw_items)} items")
         logger.info("collector.done", extra={"total": len(raw_items), "errors": len(error_log)})
+
+        # 记录 GitHub repo 快照
+        github_items = [i for i in raw_items if i.source == "github"]
+        if github_items:
+            await batch_save_github_snapshots(_db, github_items)
+
+        # 趋势筛选（对 trend_mode=true 的源）
+        for src in active_sources:
+            if src.type == "github" and src.config.get("trend_mode"):
+                min_vel = src.config.get("trend_velocity_threshold", 5)
+                trending = await get_trending_repo_urls(_db, min_vel, days=7)
+                # 只保留 trending 中的 repo
+                raw_items = [i for i in raw_items if i.url in trending]
 
         if not raw_items and error_log:
             summary = json.dumps({"collected": 0, "errors": error_log})
