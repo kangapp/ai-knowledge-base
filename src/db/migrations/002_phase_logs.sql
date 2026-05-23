@@ -11,3 +11,5 @@ CREATE TABLE IF NOT EXISTS pipeline_phase_logs (
 );
 
 CREATE INDEX IF NOT EXISTS idx_phase_logs_run ON pipeline_phase_logs(run_id);
+
+INSERT OR REPLACE INTO schema_version (version) VALUES (2);

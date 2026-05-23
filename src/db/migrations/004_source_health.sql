@@ -26,3 +26,5 @@ CREATE TABLE IF NOT EXISTS discovered_sources (
     rejected_at     TEXT,
     reject_reason   TEXT
 );
+
+INSERT OR REPLACE INTO schema_version (version) VALUES (4);
