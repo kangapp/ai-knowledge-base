@@ -28,7 +28,7 @@ async def test_initialize_and_migrate(tmp_path):
 
         # 验证迁移版本
         v = await db.fetch_one("SELECT version FROM schema_version")
-        assert v["version"] == 1
+        assert v["version"] == 4
     finally:
         await db.close()
 

@@ -40,20 +40,25 @@ class SourceHealthTracker:
         """
         判断数据源是否应该被淘汰。
         返回 (should_evict, reason)
-        """
-        count = await self.get_source_collection_count(source_id)
-        if count < PROTECTION_CYCLES:
-            return False, f"保护期内（已采集 {count} 次，< {PROTECTION_CYCLES} 次）"
 
-        records = await self.get_recent_records(source_id, limit=CONSECUTIVE_FAILURES)
-        if len(records) < CONSECUTIVE_FAILURES:
+        保护期（< 3 次记录）：跳过淘汰判断
+        超过保护期后：只看最近 3 次计算 approved 率
+        """
+        records = await self.get_recent_records(source_id, limit=CONSECUTIVE_FAILURES + PROTECTION_CYCLES)
+
+        if len(records) < PROTECTION_CYCLES:
+            return False, f"保护期内（已采集 {len(records)} 次，< {PROTECTION_CYCLES} 次）"
+
+        # 超过保护期后，只看最近 3 次
+        recent = records[:CONSECUTIVE_FAILURES]
+        if len(recent) < CONSECUTIVE_FAILURES:
             return False, "记录不足"
 
-        total = sum(r["total_collected"] for r in records)
+        total = sum(r["total_collected"] for r in recent)
         if total == 0:
             return False, "无采集数据"
 
-        approved = sum(r["approved"] for r in records)
+        approved = sum(r["approved"] for r in recent)
         rate = approved / total
 
         if rate < APPROVED_RATE_THRESHOLD:

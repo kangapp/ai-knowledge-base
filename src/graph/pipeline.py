@@ -174,6 +174,47 @@ class _ReviewerNode:
         discarded = sum(1 for r in reviewed if r.verdict == "discarded")
         details = f"approved:{approved}, retry:{retry}, discarded:{discarded}, cost:${total_cost:.6f}"
         await record_phase_end(db, state.run_id, "review", "done", details)
+
+        # 写入各数据源健康记录（含 approved/rejected/avg_score）
+        from .state import CollectResult
+        from ..db.operations import record_source_health
+
+        # 建立 ref_url -> (source, source_detail) 映射，从 routed 列表查找
+        ref_source_map = {}
+        for key in ("routed_github", "routed_rss", "routed_feishu", "routed_arxiv"):
+            for item in getattr(state, key, []):
+                ref_source_map[item.url] = (item.source, item.source_detail)
+
+        # 按 source_id 汇总 verdicts
+        source_stats = {}  # source_id -> {approved, rejected, failed, scores}
+        for r in reviewed:
+            mapping = ref_source_map.get(r.ref_url)
+            if not mapping:
+                continue
+            source, source_detail = mapping
+            # RSS 子源用 source_detail 作为 source_id，其余用 source
+            src_id = source_detail if source == "rss" else source
+            if src_id not in source_stats:
+                source_stats[src_id] = {"approved": 0, "rejected": 0, "failed": 0, "scores": []}
+            if r.verdict == "approved":
+                source_stats[src_id]["approved"] += 1
+                source_stats[src_id]["scores"].append(r.total_score)
+            elif r.verdict in ("retry", "discarded"):
+                source_stats[src_id]["rejected"] += 1
+
+        # 写入健康记录
+        for src_id, stats in source_stats.items():
+            scores = stats["scores"]
+            avg_score = round(sum(scores) / len(scores), 1) if scores else None
+            await record_source_health(db, CollectResult(
+                source_id=src_id,
+                total=0,  # collector 阶段已记录 total
+                approved=stats["approved"],
+                rejected=stats["rejected"],
+                failed=0,
+                avg_score=avg_score,
+            ))
+
         return result
 
 

@@ -2,6 +2,7 @@ import re
 import logging
 import httpx
 import feedparser
+import hashlib
 from datetime import datetime, timezone, timedelta
 from .source_manager import SourceManager
 from .config import SourceConfig
@@ -12,6 +13,12 @@ GITHUB_TRENDING_URL = "https://github.com/trending"
 RSS_NEIGHBOR_HEADERS = {
     "User-Agent": "Mozilla/5.0 (compatible; SourceDiscoveryBot/1.0)"
 }
+
+
+def _stable_rss_id(url: str) -> str:
+    """根据 URL 生成稳定的 hash-based ID"""
+    slug = hashlib.md5(url.encode()).hexdigest()[:12]
+    return f"rss_{slug}"
 
 
 class SourceDiscovery:
@@ -77,6 +84,8 @@ class SourceDiscovery:
                         "lookback_days": 7,
                     }
                 )
+                # 先写入 discovered_sources 表
+                await self._write_discovered_source(source)
                 discovered.append(source)
 
             logger.info(f"discovery.github_topics", extra={"found": len(discovered), "topics": list(new_ai_topics)})
@@ -133,7 +142,7 @@ class SourceDiscovery:
 
                     name = feed.feed.get("title", rss_url.split("/")[2] if len(rss_url.split("/")) > 2 else rss_url)
                     source = SourceConfig(
-                        id=f"rss_auto_{len(discovered)}_{datetime.now().strftime('%Y%m%d')}",
+                        id=_stable_rss_id(rss_url),
                         name=name[:50],
                         type="rss",
                         enabled=True,
@@ -145,6 +154,8 @@ class SourceDiscovery:
                             "filter_keywords": ["AI", "LLM", "artificial intelligence", "machine learning"],
                         }
                     )
+                    # 先写入 discovered_sources 表
+                    await self._write_discovered_source(source)
                     discovered.append(source)
                     existing_urls.add(rss_url)
 
@@ -154,6 +165,20 @@ class SourceDiscovery:
 
         logger.info(f"discovery.rss_neighbors", extra={"found": len(discovered)})
         return discovered
+
+    async def _write_discovered_source(self, source: SourceConfig):
+        """写入 discovered_sources 表（status='candidate'）"""
+        if self._db is None:
+            return
+        try:
+            await self._db.execute("""
+                INSERT OR IGNORE INTO discovered_sources (url, name, type, status, discovered_at)
+                VALUES (?, ?, ?, 'candidate', datetime('now'))
+            """, (source.config.get("url", ""), source.name, source.type))
+            await self._db.commit()
+            logger.info("discovered_source.recorded", extra={"source_id": source.id, "type": source.type})
+        except Exception as e:
+            logger.warning("discovered_source.write_failed", extra={"source_id": source.id, "error": str(e)})
 
     async def discover(self) -> list[SourceConfig]:
         """

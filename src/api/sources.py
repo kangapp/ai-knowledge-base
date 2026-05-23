@@ -67,14 +67,20 @@ async def get_source_stats(period: str = "week"):
 
             # 计算趋势
             if len(h["records"]) >= 2:
-                first_half = sum(r["approved"] for r in h["records"][len(h["records"])//2:]) / sum(r["total_collected"] for r in h["records"][len(h["records"])//2:]) if sum(r["total_collected"] for r in h["records"][len(h["records"])//2:]) > 0 else 0
-                second_half = sum(r["approved"] for r in h["records"][:len(h["records"])//2]) / sum(r["total_collected"] for r in h["records"][:len(h["records"])//2]) if sum(r["total_collected"] for r in h["records"][:len(h["records"])//2]) > 0 else 0
-                if approved_rate > first_half * 1.1:
-                    trend = "rising"
-                elif approved_rate < first_half * 0.9:
-                    trend = "falling"
-                else:
+                first_half_total = sum(r["total_collected"] for r in h["records"][len(h["records"])//2:])
+                second_half_total = sum(r["total_collected"] for r in h["records"][:len(h["records"])//2:])
+
+                if first_half_total == 0 or second_half_total == 0:
                     trend = "stable"
+                else:
+                    first_half = sum(r["approved"] for r in h["records"][len(h["records"])//2:]) / first_half_total
+                    second_half = sum(r["approved"] for r in h["records"][:len(h["records"])//2:]) / second_half_total
+                    if approved_rate > first_half * 1.1:
+                        trend = "rising"
+                    elif approved_rate < first_half * 0.9:
+                        trend = "falling"
+                    else:
+                        trend = "stable"
             else:
                 trend = "stable"
 
