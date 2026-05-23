@@ -100,4 +100,4 @@ CREATE TABLE IF NOT EXISTS circuit_events (
 );
 
 -- 更新 schema_version
-UPDATE schema_version SET version = 1;
+-- 001 本身不更新版本号，由 Database 类在检测到 current=0 后自动更新
