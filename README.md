@@ -78,7 +78,7 @@ flowchart TD
         Q["每周一 09:00"] --> R["SourceHealthTracker\n检查并淘汰低质量源"]
         Q --> S["SourceDiscovery\nGitHub Topic 扩展"]
         Q --> T["SourceDiscovery\nRSS 友链扫描"]
-        R --> U{"approved率<30%\n连续3次?"]
+        R --> U{"approved率<30%<br/>连续3次?"}
         U -->|是| V["SourceManager.remove\n自动删除数据源"]
         U -->|否| W["跳过"]
         S --> X["新 topic → 添加 github 源"]
