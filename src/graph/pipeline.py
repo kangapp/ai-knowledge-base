@@ -179,10 +179,14 @@ class _ReviewerNode:
         from .state import CollectResult
         from ..db.operations import record_source_health
 
-        # 建立 ref_url -> (source, source_detail) 映射，从 routed 列表查找
+        # 建立 ref_url -> (source, source_detail) 映射，同时统计每个 source 的数量
         ref_source_map = {}
+        routed_counts = {}  # src_id -> count of items entering review
         for key in ("routed_github", "routed_rss", "routed_feishu", "routed_arxiv"):
-            for item in getattr(state, key, []):
+            src_id = key.replace("routed_", "")
+            routed_items = getattr(state, key, [])
+            routed_counts[src_id] = len(routed_items)
+            for item in routed_items:
                 ref_source_map[item.url] = (item.source, item.source_detail)
 
         # 按 source_id 汇总 verdicts
@@ -208,7 +212,7 @@ class _ReviewerNode:
             avg_score = round(sum(scores) / len(scores), 1) if scores else None
             await record_source_health(db, CollectResult(
                 source_id=src_id,
-                total=0,  # collector 阶段已记录 total
+                total=routed_counts.get(src_id, 0),  # ← 修复：使用进入 review 的数量
                 approved=stats["approved"],
                 rejected=stats["rejected"],
                 failed=0,
