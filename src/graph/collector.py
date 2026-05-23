@@ -31,7 +31,7 @@ async def collect_github(source: SourceConfig) -> list[RawItem]:
     if token := os.environ.get("GITHUB_TOKEN"):
         headers["Authorization"] = f"Bearer {token}"
 
-    async with httpx.AsyncClient(timeout=30) as client:
+    async with httpx.AsyncClient(timeout=30, follow_redirects=True) as client:
         resp = await client.get(url, params=params, headers=headers)
         resp.raise_for_status()
         data = resp.json()
@@ -125,7 +125,7 @@ async def collect_feishu(source: SourceConfig) -> list[RawItem]:
     token = await _feishu_auth.get_token()
     headers = {"Authorization": f"Bearer {token}"}
 
-    async with httpx.AsyncClient(timeout=30) as client:
+    async with httpx.AsyncClient(timeout=30, follow_redirects=True) as client:
         for space_id in cfg.get("space_ids", []):
             # 获取知识库空间下的节点列表
             resp = await client.get(
@@ -170,7 +170,7 @@ async def collect_arxiv(source: SourceConfig) -> list[RawItem]:
     now = datetime.now(timezone.utc).isoformat()
     for cat in cfg.get("categories", []):
         url = f"http://export.arxiv.org/api/query?search_query=cat:{cat}&start=0&max_results={source.max_items}&sortBy=submittedDate&sortOrder=descending"
-        async with httpx.AsyncClient(timeout=30) as client:
+        async with httpx.AsyncClient(timeout=30, follow_redirects=True) as client:
             resp = await client.get(url)
             resp.raise_for_status()
         feed = feedparser.parse(resp.text)
