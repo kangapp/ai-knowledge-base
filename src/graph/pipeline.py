@@ -183,20 +183,21 @@ class _ReviewerNode:
         ref_source_map = {}
         routed_counts = {}  # src_id -> count of items entering review
         for key in ("routed_github", "routed_rss", "routed_feishu", "routed_arxiv"):
-            src_id = key.replace("routed_", "")
             routed_items = getattr(state, key, [])
-            routed_counts[src_id] = len(routed_items)
             for item in routed_items:
+                # RSS 子源用 source_detail 作为 src_id，其余用 source
+                src_id = item.source_detail if item.source == "rss" else item.source
+                routed_counts[src_id] = routed_counts.get(src_id, 0) + 1
                 ref_source_map[item.url] = (item.source, item.source_detail)
 
-        # 按 source_id 汇总 verdicts
-        source_stats = {}  # source_id -> {approved, rejected, failed, scores}
+        # 按 source_id 汇总 verdicts（src_id 与 routed_counts 一致）
+        source_stats = {}  # src_id -> {approved, rejected, failed, scores}
         for r in reviewed:
             mapping = ref_source_map.get(r.ref_url)
             if not mapping:
                 continue
             source, source_detail = mapping
-            # RSS 子源用 source_detail 作为 source_id，其余用 source
+            # RSS 子源用 source_detail 作为 src_id，其余用 source
             src_id = source_detail if source == "rss" else source
             if src_id not in source_stats:
                 source_stats[src_id] = {"approved": 0, "rejected": 0, "failed": 0, "scores": []}
