@@ -22,16 +22,29 @@ def envelope(data=None, message="ok", code=0):
 async def get_stats_enhanced(days: int = Query(default=30, ge=1, le=3650)):
     db = get_db()
 
-    # Basic stats — pass_rate = approved / total collected (入库/采集)
-    period_total = await db.fetch_one(
-        "SELECT COUNT(*) as c FROM articles WHERE collected_at >= date('now', ?)",
+    # pass_rate 从 pipeline_runs 的 summary 计算（articles 表只有 approved）
+    pipeline_rows = await db.fetch_all(
+        "SELECT summary FROM pipeline_runs WHERE started_at >= date('now', ?) AND status='completed'",
         (f"-{days} days",)
     )
-    period_approved = await db.fetch_one(
-        "SELECT COUNT(*) as c FROM articles WHERE status='approved' AND collected_at >= date('now', ?)",
-        (f"-{days} days",)
-    )
+    pipeline_approved = 0
+    pipeline_discarded = 0
+    pipeline_retry = 0
+    for row in pipeline_rows:
+        try:
+            import json
+            s = json.loads(row["summary"] or "{}")
+            pipeline_approved += s.get("approved", 0)
+            pipeline_discarded += s.get("discarded", 0)
+            pipeline_retry += s.get("retry", 0)
+        except Exception:
+            pass
+    period_total_collected = pipeline_approved + pipeline_discarded + pipeline_retry
+    pass_rate = pipeline_approved / period_total_collected if period_total_collected > 0 else 0
+
+    # 其他统计（从 articles 表查询）
     total = await db.fetch_one("SELECT COUNT(*) as c FROM articles WHERE status='approved'")
+    period_approved_count = pipeline_approved  # 已从 pipeline 汇总得到
 
     period_cost = await db.fetch_one(
         "SELECT COALESCE(SUM(cost),0) as t FROM cost_logs WHERE created_at >= date('now', ?)",
@@ -43,12 +56,6 @@ async def get_stats_enhanced(days: int = Query(default=30, ge=1, le=3650)):
         (f"-{days} days",)
     )
     avg_score = await db.fetch_one("SELECT AVG(relevance_score) as avg FROM articles WHERE status='approved'")
-
-    period_total_collected = period_total["c"] if period_total and period_total["c"] else 0
-
-    pass_rate = (period_approved["c"] / period_total_collected) if period_total_collected > 0 else 0
-
-    # Hourly (past 48 hours)
     hourly = await db.fetch_all("""
         SELECT strftime('%Y-%m-%dT%H:00', created_at) as hour,
                SUM(cost) as cost, COUNT(*) as articles
@@ -104,7 +111,7 @@ async def get_stats_enhanced(days: int = Query(default=30, ge=1, le=3650)):
         "data": {
             "summary": {
                 "total_articles": total["c"] if total else 0,
-                "period_articles": period_approved["c"] if period_approved else 0,
+                "period_articles": period_approved_count,
                 "period_cost": round(period_cost["t"] if period_cost else 0, 4),
                 "total_cost": round(cost_total["t"] if cost_total else 0, 4),
                 "active_sources": active_sources["c"] if active_sources else 0,
