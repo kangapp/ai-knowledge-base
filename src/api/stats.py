@@ -32,6 +32,7 @@ async def get_stats_enhanced(days: int = Query(default=30, ge=1, le=3650)):
         (f"-{days} days",)
     )
     total = await db.fetch_one("SELECT COUNT(*) as c FROM articles WHERE status='approved'")
+
     period_cost = await db.fetch_one(
         "SELECT COALESCE(SUM(cost),0) as t FROM cost_logs WHERE created_at >= date('now', ?)",
         (f"-{days} days",)
@@ -43,7 +44,9 @@ async def get_stats_enhanced(days: int = Query(default=30, ge=1, le=3650)):
     )
     avg_score = await db.fetch_one("SELECT AVG(relevance_score) as avg FROM articles WHERE status='approved'")
 
-    pass_rate = (period_approved["c"] / period_total["c"]) if period_total and period_total["c"] > 0 else 0
+    period_total_collected = period_total["c"] if period_total and period_total["c"] else 0
+
+    pass_rate = (period_approved["c"] / period_total_collected) if period_total_collected > 0 else 0
 
     # Hourly (past 48 hours)
     hourly = await db.fetch_all("""
@@ -107,7 +110,7 @@ async def get_stats_enhanced(days: int = Query(default=30, ge=1, le=3650)):
                 "active_sources": active_sources["c"] if active_sources else 0,
                 "avg_score": round(avg_score["avg"], 1) if avg_score and avg_score["avg"] else 0,
                 "pass_rate": round(pass_rate, 3),
-                "period_total_collected": period_total["c"] if period_total else 0,
+                "period_total_collected": period_total_collected,
             },
             "hourly_cost": [dict(r) for r in hourly],
             "daily_cost": [dict(r) for r in daily],
