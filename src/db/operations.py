@@ -381,6 +381,7 @@ async def get_consumption_detail_stats(db: Database, period: str = "week") -> di
             SELECT
                 CASE
                     WHEN agent LIKE '%_analyzer' THEN SUBSTR(agent, 1, LENGTH(agent) - 8)
+                    WHEN agent = 'reviewer' THEN 'review'
                     ELSE agent
                 END as source,
                 CASE WHEN agent LIKE '%_analyzer' THEN 'analyze' ELSE 'review' END as type,
@@ -394,7 +395,11 @@ async def get_consumption_detail_stats(db: Database, period: str = "week") -> di
     elif period == "week":
         source_trend = await db.fetch_all("""
             SELECT
-                CASE WHEN agent LIKE '%_analyzer' THEN SUBSTR(agent, 1, LENGTH(agent) - 8) ELSE agent END as source,
+                CASE
+                    WHEN agent LIKE '%_analyzer' THEN SUBSTR(agent, 1, LENGTH(agent) - 8)
+                    WHEN agent = 'reviewer' THEN 'review'
+                    ELSE agent
+                END as source,
                 CASE WHEN agent LIKE '%_analyzer' THEN 'analyze' ELSE 'review' END as type,
                 strftime('%Y-W%W', created_at) as label,
                 SUM(cost) as cost
@@ -404,7 +409,11 @@ async def get_consumption_detail_stats(db: Database, period: str = "week") -> di
     else:
         source_trend = await db.fetch_all("""
             SELECT
-                CASE WHEN agent LIKE '%_analyzer' THEN SUBSTR(agent, 1, LENGTH(agent) - 8) ELSE agent END as source,
+                CASE
+                    WHEN agent LIKE '%_analyzer' THEN SUBSTR(agent, 1, LENGTH(agent) - 8)
+                    WHEN agent = 'reviewer' THEN 'review'
+                    ELSE agent
+                END as source,
                 CASE WHEN agent LIKE '%_analyzer' THEN 'analyze' ELSE 'review' END as type,
                 strftime('%Y-%m', created_at) as label,
                 SUM(cost) as cost
@@ -442,7 +451,7 @@ async def get_consumption_detail_stats(db: Database, period: str = "week") -> di
     return {
         "period_cost": round(period_cost["total"] if period_cost else 0, 4),
         "daily_avg": round((period_cost["total"] or 0) / max(period_days["days"] if period_days else 1, 1), 4),
-        "token_efficiency": round((period_cost["total"] or 0) / max(period_tokens["total"] if period_tokens else 1, 1) * 1e6, 2),
+        "cost_per_million_tokens": round((period_cost["total"] or 0) / max(period_tokens["total"] if period_tokens else 1, 1) * 1e6, 2),
         "budget_progress": round((monthly_cost["total"] or 0) / budget, 3),
         "budget_remaining": round(budget - (monthly_cost["total"] or 0), 2),
         "trend": [{"label": r["label"], "cost": r["cost"], "articles": r["articles"]} for r in trend] if trend else [],

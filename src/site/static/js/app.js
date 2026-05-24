@@ -317,7 +317,6 @@
         const data = await loadTab(tab);
         if (!data) return;
         if (tab === 'runtime') renderRuntime(data);
-        else if (tab === 'consumption') renderConsumption(data);
     }
 
     async function loadQualityTab(days) {
@@ -419,7 +418,7 @@
         // KPI
         document.getElementById('cs-period-cost').textContent = '$' + (data.period_cost || 0).toFixed(2);
         document.getElementById('cs-daily-avg').textContent = '$' + (data.daily_avg || 0).toFixed(2);
-        document.getElementById('cs-token-eff').textContent = '$' + (data.token_efficiency || 0);
+        document.getElementById('cs-token-eff').textContent = '$' + (data.cost_per_million_tokens || 0);
         const progress = (data.budget_progress || 0) * 100;
         document.getElementById('cs-budget-progress').textContent = progress.toFixed(0) + '%';
         const bar = document.getElementById('cs-progress-bar');
@@ -568,59 +567,6 @@
                     <td>${f.title || f.url || '-'}</td>
                 </tr>
             `).join('') || '<tr><td colspan="4" style="text-align:center;color:#999">无失败记录</td></tr>';
-        }
-    }
-
-    function renderConsumption(data) {
-        document.getElementById('cs-period-cost').textContent = '$' + (data.period_cost || 0).toFixed(4);
-        const tokens = data.period_tokens || 1;
-        const cost = data.period_cost || 0;
-        const efficiency = (cost / tokens * 1e6).toFixed(2);
-        document.getElementById('cs-token-efficiency').textContent = '$' + efficiency;
-
-        const budget = 10.0;
-        const progress = Math.min((cost / budget) * 100, 100);
-        const bar = document.getElementById('cs-progress-bar');
-        if (bar) {
-            bar.style.width = progress + '%';
-            bar.className = 'progress-bar' + (progress > 80 ? ' danger' : progress > 50 ? ' warning' : '');
-        }
-        document.getElementById('cs-budget-progress').textContent = progress.toFixed(0) + '%';
-
-        if (data.provider_daily) {
-            const dates = [...new Set(data.provider_daily.map(d => d.date))].sort();
-            const providers = [...new Set(data.provider_daily.map(d => d.provider))];
-            const colors = { minimax: '#f97316', deepseek: '#22c55e', openai: '#3b82f6' };
-            const datasets = providers.map(p => {
-                const pData = data.provider_daily.filter(d => d.provider === p);
-                return {
-                    label: p,
-                    data: dates.map(dt => {
-                        const found = pData.find(d => d.date === dt);
-                        return found ? found.cost : 0;
-                    }),
-                    backgroundColor: colors[p] || '#8b5cf6'
-                };
-            });
-            renderStackedBar('provider-cost-chart', dates.map(d => d.slice(5)), datasets);
-        }
-
-        if (data.agent_daily) {
-            const dates = [...new Set(data.agent_daily.map(d => d.date))].sort();
-            const agents = [...new Set(data.agent_daily.map(d => d.agent))];
-            const colors = ['#3b82f6', '#22c55e', '#f97316', '#ef4444', '#8b5cf6'];
-            const datasets = agents.map((a, i) => {
-                const aData = data.agent_daily.filter(d => d.agent === a);
-                return {
-                    label: a,
-                    data: dates.map(dt => {
-                        const found = aData.find(d => d.date === dt);
-                        return found ? found.cost : 0;
-                    }),
-                    backgroundColor: colors[i % colors.length]
-                };
-            });
-            renderGroupedBar('agent-cost-chart', dates.map(d => d.slice(5)), datasets);
         }
     }
 
