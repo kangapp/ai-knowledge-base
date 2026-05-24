@@ -325,6 +325,132 @@ async def get_consumption_stats(db: Database, days: int = 30) -> dict:
     }
 
 
+async def get_consumption_detail_stats(db: Database, period: str = "week") -> dict:
+    """
+    资源消耗详细统计（Phase 2）
+    period: day(1) / week(7) / month(30)
+    """
+    days_map = {"day": 1, "week": 7, "month": 30}
+    days = days_map.get(period, 7)
+
+    # 1. 周期总花费和日均
+    period_cost = await db.fetch_one("""
+        SELECT COALESCE(SUM(cost), 0) as total FROM cost_logs
+        WHERE created_at >= date('now', ?)
+    """, (f"-{days} days",))
+
+    period_days = await db.fetch_one("""
+        SELECT COUNT(DISTINCT date(created_at)) as days FROM cost_logs
+        WHERE created_at >= date('now', ?)
+    """, (f"-{days} days",))
+
+    # 2. Token 效率
+    period_tokens = await db.fetch_one("""
+        SELECT COALESCE(SUM(tokens_in + tokens_out), 0) as total FROM cost_logs
+        WHERE created_at >= date('now', ?)
+    """, (f"-{days} days",))
+
+    # 3. 花费趋势（按周，支持日/月切换）
+    if period == "day":
+        trend_sql = """
+            SELECT date(created_at) as label,
+                   SUM(cost) as cost, COUNT(*) as articles
+            FROM cost_logs WHERE created_at >= date('now', ?)
+            GROUP BY date(created_at) ORDER BY label
+        """
+    elif period == "week":
+        trend_sql = """
+            SELECT strftime('%Y-W%W', created_at) as label,
+                   SUM(cost) as cost, COUNT(*) as articles
+            FROM cost_logs WHERE created_at >= date('now', '-12 weeks')
+            GROUP BY label ORDER BY label
+        """
+    else:  # month
+        trend_sql = """
+            SELECT strftime('%Y-%m', created_at) as label,
+                   SUM(cost) as cost, COUNT(*) as articles
+            FROM cost_logs WHERE created_at >= date('now', '-12 months')
+            GROUP BY label ORDER BY label
+        """
+
+    trend = await db.fetch_all(trend_sql, (f"-{days} days",) if period == "day" else ())
+
+    # 4. 来源费用趋势（分析 + 审核）
+    if period == "day":
+        source_trend = await db.fetch_all("""
+            SELECT
+                CASE
+                    WHEN agent LIKE '%_analyzer' THEN SUBSTR(agent, 1, LENGTH(agent) - 8)
+                    ELSE agent
+                END as source,
+                CASE WHEN agent LIKE '%_analyzer' THEN 'analyze' ELSE 'review' END as type,
+                date(created_at) as label,
+                SUM(cost) as cost
+            FROM cost_logs
+            WHERE created_at >= date('now', ?)
+            GROUP BY source, type, date(created_at)
+            ORDER BY label
+        """, (f"-{days} days",))
+    elif period == "week":
+        source_trend = await db.fetch_all("""
+            SELECT
+                CASE WHEN agent LIKE '%_analyzer' THEN SUBSTR(agent, 1, LENGTH(agent) - 8) ELSE agent END as source,
+                CASE WHEN agent LIKE '%_analyzer' THEN 'analyze' ELSE 'review' END as type,
+                strftime('%Y-W%W', created_at) as label,
+                SUM(cost) as cost
+            FROM cost_logs WHERE created_at >= date('now', '-12 weeks')
+            GROUP BY source, type, label ORDER BY label
+        """)
+    else:
+        source_trend = await db.fetch_all("""
+            SELECT
+                CASE WHEN agent LIKE '%_analyzer' THEN SUBSTR(agent, 1, LENGTH(agent) - 8) ELSE agent END as source,
+                CASE WHEN agent LIKE '%_analyzer' THEN 'analyze' ELSE 'review' END as type,
+                strftime('%Y-%m', created_at) as label,
+                SUM(cost) as cost
+            FROM cost_logs WHERE created_at >= date('now', '-12 months')
+            GROUP BY source, type, label ORDER BY label
+        """)
+
+    # 5. Provider 费用趋势
+    if period == "day":
+        provider_trend = await db.fetch_all("""
+            SELECT date(created_at) as label, provider, SUM(cost) as cost
+            FROM cost_logs WHERE created_at >= date('now', ?)
+            GROUP BY provider, date(created_at) ORDER BY label
+        """, (f"-{days} days",))
+    elif period == "week":
+        provider_trend = await db.fetch_all("""
+            SELECT strftime('%Y-W%W', created_at) as label, provider, SUM(cost) as cost
+            FROM cost_logs WHERE created_at >= date('now', '-12 weeks')
+            GROUP BY provider, label ORDER BY label
+        """)
+    else:
+        provider_trend = await db.fetch_all("""
+            SELECT strftime('%Y-%m', created_at) as label, provider, SUM(cost) as cost
+            FROM cost_logs WHERE created_at >= date('now', '-12 months')
+            GROUP BY provider, label ORDER BY label
+        """)
+
+    # 6. 预算进度（硬编码月度预算 $15）
+    budget = 15.0
+    monthly_cost = await db.fetch_one("""
+        SELECT COALESCE(SUM(cost), 0) as total FROM cost_logs
+        WHERE created_at >= date('now', '-30 days')
+    """)
+
+    return {
+        "period_cost": round(period_cost["total"] if period_cost else 0, 4),
+        "daily_avg": round((period_cost["total"] or 0) / max(period_days["days"] if period_days else 1, 1), 4),
+        "token_efficiency": round((period_cost["total"] or 0) / max(period_tokens["total"] if period_tokens else 1, 1) * 1e6, 2),
+        "budget_progress": round((monthly_cost["total"] or 0) / budget, 3),
+        "budget_remaining": round(budget - (monthly_cost["total"] or 0), 2),
+        "trend": [{"label": r["label"], "cost": r["cost"], "articles": r["articles"]} for r in trend] if trend else [],
+        "source_trend": [{"source": r["source"], "type": r["type"], "label": r["label"], "cost": r["cost"]} for r in source_trend] if source_trend else [],
+        "provider_trend": [{"provider": r["provider"], "label": r["label"], "cost": r["cost"]} for r in provider_trend] if provider_trend else [],
+    }
+
+
 async def record_source_health(db: Database, record: "CollectResult"):
     """记录数据源健康数据"""
     from ..graph.state import CollectResult as CR
