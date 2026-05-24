@@ -255,12 +255,34 @@ ai-knowledge-base/
 
 **FTS5 全文索引**：`articles_fts` over (title, summary, description)
 
+### extra_data JSON 结构
+
+`articles.extra_data` 存储 Reviewer 四维评分 JSON：
+
+```json
+{
+  "dimensions": {
+    "ai_relevance": {"score": 35, "reason": "核心讨论AI/LLM/Agent技术"},
+    "内容深度": {"score": 25, "reason": "有具体实现细节"},
+    "信息密度": {"score": 12, "reason": "新颖独家内容"},
+    "时效性": {"score": 10, "reason": "本月发布"}
+  }
+}
+```
+
+### Dashboard API 端点
+
+| 端点 | 说明 | 返回字段 |
+|------|------|----------|
+| `GET /api/stats/quality-detail?period=week` | 数据质量详细统计 | content_quality, audit_efficiency, tag_coverage, dimensions, reason_keywords |
+| `GET /api/stats/consumption-detail?period=month` | 资源消耗详细统计 | period_cost, daily_avg, cost_per_million_tokens, budget_progress, trend, source_trend, provider_trend |
+
 ### 采集流程产生的数据
 
 ```
 每次采集产生一条 pipeline_runs 记录
     └── cost_logs: 每次 LLM 调用产生一条记录（记录 ref_url 用于追踪来源）
-    └── articles: 入库时产生记录，status = approved/retry/discarded
+    └── articles: 入库时产生记录，status = approved/retry/discarded，extra_data 存储四维评分
     └── source_health: 每周一 09:00 汇总上周数据源表现
 ```
 
@@ -504,6 +526,8 @@ docker compose restart pipeline
 | `GET /api/sources` | 数据源列表（含健康状态） |
 | `GET /api/sources/stats` | 数据源健康统计 |
 | `GET /api/sources/discovered` | 已发现待审核的数据源 |
+| `GET /api/stats/quality-detail?period=week` | 数据质量详细统计（四维评分、Reason关键词） |
+| `GET /api/stats/consumption-detail?period=month` | 资源消耗详细统计（费用趋势、Provider分解） |
 | `POST /api/sources/{id}/action` | 数据源操作（enable/disable/remove） |
 
 响应格式：
