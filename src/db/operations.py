@@ -371,3 +371,114 @@ async def get_trending_repo_urls(db: Database, min_velocity: float, days: int = 
         WHERE (s1.stars - s0.stars) / (:days * 1.0) >= :min_velocity
     """, {"days": days, "min_velocity": min_velocity})
     return {r["repo_url"] for r in rows}
+
+
+async def get_quality_detail_stats(db: Database, period: str = "week") -> dict:
+    """
+    数据质量详细统计（Phase 1）
+    period: day(1) / week(7) / month(30)
+    """
+    days_map = {"day": 1, "week": 7, "month": 30}
+    days = days_map.get(period, 7)
+
+    # 1. 内容完整性指标
+    summary_coverage = await db.fetch_one("""
+        SELECT COUNT(*) * 1.0 / (SELECT COUNT(*) FROM articles WHERE status='approved' AND collected_at >= date('now', ?)) as rate
+        FROM articles WHERE status='approved' AND summary IS NOT NULL AND summary != '' AND collected_at >= date('now', ?)
+    """, (f"-{days} days", f"-{days} days"))
+
+    desc_len = await db.fetch_one("""
+        SELECT AVG(LENGTH(description)) as avg_len FROM articles WHERE status='approved' AND collected_at >= date('now', ?)
+    """, (f"-{days} days",))
+
+    summary_len = await db.fetch_one("""
+        SELECT AVG(LENGTH(summary)) as avg_len FROM articles WHERE status='approved' AND summary IS NOT NULL AND collected_at >= date('now', ?)
+    """, (f"-{days} days",))
+
+    # 2. 审核效率指标
+    one_pass = await db.fetch_one("""
+        SELECT COUNT(*) * 1.0 / (SELECT COUNT(*) FROM articles WHERE status='approved' AND collected_at >= date('now', ?)) as rate
+        FROM articles WHERE status='approved' AND retry_count = 0 AND collected_at >= date('now', ?)
+    """, (f"-{days} days", f"-{days} days"))
+
+    retry_rate = await db.fetch_one("""
+        SELECT COUNT(*) * 1.0 / (SELECT COUNT(*) FROM articles WHERE collected_at >= date('now', ?)) as rate
+        FROM articles WHERE status='retry' AND collected_at >= date('now', ?)
+    """, (f"-{days} days", f"-{days} days"))
+
+    exhausted_rate = await db.fetch_one("""
+        SELECT COUNT(*) * 1.0 / (SELECT COUNT(*) FROM articles WHERE collected_at >= date('now', ?)) as rate
+        FROM articles WHERE retry_count >= 2 AND collected_at >= date('now', ?)
+    """, (f"-{days} days", f"-{days} days"))
+
+    # 3. 标签覆盖指标
+    tagged_rate = await db.fetch_one("""
+        SELECT COUNT(DISTINCT at.article_id) * 1.0 / (SELECT COUNT(*) FROM articles WHERE status='approved' AND collected_at >= date('now', ?)) as rate
+        FROM article_tags at
+        JOIN articles a ON a.id = at.article_id
+        WHERE a.collected_at >= date('now', ?)
+    """, (f"-{days} days", f"-{days} days"))
+
+    avg_tags = await db.fetch_one("""
+        SELECT AVG(tag_count) as avg FROM (
+            SELECT COUNT(*) as tag_count FROM article_tags at
+            JOIN articles a ON a.id = at.article_id
+            WHERE a.collected_at >= date('now', ?)
+            GROUP BY at.article_id
+        )
+    """, (f"-{days} days",))
+
+    # 4. 四维评分统计（从 extra_data JSON 解析）
+    dimensions = ["ai_relevance", "内容深度", "信息密度", "时效性"]
+    dimension_stats = {}
+    for dim in dimensions:
+        stats = await db.fetch_one(f"""
+            SELECT
+                AVG(JSON_EXTRACT(extra_data, '$.dimensions.{dim}.score')) as avg_score,
+                COUNT(CASE WHEN JSON_EXTRACT(extra_data, '$.dimensions.{dim}.score') >= ? THEN 1 END) * 1.0 / COUNT(*) as high_rate,
+                COUNT(CASE WHEN JSON_EXTRACT(extra_data, '$.dimensions.{dim}.score') >= ? AND JSON_EXTRACT(extra_data, '$.dimensions.{dim}.score') < ? THEN 1 END) * 1.0 / COUNT(*) as mid_rate,
+                COUNT(CASE WHEN JSON_EXTRACT(extra_data, '$.dimensions.{dim}.score') < ? THEN 1 END) * 1.0 / COUNT(*) as low_rate
+            FROM articles
+            WHERE status='approved' AND extra_data IS NOT NULL AND collected_at >= date('now', ?)
+        """, (0.6, 0.3, 0.6, 0.3, f"-{days} days"))
+        dimension_stats[dim] = {
+            "avg_score": round(stats["avg_score"] or 0, 1),
+            "high_rate": round(stats["high_rate"] or 0, 3),
+            "mid_rate": round(stats["mid_rate"] or 0, 3),
+            "low_rate": round(stats["low_rate"] or 0, 3),
+        }
+
+    # 5. Reason 关键词
+    reason_rows = await db.fetch_all("""
+        SELECT JSON_EXTRACT(extra_data, '$.dimensions."AI相关度".reason') as reason
+        FROM articles WHERE status='approved' AND extra_data IS NOT NULL AND collected_at >= date('now', ?)
+    """, (f"-{days} days",))
+
+    keyword_count = {}
+    import re
+    for row in reason_rows:
+        if row["reason"]:
+            words = re.findall(r'[一-龥]+', row["reason"])
+            for w in words:
+                keyword_count[w] = keyword_count.get(w, 0) + 1
+
+    top_keywords = sorted(keyword_count.items(), key=lambda x: x[1], reverse=True)[:20]
+
+    return {
+        "content_quality": {
+            "summary_coverage": round(summary_coverage["rate"] if summary_coverage and summary_coverage["rate"] else 0, 3),
+            "avg_desc_length": round(desc_len["avg_len"] if desc_len and desc_len["avg_len"] else 0, 1),
+            "avg_summary_length": round(summary_len["avg_len"] if summary_len and summary_len["avg_len"] else 0, 1),
+        },
+        "audit_efficiency": {
+            "one_pass_rate": round(one_pass["rate"] if one_pass and one_pass["rate"] else 0, 3),
+            "retry_rate": round(retry_rate["rate"] if retry_rate and retry_rate["rate"] else 0, 3),
+            "exhausted_rate": round(exhausted_rate["rate"] if exhausted_rate and exhausted_rate["rate"] else 0, 3),
+        },
+        "tag_coverage": {
+            "tagged_rate": round(tagged_rate["rate"] if tagged_rate and tagged_rate["rate"] else 0, 3),
+            "avg_tags": round(avg_tags["avg"] if avg_tags and avg_tags["avg"] else 0, 1),
+        },
+        "dimensions": dimension_stats,
+        "reason_keywords": [{"word": w, "count": c} for w, c in top_keywords],
+    }
