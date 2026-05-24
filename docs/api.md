@@ -1,0 +1,482 @@
+# API 接口文档
+
+本文档记录所有 API 端点的详细信息。
+
+---
+
+## 基础信息
+
+**Base URL:** `/api`
+
+**响应格式:** 所有接口（除 `/api/health`）统一返回：
+
+```json
+{
+  "code": 0,
+  "data": { ... },
+  "message": "ok"
+}
+```
+
+**错误码:**
+
+| code | 含义 | HTTP 状态码 |
+|------|------|------------|
+| 0 | 成功 | 200 |
+| 40001 | 参数校验失败 | 422 |
+| 40101 | API 未认证（预留） | 401 |
+| 40401 | 资源不存在 | 404 |
+| 50001 | 服务内部错误 | 500 |
+| 50002 | 数据库错误 | 500 |
+| 50003 | 上游 API 超时 | 504 |
+| 50004 | LLM Provider 不可用 | 503 |
+
+---
+
+## 健康检查
+
+### GET /api/health
+
+健康检查接口，不包信封。
+
+**响应:**
+```json
+{"status": "ok"}
+```
+
+---
+
+## 文章接口
+
+### GET /api/articles
+
+文章列表（支持分页、来源筛选）。
+
+**参数:**
+
+| 参数 | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| query | string | "" | 搜索关键词 |
+| source | string | "" | 来源筛选 |
+| days | int | 30 | 近N天 |
+| page | int | 1 | 页码 |
+| page_size | int | 20 | 每页条数 |
+
+**响应:**
+```json
+{
+  "code": 0,
+  "data": {
+    "items": [...],
+    "total": 18250,
+    "page": 1,
+    "page_size": 20
+  },
+  "message": "ok"
+}
+```
+
+### GET /api/articles/{article_id}
+
+文章详情。
+
+**参数:**
+
+| 参数 | 类型 | 说明 |
+|------|------|------|
+| article_id | int | 文章ID |
+
+**响应:** 返回完整 articles 表记录。
+
+**错误:** 40401 - 文章不存在
+
+### GET /api/search
+
+全文搜索（FTS5）。
+
+**参数:**
+
+| 参数 | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| q | string | - | 搜索关键词（必填） |
+| limit | int | 20 | 返回条数 |
+
+**响应:**
+```json
+{
+  "code": 0,
+  "data": {
+    "items": [...],
+    "total": 18250
+  },
+  "message": "ok"
+}
+```
+
+---
+
+## 统计接口
+
+### GET /api/stats
+
+仪表盘基础统计。
+
+**参数:**
+
+| 参数 | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| days | int | 30 | 近N天 |
+
+**响应:**
+```json
+{
+  "code": 0,
+  "data": {
+    "total_articles": 125,
+    "period_articles": 103,
+    "period_cost": 0.5,
+    "active_sources": 4,
+    "avg_score": 78.5
+  },
+  "message": "ok"
+}
+```
+
+### GET /api/stats/enhanced
+
+增强版统计（含成本趋势）。
+
+**参数:**
+
+| 参数 | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| days | int | 30 | 近N天 (1-3650) |
+
+**响应:**
+```json
+{
+  "code": 0,
+  "data": {
+    "summary": {
+      "total_articles": 125,
+      "period_articles": 103,
+      "period_cost": 0.5,
+      "total_cost": 5.0,
+      "active_sources": 4,
+      "avg_score": 78.5,
+      "pass_rate": 0.39,
+      "period_total_collected": 264
+    },
+    "hourly_cost": [...],
+    "daily_cost": [...],
+    "weekly_cost": [...],
+    "monthly_cost": [...],
+    "source_distribution": [...],
+    "active_source_details": [...]
+  },
+  "message": "ok"
+}
+```
+
+### GET /api/stats/quality
+
+数据质量统计（旧版）。
+
+**参数:**
+
+| 参数 | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| days | int | 30 | 近N天 |
+
+### GET /api/stats/quality-detail
+
+数据质量详细统计（新版，四维评分）。
+
+**参数:**
+
+| 参数 | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| period | string | "week" | day/week/month |
+
+**响应:**
+```json
+{
+  "code": 0,
+  "data": {
+    "content_quality": {
+      "summary_coverage": 1.0,
+      "avg_desc_length": 277.9,
+      "avg_summary_length": 161.0
+    },
+    "audit_efficiency": {
+      "one_pass_rate": 0.928,
+      "retry_rate": 0,
+      "exhausted_rate": 0.048
+    },
+    "tag_coverage": {
+      "tagged_rate": 0.992,
+      "avg_tags": 3.0
+    },
+    "dimensions": {
+      "ai_relevance": {"avg_score": 34.4, "high_rate": 1.0, "mid_rate": 0, "low_rate": 0},
+      "内容深度": {"avg_score": 0, "high_rate": 0, "mid_rate": 0, "low_rate": 0},
+      "信息密度": {"avg_score": 0, "high_rate": 0, "mid_rate": 0, "low_rate": 0},
+      "时效性": {"avg_score": 16.0, "high_rate": 0.008, "mid_rate": 0, "low_rate": 0}
+    },
+    "reason_keywords": [
+      {"word": "核心", "count": 47},
+      {"word": "属于", "count": 35}
+    ]
+  },
+  "message": "ok"
+}
+```
+
+### GET /api/stats/runtime
+
+运行状态统计。
+
+**参数:**
+
+| 参数 | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| days | int | 7 | 近N天 |
+
+### GET /api/stats/consumption
+
+资源消耗统计（旧版）。
+
+**参数:**
+
+| 参数 | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| days | int | 30 | 近N天 |
+
+### GET /api/stats/consumption-detail
+
+资源消耗详细统计（新版）。
+
+**参数:**
+
+| 参数 | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| period | string | "week" | day/week/month |
+
+**响应:**
+```json
+{
+  "code": 0,
+  "data": {
+    "period_cost": 0.1659,
+    "daily_avg": 0.0207,
+    "cost_per_million_tokens": 0.37,
+    "budget_progress": 0.017,
+    "budget_remaining": 9.83,
+    "trend": [...],
+    "source_trend": [...],
+    "provider_trend": [...]
+  },
+  "message": "ok"
+}
+```
+
+---
+
+## 成本接口
+
+### GET /api/cost/summary
+
+花费统计。
+
+**参数:**
+
+| 参数 | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| days | int | 30 | 近N天 |
+
+**响应:**
+```json
+{
+  "code": 0,
+  "data": [
+    {"provider": "deepseek", "model": "deepseek-chat", "total_cost": 2.5, "total_tokens": 1000000}
+  ],
+  "message": "ok"
+}
+```
+
+---
+
+## 流水线接口
+
+### POST /api/pipeline/run
+
+手动触发采集。
+
+**参数:**
+
+| 参数 | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| source | string | "" | 数据源ID（空=全量） |
+
+**响应:**
+```json
+{
+  "code": 0,
+  "data": {"status": "queued"},
+  "message": "Pipeline triggered"
+}
+```
+
+### POST /api/pipeline/build
+
+强制构建站点（跳过去抖）。
+
+**响应:**
+```json
+{
+  "code": 0,
+  "data": {"status": "done"},
+  "message": "Build triggered"
+}
+```
+
+### GET /api/pipeline/dag
+
+查看 DAG 状态。
+
+**响应:**
+```json
+{
+  "code": 0,
+  "data": {
+    "run_id": "20260524-090000",
+    "run_id_bj": "run_20260524_173000",
+    "status": "completed",
+    "current_phase": null,
+    "phases": [...],
+    "logs": [...]
+  },
+  "message": "ok"
+}
+```
+
+---
+
+## 数据源接口
+
+### GET /api/sources
+
+数据源列表（含状态）。
+
+**响应:**
+```json
+{
+  "code": 0,
+  "data": {
+    "items": [
+      {
+        "id": "github_trending",
+        "name": "GitHub Trending",
+        "type": "github",
+        "status": "active",
+        "priority": 1,
+        "cron": "0 */6 * * *",
+        "recent_approved_rate": 0.75,
+        "recent_total": 20,
+        "avg_score": 82.5
+      }
+    ],
+    "total": 4
+  },
+  "message": "ok"
+}
+```
+
+### GET /api/sources/stats
+
+数据源健康统计。
+
+**参数:**
+
+| 参数 | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| period | string | "week" | day/week/month |
+
+**响应:**
+```json
+{
+  "code": 0,
+  "data": {
+    "period": "week",
+    "sources": [
+      {
+        "id": "github_trending",
+        "approved_rate": 0.75,
+        "total_collected": 20,
+        "avg_score": 82.5,
+        "trend": "rising"
+      }
+    ]
+  },
+  "message": "ok"
+}
+```
+
+### GET /api/sources/discovered
+
+已发现待审核的数据源。
+
+**响应:**
+```json
+{
+  "code": 0,
+  "data": {
+    "items": [...],
+    "total": 0
+  },
+  "message": "ok"
+}
+```
+
+### POST /api/sources/{source_id}/action
+
+数据源操作。
+
+**参数:**
+
+| 参数 | 类型 | 说明 |
+|------|------|------|
+| source_id | string | 数据源ID |
+| action | string | enable/disable/remove |
+
+**响应:**
+```json
+{
+  "code": 0,
+  "data": {"message": "Source github_trending enabled"},
+  "message": "ok"
+}
+```
+
+### POST /api/sources/maintenance/clear-health
+
+清除 source_health 数据（用于修正旧格式数据）。
+
+**响应:**
+```json
+{
+  "code": 0,
+  "data": {"message": "source_health cleared, will rebuild on next pipeline run"},
+  "message": "ok"
+}
+```
+
+---
+
+## 变更记录
+
+| 日期 | 变更内容 |
+|------|----------|
+| 2026-05-24 | 新增 `/api/stats/quality-detail` 端点 |
+| 2026-05-24 | 新增 `/api/stats/consumption-detail` 端点 |
