@@ -354,14 +354,8 @@
                 '#4F46E5');
         }
 
-        // 来源质量对比柱状图（复用原有数据）
-        const sourceScores = data.source_scores || [];
-        if (sourceScores.length > 0) {
-            renderBarChart('q-source-chart',
-                sourceScores.slice(0, 4).map(s => s.source_detail || s.source),
-                sourceScores.slice(0, 4).map(s => s.avg_score || 0),
-                '#10b981');
-        }
+        // 来源质量对比柱状图 - 已移除（data.source_scores 不在 /api/stats/quality-detail 响应中）
+        // 维度评分分布堆叠柱状图已通过 data.dimensions 提供足够的质量对比信息
 
         // 四维评分雷达图
         if (data.dimensions) {

@@ -441,8 +441,8 @@ async def get_consumption_detail_stats(db: Database, period: str = "week") -> di
             GROUP BY provider, label ORDER BY label
         """)
 
-    # 6. 预算进度（硬编码月度预算 $15）
-    budget = 15.0
+    # 6. 预算进度（硬编码月度预算 $10，与 config/agents.yaml budget.monthly: 10.0 一致）
+    budget = 10.0
     monthly_cost = await db.fetch_one("""
         SELECT COALESCE(SUM(cost), 0) as total FROM cost_logs
         WHERE created_at >= date('now', '-30 days')
