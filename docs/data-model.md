@@ -18,13 +18,37 @@
 | retry_count | INTEGER DEFAULT 0 | |
 | collected_at | TEXT | ISO 8601 |
 | published_at | TEXT | ISO 8601 |
-| extra_data | TEXT | JSON: 四维评分 detail + language + 原始 API 返回 |
+| extra_data | TEXT | JSON: 四维评分 detail + reason_keywords + language |
 | analysis_cost | REAL | 该条分析总花费 ($) |
 | analysis_tokens | INTEGER | 该条分析 token 总量 |
 | created_at | TEXT DEFAULT CURRENT_TIMESTAMP | |
 | updated_at | TEXT DEFAULT CURRENT_TIMESTAMP | |
 
 FTS5 全文索引：`articles_fts` over (title, summary, description)
+
+**样例数据：**
+
+```json
+{
+  "id": 18250,
+  "title": "Llama 4 Scout: 17B MoE with 10M context window",
+  "url": "https://github.com/meta-llama/llama4/pull/142",
+  "description": "Meta's latest open-source model featuring...",
+  "summary": "Meta 发布 Llama 4 Scout，采用 MoE 架构...",
+  "source": "github",
+  "source_detail": "meta-llama/llama4",
+  "relevance_score": 85,
+  "status": "approved",
+  "retry_count": 0,
+  "collected_at": "2026-05-24T08:30:00Z",
+  "published_at": "2026-05-23T14:00:00Z",
+  "extra_data": "{\"dimensions\":{\"ai_relevance\":{\"avg_score\":34.4,\"high_rate\":1.0,\"mid_rate\":0,\"low_rate\":0},\"内容深度\":{\"avg_score\":0,\"high_rate\":0,\"mid_rate\":0,\"low_rate\":0},\"信息密度\":{\"avg_score\":0,\"high_rate\":0,\"mid_rate\":0,\"low_rate\":0},\"时效性\":{\"avg_score\":16.0,\"high_rate\":0.008,\"mid_rate\":0,\"low_rate\":0}},\"reason_keywords\":[{\"word\":\"核心\",\"count\":47},{\"word\":\"属于\",\"count\":35}],\"language\":\"en\"}",
+  "analysis_cost": 0.0032,
+  "analysis_tokens": 1240,
+  "created_at": "2026-05-24T08:30:05Z",
+  "updated_at": "2026-05-24T08:30:05Z"
+}
+```
 
 ### tags — 标签字典
 
@@ -34,12 +58,28 @@ FTS5 全文索引：`articles_fts` over (title, summary, description)
 | name | TEXT UNIQUE | |
 | color | TEXT | |
 
+**样例数据：**
+
+| id | name | color |
+|----|------|-------|
+| 1 | LLM | #10b981 |
+| 2 | Agent | #3b82f6 |
+| 3 | 论文解读 | #f59e0b |
+
 ### article_tags — 文章-标签关联
 
 | 列 | 类型 |
 |----|------|
 | article_id | INTEGER FK → articles.id |
 | tag_id | INTEGER FK → tags.id |
+
+**样例数据：**
+
+| article_id | tag_id |
+|------------|--------|
+| 18250 | 1 |
+| 18250 | 2 |
+| 18249 | 3 |
 
 ### pipeline_runs — 流水线运行记录
 
@@ -52,6 +92,17 @@ FTS5 全文索引：`articles_fts` over (title, summary, description)
 | trigger | TEXT | cron / manual |
 | summary | TEXT | JSON: approved / discarded / retry 数统计 |
 
+**样例数据：**
+
+| 字段 | 值 |
+|------|-----|
+| id | run_20260524_090000 |
+| started_at | 2026-05-24T09:00:00Z |
+| ended_at | 2026-05-24T09:05:32Z |
+| status | completed |
+| trigger | cron |
+| summary | {"approved": 15, "discarded": 3, "retry": 2, "total_collected": 20, "cost": 0.15, "sources": {"github_trending": {"collected": 10, "approved": 8}, "rss_the_batch": {"collected": 10, "approved": 7}}} |
+
 ### pipeline_phase_logs — 流水线阶段日志
 
 | 列 | 类型 | 说明 |
@@ -63,6 +114,15 @@ FTS5 全文索引：`articles_fts` over (title, summary, description)
 | event | TEXT | started / completed / failed |
 | message | TEXT | 日志内容 |
 | created_at | TEXT | |
+
+**样例数据：**
+
+| id | run_id | phase | source | event | message | created_at |
+|----|--------|-------|--------|-------|---------|------------|
+| 1 | run_20260524_090000 | collector | - | started | 开始采集 | 2026-05-24T09:00:00Z |
+| 2 | run_20260524_090000 | collector | - | completed | 采集完成 | 2026-05-24T09:00:45Z |
+| 3 | run_20260524_090000 | analyzer | github_trending | started | 开始分析 | 2026-05-24T09:00:45Z |
+| 4 | run_20260524_090000 | analyzer | github_trending | completed | 分析完成 | 2026-05-24T09:02:30Z |
 
 ### cost_logs — LLM 调用花费
 
@@ -77,6 +137,13 @@ FTS5 全文索引：`articles_fts` over (title, summary, description)
 | tokens_out | INTEGER | |
 | cost | REAL | |
 | created_at | TEXT DEFAULT CURRENT_TIMESTAMP | |
+
+**样例数据：**
+
+| id | run_id | agent | provider | model | tokens_in | tokens_out | cost | created_at |
+|----|--------|-------|----------|-------|----------|-----------|------|------------|
+| 1 | run_20260524_090000 | github_analyzer | deepseek | deepseek-chat | 1200 | 350 | 0.0021 | 2026-05-24T09:01:00Z |
+| 2 | run_20260524_090000 | reviewer | deepseek | deepseek-chat | 2800 | 420 | 0.0048 | 2026-05-24T09:03:00Z |
 
 ### source_health — 数据源健康统计
 
@@ -94,6 +161,13 @@ FTS5 全文索引：`articles_fts` over (title, summary, description)
 
 UNIQUE(source_id, date)
 
+**样例数据：**
+
+| id | source_id | date | total_collected | approved | rejected | failed | avg_score | recorded_at |
+|----|-----------|------|-----------------|----------|----------|--------|---------|------------|
+| 1 | github_trending | 2026-05-23 | 20 | 15 | 4 | 1 | 82.5 | 2026-05-23T09:00:05Z |
+| 2 | rss_the_batch | 2026-05-23 | 10 | 9 | 1 | 0 | 78.3 | 2026-05-23T09:00:10Z |
+
 ### discovered_sources — 已发现待审核的数据源
 
 | 列 | 类型 | 说明 |
@@ -107,6 +181,13 @@ UNIQUE(source_id, date)
 | added_at | TEXT | 加入时间 |
 | rejected_at | TEXT | 拒绝时间 |
 | reject_reason | TEXT | 拒绝原因 |
+
+**样例数据：**
+
+| id | url | name | type | discovered_at | status | added_at | rejected_at | reject_reason |
+|----|-----|------|------|---------------|--------|----------|-------------|--------------|
+| 1 | https://example.com/feed.xml | Example RSS | rss | 2026-05-20T10:00:00Z | candidate | null | null | null |
+| 2 | https://github.com/foo/bar | foo/bar | github | 2026-05-18T08:00:00Z | enabled | 2026-05-19T09:00:00Z | null | null |
 
 ### github_repo_snapshots — GitHub 仓库星标快照
 
@@ -123,6 +204,12 @@ UNIQUE(source_id, date)
 
 UNIQUE(repo_url, snapshot_date)
 
+**样例数据：**
+
+| id | repo_url | repo_name | stars | forks | watchers | snapshot_date | created_at |
+|----|----------|-----------|-------|-------|----------|---------------|------------|
+| 1 | https://github.com/meta-llama/llama4 | meta-llama/llama4 | 12400 | 1800 | 560 | 2026-05-24 | 2026-05-24T00:00:00Z |
+
 ### provider_health — Provider 健康状态
 
 | 列 | 类型 | 说明 |
@@ -135,6 +222,13 @@ UNIQUE(repo_url, snapshot_date)
 | last_check | TEXT | |
 | circuit | TEXT | closed / open / half_open |
 
+**样例数据：**
+
+| provider | status | latency_ms | error_count | last_error | last_check | circuit |
+|----------|---------|-----------|-------------|-----------|------------|---------|
+| deepseek | healthy | 850 | 0 | null | 2026-05-24T09:00:00Z | closed |
+| minimax | degraded | 2200 | 3 | rate limit | 2026-05-24T09:00:00Z | half_open |
+
 ### circuit_events — 熔断事件记录
 
 | 列 | 类型 | 说明 |
@@ -145,34 +239,81 @@ UNIQUE(repo_url, snapshot_date)
 | reason | TEXT | |
 | created_at | TEXT | |
 
+**样例数据：**
+
+| id | provider | event | reason | created_at |
+|----|----------|-------|--------|------------|
+| 1 | minimax | open | 连续 3 次 rate limit | 2026-05-24T08:45:00Z |
+| 2 | minimax | half_open | 尝试恢复 | 2026-05-24T08:50:00Z |
+| 3 | minimax | close | 连续 5 次成功 | 2026-05-24T09:00:00Z |
+
 ### schema_version — 数据库迁移版本
 
 | 列 | 类型 |
 |----|------|
 | version | INTEGER |
 
-## extra_data JSON 结构
+**样例数据：**
+
+| version |
+|---------|
+| 5 |
+
+## extra_data JSON 结构详解
 
 `articles.extra_data` 存储 AI 分析产生的四维评分等详细信息：
 
 ```json
 {
   "dimensions": {
-    "ai_relevance": {"avg_score": 34.4, "high_rate": 1.0, "mid_rate": 0, "low_rate": 0},
-    "内容深度": {"avg_score": 0, "high_rate": 0, "mid_rate": 0, "low_rate": 0},
-    "信息密度": {"avg_score": 0, "high_rate": 0, "mid_rate": 0, "low_rate": 0},
-    "时效性": {"avg_score": 16.0, "high_rate": 0.008, "mid_rate": 0, "low_rate": 0}
+    "ai_relevance": {
+      "avg_score": 34.4,
+      "high_rate": 1.0,
+      "mid_rate": 0,
+      "low_rate": 0
+    },
+    "内容深度": {
+      "avg_score": 0,
+      "high_rate": 0,
+      "mid_rate": 0,
+      "low_rate": 0
+    },
+    "信息密度": {
+      "avg_score": 0,
+      "high_rate": 0,
+      "mid_rate": 0,
+      "low_rate": 0
+    },
+    "时效性": {
+      "avg_score": 16.0,
+      "high_rate": 0.008,
+      "mid_rate": 0,
+      "low_rate": 0
+    }
   },
   "reason_keywords": [
     {"word": "核心", "count": 47},
     {"word": "属于", "count": 35}
   ],
-  "language": "zh",
-  "raw_api_response": {...}
+  "language": "en"
 }
 ```
 
-四维评分说明：
+**字段说明：**
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| dimensions | object | 四维评分对象 |
+| dimensions[].avg_score | float | 该维度平均分（0-100） |
+| dimensions[].high_rate | float | 高分率（≥ 高分阈值） |
+| dimensions[].mid_rate | float | 中分率（中等分数） |
+| dimensions[].low_rate | float | 低分率（< 低分阈值） |
+| reason_keywords | array | 审核理由关键词统计 |
+| reason_keywords[].word | string | 关键词 |
+| reason_keywords[].count | int | 出现次数 |
+| language | string | 文章语言（en/zh/multi） |
+
+**四维评分说明：**
 
 | 维度 | 说明 | 高分标准 |
 |------|------|----------|
