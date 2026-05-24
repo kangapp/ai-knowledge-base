@@ -450,7 +450,7 @@ async def get_quality_detail_stats(db: Database, period: str = "week") -> dict:
 
     # 5. Reason 关键词
     reason_rows = await db.fetch_all("""
-        SELECT JSON_EXTRACT(extra_data, '$.dimensions."AI相关度".reason') as reason
+        SELECT JSON_EXTRACT(extra_data, '$.dimensions.ai_relevance.reason') as reason
         FROM articles WHERE status='approved' AND extra_data IS NOT NULL AND collected_at >= date('now', ?)
     """, (f"-{days} days",))
 
