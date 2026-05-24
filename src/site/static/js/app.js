@@ -229,6 +229,39 @@
     };
     let cachedData = { quality: null, runtime: null, consumption: null, sources: null };
     const state = { quality: 30, runtime: 7, consumption: 30, sources: 7 };
+    const globalState = { days: 30 };
+
+    async function loadGlobalKPIs(days) {
+        const res = await fetch(`/api/stats/enhanced?days=${days}`);
+        const json = await res.json();
+        if (json.code !== 0) return;
+        const s = json.data.summary || {};
+        document.getElementById('kpi-total').textContent = (s.total_articles || 0).toLocaleString();
+        document.getElementById('kpi-period').textContent = '↑ ' + (s.period_articles || 0);
+        document.getElementById('kpi-period-count').textContent = s.period_articles || 0;
+        document.getElementById('kpi-period-count').parentElement.querySelector('.range-label').textContent = days;
+        const rate = s.pass_rate != null ? (s.pass_rate * 100).toFixed(0) + '%' : '-';
+        document.getElementById('kpi-approve-rate').textContent = rate;
+        document.getElementById('kpi-avg-score').textContent = s.avg_score ? s.avg_score.toFixed(0) : '-';
+        document.getElementById('kpi-active-sources').textContent = s.active_sources || 0;
+        const details = json.data.active_source_details || [];
+        const rssSubs = details.filter(d => d.source === 'rss').map(d => RSS_LABELS_LOCAL[d.source_detail] || d.source_detail).filter(Boolean).slice(0, 5);
+        const subLabel = rssSubs.length > 0 ? 'RSS: ' + rssSubs.join(', ') : (details.length > 0 ? details.map(d => RSS_LABELS_LOCAL[d.source_detail] || d.source_detail || d.source).filter(Boolean).slice(0, 3).join(', ') : '无');
+        document.getElementById('kpi-active-sources-sub').textContent = subLabel;
+    }
+
+    function setupGlobalDateFilters() {
+        document.querySelectorAll('#global-date-filters .date-btn').forEach(btn => {
+            const d = parseInt(btn.dataset.days) || 30;
+            if (d === 30) btn.classList.add('active');
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('#global-date-filters .date-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                globalState.days = d;
+                loadGlobalKPIs(d);
+            });
+        });
+    }
 
     async function loadTab(tab) {
         const days = state[tab] || 30;
@@ -547,25 +580,8 @@
     }
 
     document.addEventListener('DOMContentLoaded', async () => {
-        // 加载全局 KPI
-        const res = await fetch('/api/stats/enhanced');
-        const json = await res.json();
-        if (json.code === 0) {
-            const s = json.data.summary || {};
-            document.getElementById('kpi-total').textContent = (s.total_articles || 0).toLocaleString();
-            document.getElementById('kpi-period').textContent = '↑ ' + (s.period_articles || 0);
-            document.getElementById('kpi-period-count').textContent = s.period_articles || 0;
-            // 通过率 = approved / total collected (由后端 pass_rate 字段提供)
-            const rate = s.pass_rate != null ? (s.pass_rate * 100).toFixed(0) + '%' : '-';
-            document.getElementById('kpi-approve-rate').textContent = rate;
-            document.getElementById('kpi-avg-score').textContent = s.avg_score ? s.avg_score.toFixed(0) : '-';
-            document.getElementById('kpi-active-sources').textContent = s.active_sources || 0;
-            // 活跃源显示细分（使用RSS_LABELS映射中文）
-            const details = json.data.active_source_details || [];
-            const rssSubs = details.filter(d => d.source === 'rss').map(d => RSS_LABELS_LOCAL[d.source_detail] || d.source_detail).filter(Boolean).slice(0, 5);
-            const subLabel = rssSubs.length > 0 ? 'RSS: ' + rssSubs.join(', ') : (details.length > 0 ? details.map(d => RSS_LABELS_LOCAL[d.source_detail] || d.source_detail || d.source).filter(Boolean).slice(0, 3).join(', ') : '无');
-            document.getElementById('kpi-active-sources-sub').textContent = subLabel;
-        }
+        // 加载全局 KPI（默认30天）
+        await loadGlobalKPIs(30);
 
         // Tab 切换
         document.querySelectorAll('.tab').forEach(tab => {
@@ -574,6 +590,7 @@
 
         // 日期筛选器
         setupDateFilters();
+        setupGlobalDateFilters();
 
         // 渲染默认 Tab
         renderTab('quality');

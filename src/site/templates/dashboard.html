@@ -13,6 +13,13 @@
     </header>
 
     <!-- 全局 KPI 卡片 -->
+    <div style="display:flex;justify-content:flex-end;margin-bottom:0.5rem">
+        <div class="date-filters" id="global-date-filters" style="display:flex;gap:0.25rem">
+            <button class="date-btn" data-days="7">近7天</button>
+            <button class="date-btn active" data-days="30">近30天</button>
+            <button class="date-btn" data-days="90">近90天</button>
+        </div>
+    </div>
     <div class="kpi-cards" id="global-kpis">
         <div class="kpi-card">
             <div class="kpi-label">总文章数</div>
