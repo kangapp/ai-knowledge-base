@@ -50,7 +50,19 @@ FTS5 全文索引：`articles_fts` over (title, summary, description)
 | ended_at | TEXT | |
 | status | TEXT | running / completed / failed |
 | trigger | TEXT | cron / manual |
-| summary | TEXT | JSON: 采集数/去重跳过/入库数/丢弃数/花费/每源状态 |
+| summary | TEXT | JSON: approved / discarded / retry 数统计 |
+
+### pipeline_phase_logs — 流水线阶段日志
+
+| 列 | 类型 | 说明 |
+|----|------|------|
+| id | INTEGER PK | |
+| run_id | TEXT FK → pipeline_runs.id | |
+| phase | TEXT | collector / router / analyzer / reviewer |
+| source | TEXT | 源名称（analyzer 阶段按源记录） |
+| event | TEXT | started / completed / failed |
+| message | TEXT | 日志内容 |
+| created_at | TEXT | |
 
 ### cost_logs — LLM 调用花费
 
@@ -64,6 +76,52 @@ FTS5 全文索引：`articles_fts` over (title, summary, description)
 | tokens_in | INTEGER | |
 | tokens_out | INTEGER | |
 | cost | REAL | |
+| created_at | TEXT DEFAULT CURRENT_TIMESTAMP | |
+
+### source_health — 数据源健康统计
+
+| 列 | 类型 | 说明 |
+|----|------|------|
+| id | INTEGER PK | |
+| source_id | TEXT | 数据源ID（对应 sources.yaml 中的 id） |
+| date | TEXT | YYYY-MM-DD |
+| total_collected | INTEGER | 当日采集总数 |
+| approved | INTEGER | 当日审核通过数 |
+| rejected | INTEGER | 当日审核拒绝数 |
+| failed | INTEGER | 当日采集失败数 |
+| avg_score | REAL | 当日平均相关性评分 |
+| recorded_at | TEXT | 记录时间 |
+
+UNIQUE(source_id, date)
+
+### discovered_sources — 已发现待审核的数据源
+
+| 列 | 类型 | 说明 |
+|----|------|------|
+| id | INTEGER PK | |
+| url | TEXT UNIQUE | 数据源 URL |
+| name | TEXT | 数据源名称 |
+| type | TEXT | 类型（github / rss / feishu / arxiv） |
+| discovered_at | TEXT | 发现时间 |
+| status | TEXT | candidate / enabled / disabled |
+| added_at | TEXT | 加入时间 |
+| rejected_at | TEXT | 拒绝时间 |
+| reject_reason | TEXT | 拒绝原因 |
+
+### github_repo_snapshots — GitHub 仓库星标快照
+
+| 列 | 类型 | 说明 |
+|----|------|------|
+| id | INTEGER PK | |
+| repo_url | TEXT | 仓库 URL |
+| repo_name | TEXT | 仓库名称 |
+| stars | INTEGER | 星标数 |
+| forks | INTEGER | Fork 数 |
+| watchers | INTEGER | Watcher 数 |
+| snapshot_date | TEXT | YYYY-MM-DD |
+| created_at | TEXT | |
+
+UNIQUE(repo_url, snapshot_date)
 
 ### provider_health — Provider 健康状态
 
@@ -92,6 +150,36 @@ FTS5 全文索引：`articles_fts` over (title, summary, description)
 | 列 | 类型 |
 |----|------|
 | version | INTEGER |
+
+## extra_data JSON 结构
+
+`articles.extra_data` 存储 AI 分析产生的四维评分等详细信息：
+
+```json
+{
+  "dimensions": {
+    "ai_relevance": {"avg_score": 34.4, "high_rate": 1.0, "mid_rate": 0, "low_rate": 0},
+    "内容深度": {"avg_score": 0, "high_rate": 0, "mid_rate": 0, "low_rate": 0},
+    "信息密度": {"avg_score": 0, "high_rate": 0, "mid_rate": 0, "low_rate": 0},
+    "时效性": {"avg_score": 16.0, "high_rate": 0.008, "mid_rate": 0, "low_rate": 0}
+  },
+  "reason_keywords": [
+    {"word": "核心", "count": 47},
+    {"word": "属于", "count": 35}
+  ],
+  "language": "zh",
+  "raw_api_response": {...}
+}
+```
+
+四维评分说明：
+
+| 维度 | 说明 | 高分标准 |
+|------|------|----------|
+| ai_relevance | AI 相关性 | 与 AI/LLM/Agent 领域相关程度 |
+| 内容深度 | 内容深度 | 有详细技术实现或分析 |
+| 信息密度 | 信息密度 | 内容充实、信息价值高 |
+| 时效性 | 时效性 | 近期发布的内容 |
 
 ## 配置文件结构
 
