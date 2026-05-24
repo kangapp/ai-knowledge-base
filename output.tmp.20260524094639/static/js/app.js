@@ -229,7 +229,7 @@
     };
     let cachedData = { quality: null, runtime: null, consumption: null, sources: null };
     const state = { quality: 30, runtime: 7, consumption: 30, sources: 7 };
-    const globalDays = { value: 30 };
+    const globalState = { days: 30 };
 
     async function loadGlobalKPIs(days) {
         const res = await fetch(`/api/stats/enhanced?days=${days}`);
@@ -250,27 +250,17 @@
         document.getElementById('kpi-active-sources-sub').textContent = subLabel;
     }
 
-    function setupDateFilters() {
-        // 全局日期筛选器（KPI + 所有 Tab 共用）
-        const globalContainer = document.getElementById('global-date-filters');
-        if (globalContainer) {
-            globalContainer.querySelectorAll('.date-btn').forEach(btn => {
-                const d = parseInt(btn.dataset.days) || 30;
-                if (d === globalDays.value) btn.classList.add('active');
-                btn.addEventListener('click', () => {
-                    globalContainer.querySelectorAll('.date-btn').forEach(b => b.classList.remove('active'));
-                    btn.classList.add('active');
-                    globalDays.value = d;
-                    loadGlobalKPIs(d);
-                    // 同步更新各 Tab 的筛选器
-                    Object.keys(state).forEach(tab => { state[tab] = d; });
-                    // 重新渲染当前 Tab
-                    const activeTab = document.querySelector('.tab.active')?.dataset.tab || 'quality';
-                    cachedData = {};
-                    renderTab(activeTab);
-                });
+    function setupGlobalDateFilters() {
+        document.querySelectorAll('#global-date-filters .date-btn').forEach(btn => {
+            const d = parseInt(btn.dataset.days) || 30;
+            if (d === 30) btn.classList.add('active');
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('#global-date-filters .date-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                globalState.days = d;
+                loadGlobalKPIs(d);
             });
-        }
+        });
     }
 
     async function loadTab(tab) {
@@ -288,6 +278,24 @@
         const days = state[tab] || 30;
         const key = `${tab}_${days}`;
         delete cachedData[key];
+    }
+
+    function setupDateFilters() {
+        document.querySelectorAll('.date-filters').forEach(container => {
+            const tab = container.id.replace('-date-filters', '');
+            const defaultDays = tab === 'runtime' ? 7 : 30;
+            container.querySelectorAll('.date-btn').forEach(btn => {
+                const d = parseInt(btn.dataset.days) || defaultDays;
+                if (d === defaultDays) btn.classList.add('active');
+                btn.addEventListener('click', () => {
+                    container.querySelectorAll('.date-btn').forEach(b => b.classList.remove('active'));
+                    btn.classList.add('active');
+                    state[tab] = d;
+                    invalidateCache(tab);
+                    renderTab(tab);
+                });
+            });
+        });
     }
 
     function switchTab(tab) {
@@ -582,6 +590,7 @@
 
         // 日期筛选器
         setupDateFilters();
+        setupGlobalDateFilters();
 
         // 渲染默认 Tab
         renderTab('quality');
