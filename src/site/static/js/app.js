@@ -228,7 +228,7 @@
         'Ars Technica': 'Ars Technica', 'OpenAI': 'OpenAI', '虎嗅': '虎嗅',
     };
     let cachedData = { quality: null, runtime: null, consumption: null, sources: null };
-    const state = { quality: 30, runtime: 7, consumption: 30, sources: 7 };
+    const state = { quality: 7, runtime: 7, consumption: 30, sources: 7 };
     const globalDays = { value: 30 };
 
     async function loadGlobalKPIs(days) {
@@ -305,12 +305,206 @@
             if (!data) return;
             renderSources(data);
             return;
+        } else if (tab === 'quality') {
+            const data = await loadQualityTab(state.quality);
+            if (data) renderQualityDetail(data);
+            return;
+        } else if (tab === 'consumption') {
+            const data = await loadConsumptionTab(state.consumption);
+            if (data) renderConsumptionDetail(data);
+            return;
         }
         const data = await loadTab(tab);
         if (!data) return;
-        if (tab === 'quality') renderQuality(data);
-        else if (tab === 'runtime') renderRuntime(data);
+        if (tab === 'runtime') renderRuntime(data);
         else if (tab === 'consumption') renderConsumption(data);
+    }
+
+    async function loadQualityTab(days) {
+        const key = `quality_${days}`;
+        if (cachedData[key]) return cachedData[key];
+        const res = await fetch(`/api/stats/quality-detail?period=${days === 7 ? 'week' : days === 30 ? 'month' : 'day'}`);
+        const json = await res.json();
+        if (json.code !== 0) return null;
+        cachedData[key] = json.data;
+        return cachedData[key];
+    }
+
+    function renderQualityDetail(data) {
+        if (!data) return;
+
+        // KPI 卡片
+        document.getElementById('q-pass-rate').textContent = data.audit_efficiency ?
+            (data.audit_efficiency.one_pass_rate * 100).toFixed(0) + '%' : '-';
+        document.getElementById('q-avg-score').textContent = data.dimensions ?
+            (data.dimensions.ai_relevance?.avg_score || 0).toFixed(0) : '-';
+        document.getElementById('q-one-pass').textContent = data.audit_efficiency ?
+            (data.audit_efficiency.one_pass_rate * 100).toFixed(0) + '%' : '-';
+        document.getElementById('q-tag-rate').textContent = data.tag_coverage ?
+            (data.tag_coverage.tagged_rate * 100).toFixed(0) + '%' : '-';
+
+        // 内容质量分布柱状图
+        if (data.content_quality) {
+            const cq = data.content_quality;
+            renderBarChart('q-content-chart',
+                ['Summary覆盖', '有标签', '一次通过', 'Exhausted', 'Retry'],
+                [(cq.summary_coverage || 0) * 100, (data.tag_coverage?.tagged_rate || 0) * 100,
+                 (data.audit_efficiency?.one_pass_rate || 0) * 100,
+                 (data.audit_efficiency?.exhausted_rate || 0) * 100,
+                 (data.audit_efficiency?.retry_rate || 0) * 100],
+                '#4F46E5');
+        }
+
+        // 来源质量对比柱状图（复用原有数据）
+        const sourceScores = data.source_scores || [];
+        if (sourceScores.length > 0) {
+            renderBarChart('q-source-chart',
+                sourceScores.slice(0, 4).map(s => s.source_detail || s.source),
+                sourceScores.slice(0, 4).map(s => s.avg_score || 0),
+                '#10b981');
+        }
+
+        // 四维评分雷达图
+        if (data.dimensions) {
+            const dims = data.dimensions;
+            const radarLabels = ['AI相关度', '内容深度', '信息密度', '时效性'];
+            const radarData = [
+                parseFloat((dims.ai_relevance?.avg_score || 0).toFixed(1)),
+                parseFloat((dims.内容深度?.avg_score || 0).toFixed(1)),
+                parseFloat((dims.信息密度?.avg_score || 0).toFixed(1)),
+                parseFloat((dims.时效性?.avg_score || 0).toFixed(1)),
+            ];
+            renderRadarChart('q-radar-chart', radarLabels, radarData);
+        }
+
+        // 维度评分分布堆叠柱状图
+        if (data.dimensions) {
+            const dims = data.dimensions;
+            const dimLabels = ['AI相关度', '内容深度', '信息密度', '时效性'];
+            const highData = [dims.ai_relevance?.high_rate || 0, dims.内容深度?.high_rate || 0,
+                             dims.信息密度?.high_rate || 0, dims.时效性?.high_rate || 0].map(v => v * 100);
+            const midData = [dims.ai_relevance?.mid_rate || 0, dims.内容深度?.mid_rate || 0,
+                            dims.信息密度?.mid_rate || 0, dims.时效性?.mid_rate || 0].map(v => v * 100);
+            const lowData = [dims.ai_relevance?.low_rate || 0, dims.内容深度?.low_rate || 0,
+                            dims.信息密度?.low_rate || 0, dims.时效性?.low_rate || 0].map(v => v * 100);
+            renderStackedBar('q-dimension-chart', dimLabels, [
+                { label: '高', data: highData, backgroundColor: '#10b981' },
+                { label: '中', data: midData, backgroundColor: '#f59e0b' },
+                { label: '低', data: lowData, backgroundColor: '#ef4444' },
+            ]);
+        }
+
+        // Reason 关键词云
+        const cloud = document.getElementById('q-keyword-cloud');
+        if (cloud && data.reason_keywords) {
+            const keywords = data.reason_keywords.slice(0, 15);
+            cloud.innerHTML = keywords.map(k => {
+                const size = k.count > 5 ? 'large' : k.count > 2 ? 'medium' : 'small';
+                return `<span class="tag-item ${size}" style="margin:4px">${k.word}</span>`;
+            }).join('');
+        }
+    }
+
+    async function loadConsumptionTab(days) {
+        const period = days === 1 ? 'day' : days === 7 ? 'week' : 'month';
+        const res = await fetch(`/api/stats/consumption-detail?period=${period}`);
+        const json = await res.json();
+        if (json.code !== 0) return null;
+        return json.data;
+    }
+
+    function renderConsumptionDetail(data) {
+        if (!data) return;
+
+        // KPI
+        document.getElementById('cs-period-cost').textContent = '$' + (data.period_cost || 0).toFixed(2);
+        document.getElementById('cs-daily-avg').textContent = '$' + (data.daily_avg || 0).toFixed(2);
+        document.getElementById('cs-token-eff').textContent = '$' + (data.token_efficiency || 0);
+        const progress = (data.budget_progress || 0) * 100;
+        document.getElementById('cs-budget-progress').textContent = progress.toFixed(0) + '%';
+        const bar = document.getElementById('cs-progress-bar');
+        if (bar) {
+            bar.style.width = Math.min(progress, 100) + '%';
+            bar.className = 'progress-bar' + (progress > 80 ? ' danger' : progress > 50 ? ' warning' : '');
+        }
+
+        // 花费趋势折线图
+        if (data.trend && data.trend.length > 0) {
+            renderLineChart('cs-trend-chart',
+                data.trend.map(t => t.label),
+                data.trend.map(t => t.cost),
+                '#ef4444');
+        }
+
+        // 来源费用分解柱状图
+        if (data.source_trend && data.source_trend.length > 0) {
+            const sources = [...new Set(data.source_trend.map(s => s.source))];
+            const labels = [...new Set(data.source_trend.map(s => s.label))];
+            const analyzeData = sources.map(src =>
+                labels.map(lbl => {
+                    const found = data.source_trend.find(s => s.source === src && s.type === 'analyze' && s.label === lbl);
+                    return found ? found.cost : 0;
+                })
+            );
+            const reviewData = sources.map(src =>
+                labels.map(lbl => {
+                    const found = data.source_trend.find(s => s.source === src && s.type === 'review' && s.label === lbl);
+                    return found ? found.cost : 0;
+                })
+            );
+            // 简化：只显示总分析+审核按来源
+            const sourceTotals = sources.map((src, i) => ({
+                source: src,
+                analyze: analyzeData[i].reduce((a, b) => a + b, 0),
+                review: reviewData[i].reduce((a, b) => a + b, 0),
+            }));
+            renderStackedBar('cs-source-chart',
+                sources.map(s => s.charAt(0).toUpperCase() + s.slice(1)),
+                [
+                    { label: '分析', data: sourceTotals.map(s => s.analyze), backgroundColor: '#8b5cf6' },
+                    { label: '审核', data: sourceTotals.map(s => s.review), backgroundColor: '#6366f1' },
+                ]);
+        }
+
+        // Provider 费用趋势
+        if (data.provider_trend && data.provider_trend.length > 0) {
+            const providers = [...new Set(data.provider_trend.map(p => p.provider))];
+            const labels = [...new Set(data.provider_trend.map(p => p.label))];
+            const colors = { deepseek: '#4F46E5', minimax: '#10b981', 'siliconflow': '#f59e0b' };
+            const datasets = providers.map(p => ({
+                label: p,
+                data: labels.map(lbl => {
+                    const found = data.provider_trend.find(r => r.provider === p && r.label === lbl);
+                    return found ? found.cost : 0;
+                }),
+                backgroundColor: colors[p] || '#8b5cf6',
+            }));
+            renderGroupedBar('cs-provider-chart', labels.map(l => l.slice(-5)), datasets);
+        }
+    }
+
+    function renderRadarChart(canvasId, labels, data) {
+        const ctx = document.getElementById(canvasId);
+        if (!ctx) return;
+        if (ctx._chart) ctx._chart.destroy();
+        ctx._chart = new Chart(ctx, {
+            type: 'radar',
+            data: {
+                labels,
+                datasets: [{
+                    data,
+                    backgroundColor: 'rgba(79,70,229,0.25)',
+                    borderColor: '#4F46E5',
+                    borderWidth: 2,
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: { r: { min: 0, max: 100 } },
+                plugins: { legend: { display: false } }
+            }
+        });
     }
 
     async function loadSourcesTab(days) {
@@ -321,38 +515,6 @@
         if (json.code !== 0) return null;
         cachedData[key] = json.data;
         return cachedData[key];
-    }
-
-    function renderQuality(data) {
-        const buckets = ['0-20','20-40','40-60','60-80','80-100'];
-        const counts = buckets.map(b => {
-            const found = data.score_distribution ? data.score_distribution.find(s => s.bucket === b) : null;
-            return found ? found.count : 0;
-        });
-        renderBarChart('score-dist-chart', buckets, counts, '#3b82f6');
-
-        const list = document.getElementById('source-score-list');
-        if (list) {
-            list.innerHTML = (data.source_scores || []).map(s => `
-                <div class="source-score-item">
-                    <div>
-                        <div class="source-name">${s.source_detail || s.source}</div>
-                        <div class="count">${s.article_count} 篇</div>
-                    </div>
-                    <div class="score">${s.avg_score}分</div>
-                </div>
-            `).join('');
-        }
-
-        const cloud = document.getElementById('tag-cloud');
-        if (cloud && data.top_tags && data.top_tags.length > 0) {
-            const maxCount = Math.max(...data.top_tags.map(t => t.count));
-            cloud.innerHTML = data.top_tags.map(t => {
-                const ratio = t.count / maxCount;
-                const size = ratio > 0.7 ? 'large' : ratio > 0.4 ? 'medium' : 'small';
-                return `<span class="tag-item ${size}">${t.name}</span>`;
-            }).join('');
-        }
     }
 
     function renderRuntime(data) {

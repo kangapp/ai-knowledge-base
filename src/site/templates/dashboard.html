@@ -52,22 +52,52 @@
 
     <!-- Tab 内容区 -->
     <div id="tab-quality" class="tab-content active">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">
-            <h3 style="margin:0;font-size:0.875rem;color:#666;text-transform:uppercase">评分分布 & 来源分析</h3>
+        <!-- 顶部 KPI -->
+        <div class="kpi-row" style="display:flex;gap:1rem;margin-bottom:1rem">
+            <div class="kpi-card" style="flex:1">
+                <div class="kpi-label">通过率</div>
+                <div class="kpi-value" id="q-pass-rate">-</div>
+            </div>
+            <div class="kpi-card" style="flex:1">
+                <div class="kpi-label">平均评分</div>
+                <div class="kpi-value" id="q-avg-score">-</div>
+            </div>
+            <div class="kpi-card" style="flex:1">
+                <div class="kpi-label">一次通过</div>
+                <div class="kpi-value" id="q-one-pass">-</div>
+            </div>
+            <div class="kpi-card" style="flex:1">
+                <div class="kpi-label">有标签占比</div>
+                <div class="kpi-value" id="q-tag-rate">-</div>
+            </div>
         </div>
-        <div class="charts-layout">
+
+        <!-- 第一行：分布图表 -->
+        <div class="charts-layout" style="margin-bottom:1rem">
             <div class="chart-card">
-                <h3>评分分布</h3>
-                <div class="chart-canvas-wrapper"><canvas id="score-dist-chart"></canvas></div>
+                <h3>内容质量分布</h3>
+                <div class="chart-canvas-wrapper"><canvas id="q-content-chart"></canvas></div>
             </div>
             <div class="chart-card">
-                <h3>来源评分排行</h3>
-                <div class="source-score-list" id="source-score-list"></div>
+                <h3>来源质量对比</h3>
+                <div class="chart-canvas-wrapper"><canvas id="q-source-chart"></canvas></div>
             </div>
         </div>
-        <div class="chart-card" style="margin-top:1rem">
-            <h3>标签云</h3>
-            <div class="tag-cloud" id="tag-cloud"></div>
+
+        <!-- 第二行：四维评分 -->
+        <div class="charts-layout" style="margin-bottom:1rem">
+            <div class="chart-card">
+                <h3>四维平均分</h3>
+                <div class="chart-canvas-wrapper"><canvas id="q-radar-chart"></canvas></div>
+            </div>
+            <div class="chart-card">
+                <h3>维度评分分布</h3>
+                <div class="chart-canvas-wrapper"><canvas id="q-dimension-chart"></canvas></div>
+            </div>
+            <div class="chart-card">
+                <h3>Reason 关键词</h3>
+                <div class="tag-cloud" id="q-keyword-cloud" style="padding:1rem"></div>
+            </div>
         </div>
     </div>
 
@@ -110,17 +140,19 @@
     </div>
 
     <div id="tab-consumption" class="tab-content">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">
-            <h3 style="margin:0;font-size:0.875rem;color:#666;text-transform:uppercase">资源消耗分析</h3>
-        </div>
+        <!-- 顶部 KPI -->
         <div class="kpi-row" style="display:flex;gap:1rem;margin-bottom:1rem">
             <div class="kpi-card" style="flex:1">
                 <div class="kpi-label">周期花费</div>
                 <div class="kpi-value" id="cs-period-cost">-</div>
             </div>
             <div class="kpi-card" style="flex:1">
+                <div class="kpi-label">日均花费</div>
+                <div class="kpi-value" id="cs-daily-avg">-</div>
+            </div>
+            <div class="kpi-card" style="flex:1">
                 <div class="kpi-label">Token 效率</div>
-                <div class="kpi-value" id="cs-token-efficiency">-</div>
+                <div class="kpi-value" id="cs-token-eff">-</div>
                 <div class="kpi-sub">$/M tokens</div>
             </div>
             <div class="kpi-card" style="flex:1">
@@ -129,14 +161,22 @@
                 <div class="progress-bar-wrapper"><div class="progress-bar" id="cs-progress-bar"></div></div>
             </div>
         </div>
+
+        <!-- 花费趋势折线图 -->
+        <div class="chart-card" style="margin-bottom:1rem">
+            <h3>花费趋势</h3>
+            <div class="chart-canvas-wrapper"><canvas id="cs-trend-chart"></canvas></div>
+        </div>
+
+        <!-- 费用分解 -->
         <div class="charts-layout">
             <div class="chart-card">
-                <h3>Provider 费用分解</h3>
-                <div class="chart-canvas-wrapper"><canvas id="provider-cost-chart"></canvas></div>
+                <h3>来源费用分解</h3>
+                <div class="chart-canvas-wrapper"><canvas id="cs-source-chart"></canvas></div>
             </div>
             <div class="chart-card">
-                <h3>Agent 费用分解</h3>
-                <div class="chart-canvas-wrapper"><canvas id="agent-cost-chart"></canvas></div>
+                <h3>Provider 费用</h3>
+                <div class="chart-canvas-wrapper"><canvas id="cs-provider-chart"></canvas></div>
             </div>
         </div>
     </div>
