@@ -257,15 +257,15 @@ ai-knowledge-base/
 
 ### extra_data JSON 结构
 
-`articles.extra_data` 存储 Reviewer 四维评分 JSON：
+`articles.extra_data` 存储 Reviewer 四维评分：
 
 ```json
 {
   "dimensions": {
-    "ai_relevance": {"score": 35, "reason": "核心讨论AI/LLM/Agent技术"},
-    "内容深度": {"score": 25, "reason": "有具体实现细节"},
-    "信息密度": {"score": 12, "reason": "新颖独家内容"},
-    "时效性": {"score": 10, "reason": "本月发布"}
+    "ai_relevance": {"score": 35, "reason": "..."},
+    "内容深度": {"score": 25, "reason": "..."},
+    "信息密度": {"score": 12, "reason": "..."},
+    "时效性": {"score": 10, "reason": "..."}
   }
 }
 ```
