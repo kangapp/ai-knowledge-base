@@ -12,31 +12,31 @@ from src.core.config import (
 @pytest.fixture
 def registry():
     llm_cfg = LLMConfig(providers={
-        "deepseek": ProviderConfig(
-            base_url="https://api.deepseek.com/v1", api_key="sk-test",
-            models=[ModelInfo(id="deepseek-chat", price_per_1k_in=0.000014, price_per_1k_out=0.000028, max_tokens=8192)]
+        "minimax": ProviderConfig(
+            base_url="https://api.minimax.chat/v1", api_key="sk-test",
+            models=[ModelInfo(id="MiniMax-M2.7", price_per_1k_in=0.0003, price_per_1k_out=0.0012, max_tokens=8192)]
         )
     })
     agents_cfg = AgentsConfig(
         agents={
             "github_analyzer": AgentConfig(
-                model=ModelBinding(primary=ModelRef(provider="deepseek", model="deepseek-chat"), fallback=[]),
+                model=ModelBinding(primary=ModelRef(provider="minimax", model="MiniMax-M2.7"), fallback=[]),
                 params={"temperature": 0.3, "max_tokens": 2048}
             ),
             "rss_analyzer": AgentConfig(
-                model=ModelBinding(primary=ModelRef(provider="deepseek", model="deepseek-chat"), fallback=[]),
+                model=ModelBinding(primary=ModelRef(provider="minimax", model="MiniMax-M2.7"), fallback=[]),
                 params={"temperature": 0.3, "max_tokens": 2048}
             ),
             "feishu_analyzer": AgentConfig(
-                model=ModelBinding(primary=ModelRef(provider="deepseek", model="deepseek-chat"), fallback=[]),
+                model=ModelBinding(primary=ModelRef(provider="minimax", model="MiniMax-M2.7"), fallback=[]),
                 params={"temperature": 0.3, "max_tokens": 2048}
             ),
             "arxiv_analyzer": AgentConfig(
-                model=ModelBinding(primary=ModelRef(provider="deepseek", model="deepseek-chat"), fallback=[]),
+                model=ModelBinding(primary=ModelRef(provider="minimax", model="MiniMax-M2.7"), fallback=[]),
                 params={"temperature": 0.3, "max_tokens": 4096}
             ),
             "reviewer": AgentConfig(
-                model=ModelBinding(primary=ModelRef(provider="deepseek", model="deepseek-chat"), fallback=[]),
+                model=ModelBinding(primary=ModelRef(provider="minimax", model="MiniMax-M2.7"), fallback=[]),
                 params={"temperature": 0.0, "max_tokens": 1024}
             ),
         },
@@ -72,7 +72,7 @@ async def test_pipeline_e2e_mocked(registry):
 
     # 先定义 mock 函数
     async def mock_analyze_github(items, reg):
-        return [AnalyzedItem(ref_url="https://github.com/test/x", title="Test", summary="Mocked", tags=["AI"], language="zh")], [CostRecord(agent="github_analyzer", provider="deepseek", model="deepseek-chat", tokens_in=100, tokens_out=50, cost=0.001)]
+        return [AnalyzedItem(ref_url="https://github.com/test/x", title="Test", summary="Mocked", tags=["AI"], language="zh")], [CostRecord(agent="github_analyzer", provider="minimax", model="MiniMax-M2.7", tokens_in=100, tokens_out=50, cost=0.001)]
 
     async def mock_analyze_rss(items, reg):
         return [], []

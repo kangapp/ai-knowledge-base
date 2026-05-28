@@ -2,7 +2,7 @@ agents:
   github_analyzer:
     model:
       primary: { provider: minimax, model: MiniMax-M2.7 }
-      fallback: [{ provider: deepseek, model: deepseek-chat }]
+      fallback: []
     params: { temperature: 0.3, max_tokens: 2048 }
     prompt: prompts/github_analyzer.md
     budget_weight: 1.0
@@ -26,7 +26,7 @@ agents:
   arxiv_analyzer:
     model:
       primary: { provider: minimax, model: MiniMax-M2.7 }
-      fallback: [{ provider: deepseek, model: deepseek-chat }]
+      fallback: []
     params: { temperature: 0.3, max_tokens: 4096 }
     prompt: prompts/arxiv_analyzer.md
     budget_weight: 1.0

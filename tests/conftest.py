@@ -14,14 +14,14 @@ def sample_llm_yaml(config_dir):
     p = config_dir / "llm.yaml"
     p.write_text("""
 providers:
-  deepseek:
-    base_url: https://api.deepseek.com/v1
-    api_key: ${DEEPSEEK_API_KEY}
-    supports_json_mode: true
+  minimax:
+    base_url: https://api.minimax.chat/v1
+    api_key: sk-test-placeholder
+    supports_json_mode: false
     models:
-      - id: deepseek-chat
-        price_per_1k_in: 0.000014
-        price_per_1k_out: 0.000028
+      - id: MiniMax-M2.7
+        price_per_1k_in: 0.0003
+        price_per_1k_out: 0.0012
         max_tokens: 8192
 """)
     return p
@@ -52,8 +52,8 @@ def sample_agents_yaml(config_dir):
 agents:
   github_analyzer:
     model:
-      primary: {provider: deepseek, model: deepseek-chat}
-      fallback: [{provider: openai, model: gpt-4o-mini}]
+      primary: {provider: minimax, model: MiniMax-M2.7}
+      fallback: []
     params: {temperature: 0.3, max_tokens: 2048}
     prompt: prompts/github_analyzer.md
     budget_weight: 1.0

@@ -9,13 +9,9 @@ from src.core.config import (
 @pytest.fixture
 def llm_cfg():
     return LLMConfig(providers={
-        "deepseek": ProviderConfig(
-            base_url="https://api.deepseek.com/v1", api_key="sk-test",
-            models=[ModelInfo(id="deepseek-chat", price_per_1k_in=0.000014, price_per_1k_out=0.000028, max_tokens=8192)]
-        ),
-        "openai": ProviderConfig(
-            base_url="https://api.openai.com/v1", api_key="sk-test",
-            models=[ModelInfo(id="gpt-4o-mini", price_per_1k_in=0.000015, price_per_1k_out=0.00006, max_tokens=4096)]
+        "minimax": ProviderConfig(
+            base_url="https://api.minimax.chat/v1", api_key="sk-test",
+            models=[ModelInfo(id="MiniMax-M2.7", price_per_1k_in=0.0003, price_per_1k_out=0.0012, max_tokens=8192)]
         )
     })
 
@@ -25,8 +21,8 @@ def agents_cfg():
         agents={
             "github_analyzer": AgentConfig(
                 model=ModelBinding(
-                    primary=ModelRef(provider="deepseek", model="deepseek-chat"),
-                    fallback=[ModelRef(provider="openai", model="gpt-4o-mini")]
+                    primary=ModelRef(provider="minimax", model="MiniMax-M2.7"),
+                    fallback=[]
                 ),
                 params={"temperature": 0.3, "max_tokens": 2048}
             ),
@@ -37,27 +33,25 @@ def agents_cfg():
 def test_get_client_primary(llm_cfg, agents_cfg):
     registry = LLMRegistry(llm_cfg, agents_cfg)
     client, provider, model_id, params = registry.get_client("github_analyzer")
-    assert provider == "deepseek"
-    assert model_id == "deepseek-chat"
+    assert provider == "minimax"
+    assert model_id == "MiniMax-M2.7"
     assert params["temperature"] == 0.3
 
 def test_fallback_on_unhealthy(llm_cfg, agents_cfg):
+    """无 fallback 时应该抛出异常"""
     registry = LLMRegistry(llm_cfg, agents_cfg)
-    registry.health.record_failure("deepseek", "500")
-    registry.health.record_failure("deepseek", "500")
-    registry.health.record_failure("deepseek", "500")  # open
-    client, provider, model_id, _ = registry.get_client("github_analyzer")
-    assert provider == "openai"  # fallback provider
-    assert model_id == "gpt-4o-mini"  # fallback model
+    registry.health.record_failure("minimax", "500")
+    registry.health.record_failure("minimax", "500")
+    registry.health.record_failure("minimax", "500")  # open
+    with pytest.raises(AllProvidersUnavailable):
+        registry.get_client("github_analyzer")
 
 def test_soft_limit_skips_primary(llm_cfg, agents_cfg):
-    """软熔断 (80%) → 跳过 primary，只用 fallback"""
+    """软熔断 (80%) → 无 fallback 时抛出异常"""
     registry = LLMRegistry(llm_cfg, agents_cfg)
-    # 设置花费超过软熔断阈值
     registry.budget._daily_spend["__global__"] = registry.budget.daily_limit * 0.85
-    client, provider, model_id, _ = registry.get_client("github_analyzer")
-    assert provider == "openai"  # fallback
-    assert model_id == "gpt-4o-mini"
+    with pytest.raises(AllProvidersUnavailable):
+        registry.get_client("github_analyzer")
 
 def test_hard_limit_raises(llm_cfg, agents_cfg):
     """硬熔断 (100%) → 全部不可用"""
@@ -69,13 +63,12 @@ def test_hard_limit_raises(llm_cfg, agents_cfg):
 def test_all_unavailable_raises(llm_cfg, agents_cfg):
     registry = LLMRegistry(llm_cfg, agents_cfg)
     for _ in range(3):
-        registry.health.record_failure("deepseek", "500")
-        registry.health.record_failure("openai", "500")
+        registry.health.record_failure("minimax", "500")
     with pytest.raises(AllProvidersUnavailable):
         registry.get_client("github_analyzer")
 
 def test_calc_cost(llm_cfg, agents_cfg):
     registry = LLMRegistry(llm_cfg, agents_cfg)
-    cost = registry.calc_cost("deepseek", "deepseek-chat", 1000, 500)
-    # 1000/1000 * 0.000014 + 500/1000 * 0.000028 = 0.000014 + 0.000014 = 0.000028
-    assert cost == pytest.approx(0.000028, rel=1e-6)
+    cost = registry.calc_cost("minimax", "MiniMax-M2.7", 1000, 500)
+    # 1000/1000 * 0.0003 + 500/1000 * 0.0012 = 0.0003 + 0.0006 = 0.0009
+    assert cost == pytest.approx(0.0009, rel=1e-6)

@@ -56,15 +56,15 @@ async def test_reviewer_node_mocked():
     )
 
     llm_cfg = LLMConfig(providers={
-        "deepseek": ProviderConfig(
-            base_url="https://api.deepseek.com/v1", api_key="sk-test",
-            models=[ModelInfo(id="deepseek-chat", price_per_1k_in=0.000014, price_per_1k_out=0.000028, max_tokens=8192)]
+        "minimax": ProviderConfig(
+            base_url="https://api.minimax.chat/v1", api_key="sk-test",
+            models=[ModelInfo(id="MiniMax-M2.7", price_per_1k_in=0.0003, price_per_1k_out=0.0012, max_tokens=8192)]
         )
     })
     agents_cfg = AgentsConfig(
         agents={
             "reviewer": AgentConfig(
-                model=ModelBinding(primary=ModelRef(provider="deepseek", model="deepseek-chat"), fallback=[]),
+                model=ModelBinding(primary=ModelRef(provider="minimax", model="MiniMax-M2.7"), fallback=[]),
                 params={"temperature": 0.0, "max_tokens": 1024}
             ),
         },
@@ -87,7 +87,7 @@ async def test_reviewer_node_mocked():
     ]
     mock_response.usage = MagicMock(prompt_tokens=300, completion_tokens=120)
     mock_client.chat.completions.create = AsyncMock(return_value=mock_response)
-    registry._clients["deepseek"] = mock_client
+    registry._clients["minimax"] = mock_client
 
     state = PipelineState(analyzed_items=[
         AnalyzedItem(ref_url="https://example.com/1", title="Test Agent", summary="A new agent framework", tags=["Agent", "Framework"], language="zh", retry_count=0)

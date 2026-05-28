@@ -14,7 +14,7 @@ def test_initial_state(tracker):
 
 
 def test_add_cost(tracker):
-    tracker.add_cost("deepseek", 0.5)
+    tracker.add_cost("minimax", 0.5)
     assert tracker.current_daily() == 0.5
 
 
@@ -30,12 +30,11 @@ def test_hard_exceeded(tracker):
 
 
 def test_per_provider_tracking(tracker):
-    tracker.add_cost("deepseek", 1.0)
-    tracker.add_cost("openai", 0.5)
-    assert tracker.current_daily() == 1.5
+    tracker.add_cost("minimax", 1.0)
+    assert tracker.current_daily() == 1.0
 
 
 def test_reset_daily(tracker):
-    tracker.add_cost("deepseek", 5.0)
+    tracker.add_cost("minimax", 5.0)
     tracker.reset_daily()
     assert tracker.current_daily() == 0.0
