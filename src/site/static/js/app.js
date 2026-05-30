@@ -228,8 +228,10 @@
         'Ars Technica': 'Ars Technica', 'OpenAI': 'OpenAI', '虎嗅': '虎嗅',
     };
     let cachedData = { quality: null, runtime: null, consumption: null, sources: null };
-    const state = { quality: 7, runtime: 7, consumption: 30, sources: 7 };
-    const globalDays = { value: 30 };
+    const periodDays = { day: 1, week: 7, month: 30 };
+    const periodLabels = { day: '今日', week: '近 7 天', month: '近 30 天' };
+    const state = { quality: 7, runtime: 7, consumption: 7, sources: 7 };
+    const globalPeriod = { value: 'week' };
 
     async function loadGlobalKPIs(days) {
         const res = await fetch(`/api/stats/enhanced?days=${days}`);
@@ -251,20 +253,18 @@
     }
 
     function setupDateFilters() {
-        // 全局日期筛选器（KPI + 所有 Tab 共用）
+        // 全局日期筛选器（当前 Tab 数据联动）
         const globalContainer = document.getElementById('global-date-filters');
         if (globalContainer) {
             globalContainer.querySelectorAll('.date-btn').forEach(btn => {
-                const d = parseInt(btn.dataset.days) || 30;
-                if (d === globalDays.value) btn.classList.add('active');
+                const period = btn.dataset.period || 'day';
+                const d = periodDays[period] || 1;
+                if (period === globalPeriod.value) btn.classList.add('active');
                 btn.addEventListener('click', () => {
                     globalContainer.querySelectorAll('.date-btn').forEach(b => b.classList.remove('active'));
                     btn.classList.add('active');
-                    globalDays.value = d;
-                    loadGlobalKPIs(d);
-                    // 同步更新各 Tab 的筛选器
+                    globalPeriod.value = period;
                     Object.keys(state).forEach(tab => { state[tab] = d; });
-                    // 重新渲染当前 Tab
                     const activeTab = document.querySelector('.tab.active')?.dataset.tab || 'quality';
                     cachedData = {};
                     renderTab(activeTab);
@@ -322,7 +322,8 @@
     async function loadQualityTab(days) {
         const key = `quality_${days}`;
         if (cachedData[key]) return cachedData[key];
-        const res = await fetch(`/api/stats/quality-detail?period=${days === 7 ? 'week' : days === 30 ? 'month' : 'day'}`);
+        const period = days === 7 ? 'week' : days === 30 ? 'month' : 'day';
+        const res = await fetch(`/api/stats/quality-detail?period=${period}`);
         const json = await res.json();
         if (json.code !== 0) return null;
         cachedData[key] = json.data;
@@ -332,40 +333,47 @@
     function renderQualityDetail(data) {
         if (!data) return;
 
-        // KPI 卡片
-        document.getElementById('q-pass-rate').textContent = data.audit_efficiency ?
-            (data.audit_efficiency.one_pass_rate * 100).toFixed(0) + '%' : '-';
-        document.getElementById('q-avg-score').textContent = data.dimensions ?
-            (data.dimensions.ai_relevance?.avg_score || 0).toFixed(0) : '-';
-        document.getElementById('q-one-pass').textContent = data.audit_efficiency ?
-            (data.audit_efficiency.one_pass_rate * 100).toFixed(0) + '%' : '-';
-        document.getElementById('q-tag-rate').textContent = data.tag_coverage ?
-            (data.tag_coverage.tagged_rate * 100).toFixed(0) + '%' : '-';
+        const summary = data.summary || {};
+        const currentDays = state.quality || 1;
+        const period = currentDays === 7 ? 'week' : currentDays === 30 ? 'month' : 'day';
+        document.getElementById('q-total-articles').textContent = (summary.total_articles || 0).toLocaleString();
+        document.getElementById('q-total-trend').textContent = '↑ ' + (summary.period_articles || 0) + '（' + periodLabels[period] + '）';
+        document.getElementById('q-period-articles').textContent = summary.period_articles || 0;
+        document.getElementById('q-period-label').textContent = periodLabels[period];
+        document.getElementById('q-pass-rate').textContent = summary.pass_rate != null ?
+            (summary.pass_rate * 100).toFixed(0) + '%' : '-';
+        document.getElementById('q-avg-score').textContent = summary.avg_score != null ?
+            Number(summary.avg_score).toFixed(0) : '-';
 
         // 内容质量分布柱状图
         if (data.content_quality) {
             const cq = data.content_quality;
             renderBarChart('q-content-chart',
-                ['Summary覆盖', '有标签', '一次通过', 'Exhausted', 'Retry'],
+                ['Summary覆盖', '有标签', '一次通过'],
                 [(cq.summary_coverage || 0) * 100, (data.tag_coverage?.tagged_rate || 0) * 100,
-                 (data.audit_efficiency?.one_pass_rate || 0) * 100,
-                 (data.audit_efficiency?.exhausted_rate || 0) * 100,
-                 (data.audit_efficiency?.retry_rate || 0) * 100],
+                 (data.audit_efficiency?.one_pass_rate || 0) * 100],
                 '#4F46E5');
         }
 
-        // 来源质量对比柱状图 - 已移除（data.source_scores 不在 /api/stats/quality-detail 响应中）
-        // 维度评分分布堆叠柱状图已通过 data.dimensions 提供足够的质量对比信息
+        if (data.source_quality && data.source_quality.length > 0) {
+            const sources = data.source_quality.slice(0, 10);
+            renderHorizontalBarChart('q-source-chart',
+                sources.map(s => RSS_LABELS_LOCAL[s.source_detail] || s.source_detail || s.source),
+                sources.map(s => s.avg_score || 0),
+                '#10b981');
+        } else {
+            renderHorizontalBarChart('q-source-chart', ['暂无数据'], [0], '#d1d5db');
+        }
 
         // 四维评分雷达图
         if (data.dimensions) {
             const dims = data.dimensions;
             const radarLabels = ['AI相关度', '内容深度', '信息密度', '时效性'];
             const radarData = [
-                parseFloat((dims.ai_relevance?.avg_score || 0).toFixed(1)),
-                parseFloat((dims.内容深度?.avg_score || 0).toFixed(1)),
-                parseFloat((dims.信息密度?.avg_score || 0).toFixed(1)),
-                parseFloat((dims.时效性?.avg_score || 0).toFixed(1)),
+                normalizeDimensionScore(dims.ai_relevance),
+                normalizeDimensionScore(dims.content_depth),
+                normalizeDimensionScore(dims.info_density),
+                normalizeDimensionScore(dims.timeliness),
             ];
             renderRadarChart('q-radar-chart', radarLabels, radarData);
         }
@@ -374,28 +382,23 @@
         if (data.dimensions) {
             const dims = data.dimensions;
             const dimLabels = ['AI相关度', '内容深度', '信息密度', '时效性'];
-            const highData = [dims.ai_relevance?.high_rate || 0, dims.内容深度?.high_rate || 0,
-                             dims.信息密度?.high_rate || 0, dims.时效性?.high_rate || 0].map(v => v * 100);
-            const midData = [dims.ai_relevance?.mid_rate || 0, dims.内容深度?.mid_rate || 0,
-                            dims.信息密度?.mid_rate || 0, dims.时效性?.mid_rate || 0].map(v => v * 100);
-            const lowData = [dims.ai_relevance?.low_rate || 0, dims.内容深度?.low_rate || 0,
-                            dims.信息密度?.low_rate || 0, dims.时效性?.low_rate || 0].map(v => v * 100);
-            renderStackedBar('q-dimension-chart', dimLabels, [
+            const highData = [dims.ai_relevance?.high_rate || 0, dims.content_depth?.high_rate || 0,
+                             dims.info_density?.high_rate || 0, dims.timeliness?.high_rate || 0].map(v => v * 100);
+            const midData = [dims.ai_relevance?.mid_rate || 0, dims.content_depth?.mid_rate || 0,
+                            dims.info_density?.mid_rate || 0, dims.timeliness?.mid_rate || 0].map(v => v * 100);
+            const lowData = [dims.ai_relevance?.low_rate || 0, dims.content_depth?.low_rate || 0,
+                            dims.info_density?.low_rate || 0, dims.timeliness?.low_rate || 0].map(v => v * 100);
+            renderHorizontalStackedBar('q-dimension-chart', dimLabels, [
                 { label: '高', data: highData, backgroundColor: '#10b981' },
                 { label: '中', data: midData, backgroundColor: '#f59e0b' },
                 { label: '低', data: lowData, backgroundColor: '#ef4444' },
             ]);
         }
+    }
 
-        // Reason 关键词云
-        const cloud = document.getElementById('q-keyword-cloud');
-        if (cloud && data.reason_keywords) {
-            const keywords = data.reason_keywords.slice(0, 15);
-            cloud.innerHTML = keywords.map(k => {
-                const size = k.count > 5 ? 'large' : k.count > 2 ? 'medium' : 'small';
-                return `<span class="tag-item ${size}" style="margin:4px">${k.word}</span>`;
-            }).join('');
-        }
+    function normalizeDimensionScore(dim) {
+        if (!dim || !dim.max_score) return 0;
+        return Math.round((dim.avg_score || 0) / dim.max_score * 100);
     }
 
     async function loadConsumptionTab(days) {
@@ -503,7 +506,8 @@
     async function loadSourcesTab(days) {
         const key = `sources_${days}`;
         if (cachedData[key]) return cachedData[key];
-        const res = await fetch(`/api/sources/stats?period=${days === 7 ? 'week' : 'month'}`);
+        const period = days === 1 ? 'day' : days === 7 ? 'week' : 'month';
+        const res = await fetch(`/api/sources/stats?period=${period}`);
         const json = await res.json();
         if (json.code !== 0) return null;
         cachedData[key] = json.data;
@@ -575,6 +579,23 @@
         });
     }
 
+    function renderHorizontalBarChart(canvasId, labels, data, color) {
+        const ctx = document.getElementById(canvasId);
+        if (!ctx) return;
+        if (ctx._chart) ctx._chart.destroy();
+        ctx._chart = new Chart(ctx, {
+            type: 'bar',
+            data: { labels, datasets: [{ data, backgroundColor: color }] },
+            options: {
+                indexAxis: 'y',
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: { x: { min: 0, max: 100 } },
+                plugins: { legend: { display: false } }
+            }
+        });
+    }
+
     function renderStackedBar(canvasId, labels, datasets) {
         const ctx = document.getElementById(canvasId);
         if (!ctx) return;
@@ -583,6 +604,22 @@
             type: 'bar',
             data: { labels, datasets },
             options: { responsive: true, maintainAspectRatio: false, scales: { x: { stacked: true }, y: { stacked: true } } }
+        });
+    }
+
+    function renderHorizontalStackedBar(canvasId, labels, datasets) {
+        const ctx = document.getElementById(canvasId);
+        if (!ctx) return;
+        if (ctx._chart) ctx._chart.destroy();
+        ctx._chart = new Chart(ctx, {
+            type: 'bar',
+            data: { labels, datasets },
+            options: {
+                indexAxis: 'y',
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: { x: { stacked: true, min: 0, max: 100 }, y: { stacked: true } }
+            }
         });
     }
 
@@ -674,9 +711,6 @@
     }
 
     document.addEventListener('DOMContentLoaded', async () => {
-        // 加载全局 KPI（默认30天）
-        await loadGlobalKPIs(30);
-
         // Tab 切换
         document.querySelectorAll('.tab').forEach(tab => {
             tab.addEventListener('click', () => switchTab(tab.dataset.tab));

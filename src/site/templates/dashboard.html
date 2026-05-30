@@ -2,90 +2,58 @@
 {% block title %}仪表盘{% endblock %}
 {% block content %}
 <div class="dashboard-page">
-    <header class="page-header">
+    <header class="page-header dashboard-hero">
         <h1>📈 仪表盘</h1>
-        <div class="tabs">
-            <button class="tab active" data-tab="quality">数据质量</button>
-            <button class="tab" data-tab="runtime">运行状态</button>
-            <button class="tab" data-tab="consumption">资源消耗</button>
-            <button class="tab" data-tab="sources">数据源健康</button>
+        <div class="dashboard-controls">
+            <div class="tabs">
+                <button class="tab active" data-tab="quality">数据质量</button>
+                <button class="tab" data-tab="consumption">资源消耗</button>
+                <button class="tab" data-tab="sources">数据源健康</button>
+            </div>
+            <div class="date-filters" id="global-date-filters">
+                <button class="date-btn" data-period="day">日</button>
+                <button class="date-btn active" data-period="week">周</button>
+                <button class="date-btn" data-period="month">月</button>
+            </div>
         </div>
     </header>
 
-    <!-- 全局日期筛选器 -->
-    <div style="display:flex;justify-content:flex-end;margin-bottom:0.5rem">
-        <div class="date-filters" id="global-date-filters" style="display:flex;gap:0.25rem">
-            <button class="date-btn" data-days="7">近7天</button>
-            <button class="date-btn active" data-days="30">近30天</button>
-            <button class="date-btn" data-days="90">近90天</button>
-        </div>
-    </div>
-
-    <!-- 全局 KPI 卡片 -->
-    <div class="kpi-cards" id="global-kpis">
-        <div class="kpi-card">
-            <div class="kpi-label">总文章数</div>
-            <div class="kpi-value" id="kpi-total">-</div>
-            <div class="kpi-sub" id="kpi-period">-</div>
-        </div>
-        <div class="kpi-card">
-            <div class="kpi-label">周期新增</div>
-            <div class="kpi-value" id="kpi-period-count">-</div>
-            <div class="kpi-sub">近 <span class="range-label">30</span> 天</div>
-        </div>
-        <div class="kpi-card">
-            <div class="kpi-label">通过率</div>
-            <div class="kpi-value" id="kpi-approve-rate">-</div>
-            <div class="kpi-sub">审核通过</div>
-        </div>
-        <div class="kpi-card">
-            <div class="kpi-label">平均分</div>
-            <div class="kpi-value" id="kpi-avg-score">-</div>
-            <div class="kpi-sub">质量评分</div>
-        </div>
-        <div class="kpi-card">
-            <div class="kpi-label">活跃源</div>
-            <div class="kpi-value" id="kpi-active-sources">-</div>
-            <div class="kpi-sub" id="kpi-active-sources-sub">-</div>
-        </div>
-    </div>
-
     <!-- Tab 内容区 -->
     <div id="tab-quality" class="tab-content active">
-        <!-- 顶部 KPI -->
-        <div class="kpi-row" style="display:flex;gap:1rem;margin-bottom:1rem">
-            <div class="kpi-card" style="flex:1">
-                <div class="kpi-label">通过率</div>
-                <div class="kpi-value" id="q-pass-rate">-</div>
+        <section class="quality-dashboard">
+            <div class="section-title">数据质量模块</div>
+            <div class="quality-kpis">
+                <div class="kpi-card">
+                    <div class="kpi-label">总文章数</div>
+                    <div class="kpi-value" id="q-total-articles">-</div>
+                    <div class="kpi-sub" id="q-total-trend">-</div>
+                </div>
+                <div class="kpi-card">
+                    <div class="kpi-label">周期新增</div>
+                    <div class="kpi-value" id="q-period-articles">-</div>
+                    <div class="kpi-sub" id="q-period-label">-</div>
+                </div>
+                <div class="kpi-card">
+                    <div class="kpi-label">通过率</div>
+                    <div class="kpi-sub">审核通过 / 采集总数</div>
+                    <div class="kpi-value" id="q-pass-rate">-</div>
+                </div>
+                <div class="kpi-card">
+                    <div class="kpi-label">平均分</div>
+                    <div class="kpi-sub">审核得分</div>
+                    <div class="kpi-value" id="q-avg-score">-</div>
+                </div>
             </div>
-            <div class="kpi-card" style="flex:1">
-                <div class="kpi-label">平均评分</div>
-                <div class="kpi-value" id="q-avg-score">-</div>
-            </div>
-            <div class="kpi-card" style="flex:1">
-                <div class="kpi-label">一次通过</div>
-                <div class="kpi-value" id="q-one-pass">-</div>
-            </div>
-            <div class="kpi-card" style="flex:1">
-                <div class="kpi-label">有标签占比</div>
-                <div class="kpi-value" id="q-tag-rate">-</div>
-            </div>
-        </div>
 
-        <!-- 第一行：分布图表 -->
-        <div class="charts-layout" style="margin-bottom:1rem">
+            <div class="quality-grid">
             <div class="chart-card">
                 <h3>内容质量分布</h3>
                 <div class="chart-canvas-wrapper"><canvas id="q-content-chart"></canvas></div>
             </div>
             <div class="chart-card">
-                <h3>来源质量对比</h3>
+                <h3>来源质量分布</h3>
                 <div class="chart-canvas-wrapper"><canvas id="q-source-chart"></canvas></div>
             </div>
-        </div>
-
-        <!-- 第二行：四维评分 -->
-        <div class="charts-layout" style="margin-bottom:1rem">
             <div class="chart-card">
                 <h3>四维平均分</h3>
                 <div class="chart-canvas-wrapper"><canvas id="q-radar-chart"></canvas></div>
@@ -94,11 +62,8 @@
                 <h3>维度评分分布</h3>
                 <div class="chart-canvas-wrapper"><canvas id="q-dimension-chart"></canvas></div>
             </div>
-            <div class="chart-card">
-                <h3>Reason 关键词</h3>
-                <div class="tag-cloud" id="q-keyword-cloud" style="padding:1rem"></div>
             </div>
-        </div>
+        </section>
     </div>
 
     <div id="tab-runtime" class="tab-content">

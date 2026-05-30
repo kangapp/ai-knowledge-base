@@ -515,36 +515,52 @@ async def get_quality_detail_stats(db: Database, period: str = "week") -> dict:
     """
     days_map = {"day": 1, "week": 7, "month": 30}
     days = days_map.get(period, 7)
+    cutoff = f"-{days} days"
+
+    total_articles = await db.fetch_one(
+        "SELECT COUNT(*) as c FROM articles WHERE status='approved'"
+    )
+    period_status = await db.fetch_one("""
+        SELECT
+            COUNT(*) as total,
+            SUM(CASE WHEN status='approved' THEN 1 ELSE 0 END) as approved,
+            AVG(CASE WHEN status='approved' THEN relevance_score END) as avg_score
+        FROM articles
+        WHERE collected_at >= date('now', ?)
+    """, (cutoff,))
+    period_total = period_status["total"] if period_status else 0
+    period_approved = period_status["approved"] if period_status and period_status["approved"] else 0
+    avg_score = period_status["avg_score"] if period_status and period_status["avg_score"] else 0
 
     # 1. 内容完整性指标
     summary_coverage = await db.fetch_one("""
         SELECT COUNT(*) * 1.0 / (SELECT COUNT(*) FROM articles WHERE status='approved' AND collected_at >= date('now', ?)) as rate
         FROM articles WHERE status='approved' AND summary IS NOT NULL AND summary != '' AND collected_at >= date('now', ?)
-    """, (f"-{days} days", f"-{days} days"))
+    """, (cutoff, cutoff))
 
     desc_len = await db.fetch_one("""
         SELECT AVG(LENGTH(description)) as avg_len FROM articles WHERE status='approved' AND collected_at >= date('now', ?)
-    """, (f"-{days} days",))
+    """, (cutoff,))
 
     summary_len = await db.fetch_one("""
         SELECT AVG(LENGTH(summary)) as avg_len FROM articles WHERE status='approved' AND summary IS NOT NULL AND collected_at >= date('now', ?)
-    """, (f"-{days} days",))
+    """, (cutoff,))
 
     # 2. 审核效率指标
     one_pass = await db.fetch_one("""
         SELECT COUNT(*) * 1.0 / (SELECT COUNT(*) FROM articles WHERE status='approved' AND collected_at >= date('now', ?)) as rate
         FROM articles WHERE status='approved' AND retry_count = 0 AND collected_at >= date('now', ?)
-    """, (f"-{days} days", f"-{days} days"))
+    """, (cutoff, cutoff))
 
     retry_rate = await db.fetch_one("""
         SELECT COUNT(*) * 1.0 / (SELECT COUNT(*) FROM articles WHERE collected_at >= date('now', ?)) as rate
         FROM articles WHERE status='retry' AND collected_at >= date('now', ?)
-    """, (f"-{days} days", f"-{days} days"))
+    """, (cutoff, cutoff))
 
     exhausted_rate = await db.fetch_one("""
         SELECT COUNT(*) * 1.0 / (SELECT COUNT(*) FROM articles WHERE collected_at >= date('now', ?)) as rate
         FROM articles WHERE retry_count >= 2 AND collected_at >= date('now', ?)
-    """, (f"-{days} days", f"-{days} days"))
+    """, (cutoff, cutoff))
 
     # 3. 标签覆盖指标
     tagged_rate = await db.fetch_one("""
@@ -552,7 +568,7 @@ async def get_quality_detail_stats(db: Database, period: str = "week") -> dict:
         FROM article_tags at
         JOIN articles a ON a.id = at.article_id
         WHERE a.collected_at >= date('now', ?)
-    """, (f"-{days} days", f"-{days} days"))
+    """, (cutoff, cutoff))
 
     avg_tags = await db.fetch_one("""
         SELECT AVG(tag_count) as avg FROM (
@@ -561,33 +577,51 @@ async def get_quality_detail_stats(db: Database, period: str = "week") -> dict:
             WHERE a.collected_at >= date('now', ?)
             GROUP BY at.article_id
         )
-    """, (f"-{days} days",))
+    """, (cutoff,))
 
-    # 4. 四维评分统计（从 extra_data JSON 解析）
-    dimensions = ["ai_relevance", "内容深度", "信息密度", "时效性"]
+    # 4. 来源质量分布
+    source_rows = await db.fetch_all("""
+        SELECT source, source_detail, COUNT(*) as article_count, AVG(relevance_score) as avg_score
+        FROM articles
+        WHERE status='approved' AND collected_at >= date('now', ?)
+        GROUP BY source, source_detail
+        ORDER BY avg_score DESC, article_count DESC
+        LIMIT 12
+    """, (cutoff,))
+
+    # 5. 四维评分统计（从 extra_data JSON 解析）
+    dimensions = [
+        ("ai_relevance", "ai_relevance", 40),
+        ("content_depth", "content_depth", 30),
+        ("info_density", "info_density", 15),
+        ("timeliness", "timeliness", 15),
+    ]
     dimension_stats = {}
-    for dim in dimensions:
+    for name, json_key, max_score in dimensions:
+        high_threshold = max_score * 0.8
+        mid_threshold = max_score * 0.5
         stats = await db.fetch_one(f"""
             SELECT
-                AVG(JSON_EXTRACT(extra_data, '$.dimensions.{dim}.score')) as avg_score,
-                COUNT(CASE WHEN JSON_EXTRACT(extra_data, '$.dimensions.{dim}.score') >= ? THEN 1 END) * 1.0 / COUNT(*) as high_rate,
-                COUNT(CASE WHEN JSON_EXTRACT(extra_data, '$.dimensions.{dim}.score') >= ? AND JSON_EXTRACT(extra_data, '$.dimensions.{dim}.score') < ? THEN 1 END) * 1.0 / COUNT(*) as mid_rate,
-                COUNT(CASE WHEN JSON_EXTRACT(extra_data, '$.dimensions.{dim}.score') < ? THEN 1 END) * 1.0 / COUNT(*) as low_rate
+                AVG(JSON_EXTRACT(extra_data, '$.dimensions.{json_key}.score')) as avg_score,
+                COUNT(CASE WHEN JSON_EXTRACT(extra_data, '$.dimensions.{json_key}.score') >= ? THEN 1 END) * 1.0 / NULLIF(COUNT(JSON_EXTRACT(extra_data, '$.dimensions.{json_key}.score')), 0) as high_rate,
+                COUNT(CASE WHEN JSON_EXTRACT(extra_data, '$.dimensions.{json_key}.score') >= ? AND JSON_EXTRACT(extra_data, '$.dimensions.{json_key}.score') < ? THEN 1 END) * 1.0 / NULLIF(COUNT(JSON_EXTRACT(extra_data, '$.dimensions.{json_key}.score')), 0) as mid_rate,
+                COUNT(CASE WHEN JSON_EXTRACT(extra_data, '$.dimensions.{json_key}.score') < ? THEN 1 END) * 1.0 / NULLIF(COUNT(JSON_EXTRACT(extra_data, '$.dimensions.{json_key}.score')), 0) as low_rate
             FROM articles
             WHERE status='approved' AND extra_data IS NOT NULL AND collected_at >= date('now', ?)
-        """, (0.6, 0.3, 0.6, 0.3, f"-{days} days"))
-        dimension_stats[dim] = {
+        """, (high_threshold, mid_threshold, high_threshold, mid_threshold, cutoff))
+        dimension_stats[name] = {
             "avg_score": round(stats["avg_score"] or 0, 1),
             "high_rate": round(stats["high_rate"] or 0, 3),
             "mid_rate": round(stats["mid_rate"] or 0, 3),
             "low_rate": round(stats["low_rate"] or 0, 3),
+            "max_score": max_score,
         }
 
-    # 5. Reason 关键词
+    # 6. Reason 关键词
     reason_rows = await db.fetch_all("""
         SELECT JSON_EXTRACT(extra_data, '$.dimensions.ai_relevance.reason') as reason
         FROM articles WHERE status='approved' AND extra_data IS NOT NULL AND collected_at >= date('now', ?)
-    """, (f"-{days} days",))
+    """, (cutoff,))
 
     keyword_count = {}
     import re
@@ -600,6 +634,13 @@ async def get_quality_detail_stats(db: Database, period: str = "week") -> dict:
     top_keywords = sorted(keyword_count.items(), key=lambda x: x[1], reverse=True)[:20]
 
     return {
+        "summary": {
+            "total_articles": total_articles["c"] if total_articles else 0,
+            "period_articles": period_approved,
+            "period_total_collected": period_total,
+            "pass_rate": round(period_approved / period_total, 3) if period_total else 0,
+            "avg_score": round(avg_score, 1),
+        },
         "content_quality": {
             "summary_coverage": round(summary_coverage["rate"] if summary_coverage and summary_coverage["rate"] else 0, 3),
             "avg_desc_length": round(desc_len["avg_len"] if desc_len and desc_len["avg_len"] else 0, 1),
@@ -614,6 +655,15 @@ async def get_quality_detail_stats(db: Database, period: str = "week") -> dict:
             "tagged_rate": round(tagged_rate["rate"] if tagged_rate and tagged_rate["rate"] else 0, 3),
             "avg_tags": round(avg_tags["avg"] if avg_tags and avg_tags["avg"] else 0, 1),
         },
+        "source_quality": [
+            {
+                "source": r["source"],
+                "source_detail": r["source_detail"] or r["source"],
+                "article_count": r["article_count"],
+                "avg_score": round(r["avg_score"] or 0, 1),
+            }
+            for r in source_rows
+        ],
         "dimensions": dimension_stats,
         "reason_keywords": [{"word": w, "count": c} for w, c in top_keywords],
     }
