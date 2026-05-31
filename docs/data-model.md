@@ -177,7 +177,14 @@ UNIQUE(source_id, date)
 | id | source_id | date | total_collected | approved | rejected | failed | avg_score | recorded_at |
 |----|-----------|------|-----------------|----------|----------|--------|---------|------------|
 | 1 | github_trending | 2026-05-23 | 20 | 15 | 4 | 1 | 82.5 | 2026-05-23T09:00:05Z |
-| 2 | rss_the_batch | 2026-05-23 | 10 | 9 | 1 | 0 | 78.3 | 2026-05-23T09:00:10Z |
+| 2 | rss_36kr | 2026-05-23 | 10 | 9 | 1 | 0 | 78.3 | 2026-05-23T09:00:10Z |
+
+**数据源健康主键口径：**
+
+- `source_id` 始终使用 `config/sources.yaml` 中的配置 id。
+- Collector 阶段采集成功/失败直接按配置 id 写入。
+- Reviewer 阶段通过 `RawItem.raw_metadata.source_id` 归并审核结果；`source_detail` 只作为展示和文章来源细分，不作为健康统计主键。
+- 这样 RSS 展示名（如 `36氪`）和 arXiv 分类（如 `cs.AI`）不会被误当成数据源 id。
 
 ### discovered_sources — 已发现待审核的数据源
 

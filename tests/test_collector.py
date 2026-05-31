@@ -27,6 +27,29 @@ async def test_collect_github_mock():
 
 
 @pytest.mark.asyncio
+async def test_collect_rss_records_config_source_id():
+    source = make_source(
+        id="rss_36kr",
+        name="36氪",
+        type="rss",
+        config={"url": "https://36kr.com/feed", "filter_keywords": []},
+    )
+    entry = {
+        "title": "AI news",
+        "summary": "LLM update",
+        "link": "https://36kr.com/p/1",
+        "published": "2026-05-31T10:00:00Z",
+    }
+
+    with patch("feedparser.parse", return_value=type("Feed", (), {"entries": [entry]})()):
+        items = await collect_rss(source)
+
+    assert len(items) == 1
+    assert items[0].source_detail == "36氪"
+    assert items[0].raw_metadata["source_id"] == "rss_36kr"
+
+
+@pytest.mark.asyncio
 async def test_collect_github_multi_threshold_filter():
     """多维阈值过滤：stars/forks/watchers 全部达标才通过"""
     source = make_source(type="github", config={

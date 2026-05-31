@@ -80,7 +80,7 @@ async def collect_rss(source: SourceConfig) -> list[RawItem]:
             source="rss",
             source_detail=source.name,
             published_at=entry.get("published", ""),
-            raw_metadata={"feed": cfg["url"]},
+            raw_metadata={"feed": cfg["url"], "source_id": source.id},
             collected_at=now,
         ))
     return items
@@ -158,7 +158,7 @@ async def collect_feishu(source: SourceConfig) -> list[RawItem]:
                                 source="feishu",
                                 source_detail=space_id,
                                 published_at=node.get("create_time", ""),
-                                raw_metadata={"node_id": node_id, "space_id": space_id},
+                                raw_metadata={"node_id": node_id, "space_id": space_id, "source_id": source.id},
                                 collected_at=now,
                             ))
     return items
@@ -187,7 +187,7 @@ async def collect_arxiv(source: SourceConfig) -> list[RawItem]:
                 source="arxiv",
                 source_detail=cat,
                 published_at=entry.get("published", ""),
-                raw_metadata={"categories": [t.get("term", "") for t in entry.get("tags", [])]},
+                raw_metadata={"categories": [t.get("term", "") for t in entry.get("tags", [])], "source_id": source.id},
                 collected_at=now,
             ))
     return items

@@ -191,13 +191,7 @@ class _ReviewerNode:
         for key in ("routed_github", "routed_rss", "routed_feishu", "routed_arxiv"):
             routed_items = getattr(state, key, [])
             for item in routed_items:
-                # GitHub 用 source.id（存在 raw_metadata.source_id），其余用 source_detail
-                if item.source == "github":
-                    src_id = item.raw_metadata.get("source_id", item.source)
-                elif item.source == "rss":
-                    src_id = item.source_detail  # RSS 子源用 feed URL
-                else:
-                    src_id = item.source_detail
+                src_id = item.raw_metadata.get("source_id") or item.source_detail or item.source
                 routed_counts[src_id] = routed_counts.get(src_id, 0) + 1
                 ref_source_map[item.url] = (item.source, item.source_detail, src_id)
 

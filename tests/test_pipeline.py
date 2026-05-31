@@ -108,3 +108,59 @@ async def test_pipeline_e2e_mocked(registry):
     assert result["analyzed_items"][0].ref_url == "https://github.com/test/x"
     assert len(result["reviewed_items"]) == 1
     assert result["reviewed_items"][0].verdict == "approved"
+
+
+@pytest.mark.asyncio
+async def test_reviewer_health_uses_config_source_id(registry):
+    """Reviewer 阶段 source_health 主键使用配置 id，而不是展示名或分类名。"""
+    from src.graph import pipeline as pl
+    from unittest.mock import MagicMock, patch
+
+    mock_db = MagicMock()
+    mock_db.execute = AsyncMock()
+    mock_db.commit = AsyncMock()
+    mock_db.fetch_one = AsyncMock(return_value=None)
+    pl.set_pipeline_db(mock_db)
+
+    async def mock_reviewer(state, reg):
+        return {
+            "reviewed_items": [
+                ReviewedItem(ref_url="https://36kr.com/p/1", total_score=80, dimensions={}, verdict="approved"),
+                ReviewedItem(ref_url="https://arxiv.org/abs/2605.1", total_score=90, dimensions={}, verdict="approved"),
+            ],
+            "cost_records": [],
+        }
+
+    recorded = []
+
+    async def fake_record_source_health(db, record):
+        recorded.append(record)
+
+    node = pl._ReviewerNode(registry)
+    node._reviewer = mock_reviewer
+    state = PipelineState(
+        run_id="test_run",
+        routed_rss=[
+            RawItem(
+                url="https://36kr.com/p/1",
+                title="rss",
+                source="rss",
+                source_detail="36氪",
+                raw_metadata={"source_id": "rss_36kr"},
+            )
+        ],
+        routed_arxiv=[
+            RawItem(
+                url="https://arxiv.org/abs/2605.1",
+                title="arxiv",
+                source="arxiv",
+                source_detail="cs.AI",
+                raw_metadata={"source_id": "rss_arxiv"},
+            )
+        ],
+    )
+
+    with patch("src.db.operations.record_source_health", fake_record_source_health):
+        await node(state)
+
+    assert {record.source_id for record in recorded} == {"rss_36kr", "rss_arxiv"}

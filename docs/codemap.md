@@ -27,6 +27,7 @@
 - `src/api/sources.py`
   - 数据源列表、数据源健康统计、启用/停用/删除、清理 source health、候选源列表。
   - 优先复用 `src/api/routes.py` 注入的全局 DB，测试或单独调用时 fallback 到 `data/kb.db`。
+  - `/api/sources/stats` 只展示能与 `config/sources.yaml` 配置 id 对齐的健康数据。
 
 - `src/api/config.py`
   - 配置查看接口：读取 `llm/sources/agents` YAML，返回 raw + parsed。
@@ -54,6 +55,7 @@
 
 - `src/graph/collector.py`
   - 多源采集和 DB 查重。
+  - `RawItem.raw_metadata.source_id` 保存配置 id，供 source health、成本归因等后续阶段使用。
 
 - `src/graph/pipeline.py`
   - LangGraph DAG 编排和 phase log 记录。
@@ -68,6 +70,7 @@
 - `src/graph/reviewer.py`
   - 四维评分审核。
   - Reviewer 成本记录先保留 `ref_url`，图外入库前由 `src/main.py` 按本轮 `RawItem` 补齐来源字段。
+  - Reviewer 节点结束后由 `src/graph/pipeline.py` 按配置 id 汇总 source health。
 
 ## 静态站与仪表盘前端
 

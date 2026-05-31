@@ -44,6 +44,10 @@
   - `cost_logs` 新增 `source/source_detail/source_id`
   - 新成本记录写入时保存来源快照，统计优先使用显式字段
   - 历史成本无法 JOIN 文章时按 `ref_url` 域名兜底识别来源
+- [x] 统一数据源健康 source_id 口径
+  - `source_health.source_id` 统一使用 `config/sources.yaml` 的配置 id
+  - RSS/arXiv/飞书采集结果在 `raw_metadata.source_id` 保留配置 id
+  - Reviewer 阶段按配置 id 汇总通过率和平均分，避免展示名或分类名被过滤
 - [ ] 统计服务层继续收口
   - 将 `quality/runtime/consumption` SQL 从 `src/db/operations.py` 逐步迁到更聚焦的统计服务文件
   - 每迁一个接口补一个契约测试
@@ -58,6 +62,6 @@
 
 - 已通过：`.venv/bin/python -m pytest tests/test_api_contracts.py -q`
 - 已通过：`.venv/bin/python -m pytest tests/test_stats_consumption_detail.py -q`
-- 已通过：`.venv/bin/python -m pytest -m "not integration and not e2e"`
+- 已通过：`.venv/bin/python -m pytest -m "not integration and not e2e"`（64 passed）
 
 说明：当前 shell 中 `uv` 不可用，使用项目 `.venv/bin/python` 执行测试。

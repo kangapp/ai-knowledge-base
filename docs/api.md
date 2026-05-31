@@ -467,6 +467,15 @@
 |------|------|--------|------|
 | period | string | "week" | day/week/month，其他值按 week 处理 |
 
+**统计口径:**
+
+- `sources[].id` 使用 `config/sources.yaml` 中的数据源配置 id，例如 `rss_36kr`、`github_trending`、`rss_arxiv`。
+- `period` 映射到最近 N 条 `source_health` 记录：day=1、week=7、month=30；正常情况下接近最近 N 天，但不是严格自然日窗口。
+- `total_collected` 为窗口内 `source_health.total_collected` 求和。
+- `approved_rate` 为窗口内 `approved / total_collected`。
+- `avg_score` 为窗口内每日 `avg_score` 的简单平均。
+- `trend` 通过窗口前后半段 approved rate 对比得出：超过 10% 为 `rising`，低于 10% 为 `falling`，否则 `stable`。
+
 **响应:**
 ```json
 {
