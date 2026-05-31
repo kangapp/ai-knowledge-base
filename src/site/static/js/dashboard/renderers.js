@@ -1,0 +1,195 @@
+(function() {
+    const rssLabels = window.__RSS_LABELS__ || {};
+
+    function text(id, value) {
+        const element = document.getElementById(id);
+        if (element) element.textContent = value;
+    }
+
+    function percent(value) {
+        return value == null ? '-' : `${(value * 100).toFixed(0)}%`;
+    }
+
+    function money(value) {
+        return `$${Number(value || 0).toFixed(2)}`;
+    }
+
+    function sourceLabel(source) {
+        return rssLabels[source] || source;
+    }
+
+    function dimScore(dim) {
+        if (!dim || !dim.max_score) return 0;
+        return Math.round((dim.avg_score || 0) / dim.max_score * 100);
+    }
+
+    function showError(message) {
+        const box = document.getElementById('dashboard-error');
+        if (!box) return;
+        box.hidden = !message;
+        box.textContent = message || '';
+    }
+
+    function renderSummary(data, label) {
+        text('dash-total-articles', (data.total_articles || 0).toLocaleString());
+        text('dash-period-articles', data.period_articles || 0);
+        text('dash-period-label', label);
+        text('dash-pass-rate', percent(data.pass_rate));
+        text('dash-period-cost', money(data.period_cost));
+        text('dash-active-sources', data.active_sources || 0);
+    }
+
+    function renderQuality(data, label) {
+        const summary = data.summary || {};
+        text('q-period-articles', summary.period_articles || 0);
+        text('q-period-label', label);
+        text('q-avg-score', summary.avg_score != null ? Number(summary.avg_score).toFixed(0) : '-');
+        text('q-summary-coverage', percent(data.content_quality?.summary_coverage));
+        text('q-tagged-rate', percent(data.tag_coverage?.tagged_rate));
+
+        DashboardCharts.bar(
+            'q-content-chart',
+            ['Summary覆盖', '标签覆盖', '一次通过'],
+            [
+                (data.content_quality?.summary_coverage || 0) * 100,
+                (data.tag_coverage?.tagged_rate || 0) * 100,
+                (data.audit_efficiency?.one_pass_rate || 0) * 100,
+            ],
+            '#4F46E5'
+        );
+
+        const sources = (data.source_quality || []).slice(0, 10);
+        DashboardCharts.horizontalBar(
+            'q-source-chart',
+            sources.length ? sources.map(s => sourceLabel(s.source_detail || s.source)) : ['暂无数据'],
+            sources.length ? sources.map(s => s.avg_score || 0) : [0],
+            sources.length ? '#10b981' : '#d1d5db'
+        );
+
+        const dims = data.dimensions || {};
+        DashboardCharts.radar(
+            'q-radar-chart',
+            ['AI相关度', '内容深度', '信息密度', '时效性'],
+            [
+                dimScore(dims.ai_relevance),
+                dimScore(dims.content_depth),
+                dimScore(dims.info_density),
+                dimScore(dims.timeliness),
+            ]
+        );
+
+        DashboardCharts.stackedBar(
+            'q-dimension-chart',
+            ['AI相关度', '内容深度', '信息密度', '时效性'],
+            [
+                {
+                    label: '高',
+                    data: [dims.ai_relevance, dims.content_depth, dims.info_density, dims.timeliness].map(d => (d?.high_rate || 0) * 100),
+                    backgroundColor: '#10b981',
+                },
+                {
+                    label: '中',
+                    data: [dims.ai_relevance, dims.content_depth, dims.info_density, dims.timeliness].map(d => (d?.mid_rate || 0) * 100),
+                    backgroundColor: '#f59e0b',
+                },
+                {
+                    label: '低',
+                    data: [dims.ai_relevance, dims.content_depth, dims.info_density, dims.timeliness].map(d => (d?.low_rate || 0) * 100),
+                    backgroundColor: '#ef4444',
+                },
+            ],
+            'y'
+        );
+    }
+
+    function renderConsumption(data) {
+        text('cs-period-cost', money(data.period_cost));
+        text('cs-daily-avg', money(data.daily_avg));
+        text('cs-token-eff', `$${data.cost_per_million_tokens || 0}`);
+        const progress = (data.budget_progress || 0) * 100;
+        text('cs-budget-progress', `${progress.toFixed(0)}%`);
+        const bar = document.getElementById('cs-progress-bar');
+        if (bar) {
+            bar.style.width = `${Math.min(progress, 100)}%`;
+            bar.className = `progress-bar${progress > 80 ? ' danger' : progress > 50 ? ' warning' : ''}`;
+        }
+
+        DashboardCharts.line('cs-trend-chart', (data.trend || []).map(t => t.label), (data.trend || []).map(t => t.cost), '#ef4444');
+
+        const sources = [...new Set((data.source_trend || []).map(s => s.source))];
+        DashboardCharts.stackedBar(
+            'cs-source-chart',
+            sources,
+            [
+                {
+                    label: '分析',
+                    data: sources.map(source => (data.source_trend || []).filter(s => s.source === source && s.type === 'analyze').reduce((sum, s) => sum + (s.cost || 0), 0)),
+                    backgroundColor: '#8b5cf6',
+                },
+                {
+                    label: '审核',
+                    data: sources.map(source => (data.source_trend || []).filter(s => s.source === source && s.type === 'review').reduce((sum, s) => sum + (s.cost || 0), 0)),
+                    backgroundColor: '#6366f1',
+                },
+            ]
+        );
+
+        const providers = [...new Set((data.provider_trend || []).map(p => p.provider))];
+        const labels = [...new Set((data.provider_trend || []).map(p => p.label))];
+        DashboardCharts.groupedBar(
+            'cs-provider-chart',
+            labels.map(label => label.slice(-5)),
+            providers.map(provider => ({
+                label: provider,
+                data: labels.map(label => {
+                    const row = (data.provider_trend || []).find(item => item.provider === provider && item.label === label);
+                    return row ? row.cost : 0;
+                }),
+                backgroundColor: provider === 'deepseek' ? '#4F46E5' : provider === 'minimax' ? '#10b981' : '#f59e0b',
+            }))
+        );
+    }
+
+    function renderSources(data) {
+        const sources = data.sources || [];
+        const totalCollected = sources.reduce((sum, s) => sum + (s.total_collected || 0), 0);
+        const avgRate = sources.length ? sources.reduce((sum, s) => sum + (s.approved_rate || 0), 0) / sources.length : null;
+        const avgScore = sources.length ? sources.reduce((sum, s) => sum + (s.avg_score || 0), 0) / sources.length : null;
+
+        text('src-active-count', sources.length);
+        text('src-avg-rate', percent(avgRate));
+        text('src-total-collected', totalCollected);
+        text('src-avg-score', avgScore == null ? '-' : avgScore.toFixed(1));
+
+        DashboardCharts.line('src-approved-rate-chart', sources.map(s => s.id), sources.map(s => (s.approved_rate || 0) * 100), '#22c55e');
+        DashboardCharts.bar('src-contribution-chart', sources.map(s => s.id), sources.map(s => s.total_collected || 0), '#3b82f6');
+
+        const table = document.getElementById('src-quality-table');
+        if (!table) return;
+        const rows = [...sources].sort((a, b) => (b.avg_score || 0) - (a.avg_score || 0));
+        table.innerHTML = `
+            <table class="log-table">
+                <thead><tr><th>数据源</th><th>采集量</th><th>通过率</th><th>平均分</th><th>趋势</th></tr></thead>
+                <tbody>
+                    ${rows.map(s => `
+                        <tr>
+                            <td>${s.id}</td>
+                            <td>${s.total_collected || 0}</td>
+                            <td>${((s.approved_rate || 0) * 100).toFixed(1)}%</td>
+                            <td>${(s.avg_score || 0).toFixed(1)}</td>
+                            <td>${s.trend === 'rising' ? '上升' : s.trend === 'falling' ? '下降' : '稳定'}</td>
+                        </tr>
+                    `).join('')}
+                </tbody>
+            </table>
+        `;
+    }
+
+    window.DashboardRenderers = {
+        showError,
+        renderSummary,
+        renderQuality,
+        renderConsumption,
+        renderSources,
+    };
+})();

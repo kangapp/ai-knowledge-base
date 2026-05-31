@@ -90,11 +90,16 @@ main { max-width: 1200px; margin: 2rem auto; padding: 0 1rem; }
 /* ===== Enhanced Dashboard (Light Theme) ===== */
 .dashboard-page .page-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; }
 .dashboard-hero { background: #fff; border: 1px solid #e0e0e0; border-radius: 12px; padding: 1.5rem; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+.dashboard-hero h1 { margin-bottom: 0.25rem; }
+.page-subtitle { color: #666; margin: 0; }
 .dashboard-controls { display: flex; flex-direction: column; align-items: flex-end; gap: 0.75rem; }
 .dashboard-page .tabs { display: flex; gap: 0.25rem; background: #fff; padding: 0.25rem; border-radius: 8px; border: 1px solid #e0e0e0; }
 .dashboard-page .tab { padding: 0.5rem 1rem; border-radius: 6px; font-size: 0.875rem; cursor: pointer; color: #666; border: none; background: none; transition: all 0.2s; }
 .dashboard-page .tab.active { background: #1a1a2e; color: #fff; }
 .dashboard-page .tab:hover:not(.active) { background: #f5f5f5; }
+.dashboard-summary { display: grid; grid-template-columns: repeat(5, 1fr); gap: 1rem; margin-bottom: 1.5rem; }
+.dashboard-section { background: #fff; border: 1px solid #e0e0e0; border-radius: 12px; padding: 1.5rem; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+.dashboard-error { border: 1px solid #fecaca; background: #fef2f2; color: #991b1b; border-radius: 8px; padding: 0.75rem 1rem; margin-bottom: 1rem; }
 .kpi-cards { display: grid; grid-template-columns: repeat(5, 1fr); gap: 1rem; margin-bottom: 1.5rem; }
 .kpi-card { background: #fff; border-radius: 12px; padding: 1.25rem; border: 1px solid #e0e0e0; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
 .kpi-label { font-size: 0.75rem; color: #666; text-transform: uppercase; margin-bottom: 0.5rem; }
@@ -106,6 +111,7 @@ main { max-width: 1200px; margin: 2rem auto; padding: 0 1rem; }
 .chart-card { background: #fff; border-radius: 12px; padding: 1.5rem; border: 1px solid #e0e0e0; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
 .chart-card h3 { font-size: 0.875rem; color: #666; margin-bottom: 1rem; text-transform: uppercase; }
 .chart-canvas-wrapper { position: relative; height: 350px; width: 100%; }
+.chart-spaced { margin-bottom: 1rem; }
 .chart-legend { display: flex; gap: 1.5rem; margin-top: 1rem; font-size: 0.75rem; color: #94a3b8; }
 .chart-legend .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; margin-right: 0.5rem; }
 .source-list { display: flex; flex-direction: column; gap: 0.5rem; }
@@ -116,11 +122,11 @@ main { max-width: 1200px; margin: 2rem auto; padding: 0 1rem; }
 .source-bar-fill { height: 100%; background: #3b82f6; border-radius: 2px; transition: width 0.3s; }
 .tab-content { display: none; }
 .tab-content.active { display: block; }
-.quality-dashboard { background: #fff; border: 1px solid #e0e0e0; border-radius: 12px; padding: 1.5rem; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
 .section-title { font-size: 0.875rem; color: #666; font-weight: 700; margin-bottom: 1rem; text-transform: uppercase; }
 .quality-kpis { display: grid; grid-template-columns: 1fr 1fr 1.5fr 1fr; gap: 1rem; margin-bottom: 1.5rem; }
 .quality-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
 .quality-grid .chart-card { box-shadow: none; }
+.kpi-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; margin-bottom: 1rem; }
 
 /* 日期筛选按钮 */
 .date-filters { display: flex; gap: 0.25rem; }
@@ -177,11 +183,16 @@ main { max-width: 1200px; margin: 2rem auto; padding: 0 1rem; }
   .dashboard-hero { align-items: flex-start; flex-direction: column; gap: 1rem; }
   .dashboard-controls { align-items: stretch; width: 100%; }
   .dashboard-page .tabs { overflow-x: auto; }
+  .dashboard-summary { grid-template-columns: repeat(2, 1fr); }
+  .kpi-row { grid-template-columns: repeat(2, 1fr); }
+  .charts-layout { grid-template-columns: 1fr; }
   .quality-kpis { grid-template-columns: repeat(2, 1fr); }
   .quality-grid { grid-template-columns: 1fr; }
 }
 
 @media (max-width: 560px) {
+  .dashboard-summary { grid-template-columns: 1fr; }
+  .kpi-row { grid-template-columns: 1fr; }
   .quality-kpis { grid-template-columns: 1fr; }
   .chart-canvas-wrapper { height: 300px; }
 }

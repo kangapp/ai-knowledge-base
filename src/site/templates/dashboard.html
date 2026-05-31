@@ -3,7 +3,10 @@
 {% block content %}
 <div class="dashboard-page">
     <header class="page-header dashboard-hero">
-        <h1>📈 仪表盘</h1>
+        <div>
+            <h1>仪表盘</h1>
+            <p class="page-subtitle">采集质量、资源消耗和数据源健康</p>
+        </div>
         <div class="dashboard-controls">
             <div class="tabs">
                 <button class="tab active" data-tab="quality">数据质量</button>
@@ -18,170 +21,166 @@
         </div>
     </header>
 
-    <!-- Tab 内容区 -->
+    <section class="dashboard-summary" aria-label="仪表盘概览">
+        <div class="kpi-card">
+            <div class="kpi-label">总文章数</div>
+            <div class="kpi-value" id="dash-total-articles">-</div>
+            <div class="kpi-sub">Approved 总量</div>
+        </div>
+        <div class="kpi-card">
+            <div class="kpi-label">周期新增</div>
+            <div class="kpi-value" id="dash-period-articles">-</div>
+            <div class="kpi-sub" id="dash-period-label">近 7 天</div>
+        </div>
+        <div class="kpi-card">
+            <div class="kpi-label">审核通过率</div>
+            <div class="kpi-value" id="dash-pass-rate">-</div>
+            <div class="kpi-sub">通过 / 审核总数</div>
+        </div>
+        <div class="kpi-card">
+            <div class="kpi-label">周期花费</div>
+            <div class="kpi-value" id="dash-period-cost">-</div>
+            <div class="kpi-sub">LLM 成本</div>
+        </div>
+        <div class="kpi-card">
+            <div class="kpi-label">活跃来源</div>
+            <div class="kpi-value" id="dash-active-sources">-</div>
+            <div class="kpi-sub">周期内有产出</div>
+        </div>
+    </section>
+
+    <div id="dashboard-error" class="dashboard-error" hidden></div>
+
     <div id="tab-quality" class="tab-content active">
-        <section class="quality-dashboard">
-            <div class="section-title">数据质量模块</div>
+        <section class="dashboard-section">
+            <div class="section-title">数据质量</div>
             <div class="quality-kpis">
                 <div class="kpi-card">
-                    <div class="kpi-label">总文章数</div>
-                    <div class="kpi-value" id="q-total-articles">-</div>
-                    <div class="kpi-sub" id="q-total-trend">-</div>
-                </div>
-                <div class="kpi-card">
-                    <div class="kpi-label">周期新增</div>
+                    <div class="kpi-label">周期文章</div>
                     <div class="kpi-value" id="q-period-articles">-</div>
                     <div class="kpi-sub" id="q-period-label">-</div>
                 </div>
                 <div class="kpi-card">
-                    <div class="kpi-label">通过率</div>
-                    <div class="kpi-sub">审核通过 / 采集总数</div>
-                    <div class="kpi-value" id="q-pass-rate">-</div>
+                    <div class="kpi-label">平均分</div>
+                    <div class="kpi-value" id="q-avg-score">-</div>
+                    <div class="kpi-sub">审核得分</div>
                 </div>
                 <div class="kpi-card">
-                    <div class="kpi-label">平均分</div>
-                    <div class="kpi-sub">审核得分</div>
-                    <div class="kpi-value" id="q-avg-score">-</div>
+                    <div class="kpi-label">Summary 覆盖</div>
+                    <div class="kpi-value" id="q-summary-coverage">-</div>
+                    <div class="kpi-sub">内容完整性</div>
+                </div>
+                <div class="kpi-card">
+                    <div class="kpi-label">标签覆盖</div>
+                    <div class="kpi-value" id="q-tagged-rate">-</div>
+                    <div class="kpi-sub">可检索性</div>
                 </div>
             </div>
-
             <div class="quality-grid">
-            <div class="chart-card">
-                <h3>内容质量分布</h3>
-                <div class="chart-canvas-wrapper"><canvas id="q-content-chart"></canvas></div>
-            </div>
-            <div class="chart-card">
-                <h3>来源质量分布</h3>
-                <div class="chart-canvas-wrapper"><canvas id="q-source-chart"></canvas></div>
-            </div>
-            <div class="chart-card">
-                <h3>四维平均分</h3>
-                <div class="chart-canvas-wrapper"><canvas id="q-radar-chart"></canvas></div>
-            </div>
-            <div class="chart-card">
-                <h3>维度评分分布</h3>
-                <div class="chart-canvas-wrapper"><canvas id="q-dimension-chart"></canvas></div>
-            </div>
+                <div class="chart-card">
+                    <h3>内容质量指标</h3>
+                    <div class="chart-canvas-wrapper"><canvas id="q-content-chart"></canvas></div>
+                </div>
+                <div class="chart-card">
+                    <h3>来源质量排行</h3>
+                    <div class="chart-canvas-wrapper"><canvas id="q-source-chart"></canvas></div>
+                </div>
+                <div class="chart-card">
+                    <h3>四维平均分</h3>
+                    <div class="chart-canvas-wrapper"><canvas id="q-radar-chart"></canvas></div>
+                </div>
+                <div class="chart-card">
+                    <h3>维度评分分布</h3>
+                    <div class="chart-canvas-wrapper"><canvas id="q-dimension-chart"></canvas></div>
+                </div>
             </div>
         </section>
     </div>
 
-    <div id="tab-runtime" class="tab-content">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">
-            <h3 style="margin:0;font-size:0.875rem;color:#666;text-transform:uppercase">Pipeline 运行监控</h3>
-        </div>
-        <div class="kpi-row" style="display:flex;gap:1rem;margin-bottom:1rem">
-            <div class="kpi-card" style="flex:1">
-                <div class="kpi-label">上次运行</div>
-                <div class="kpi-value" id="rt-run-id">-</div>
-                <div class="kpi-sub" id="rt-run-time">-</div>
-            </div>
-            <div class="kpi-card" style="flex:1">
-                <div class="kpi-label">运行时长</div>
-                <div class="kpi-value" id="rt-duration">-</div>
-            </div>
-            <div class="kpi-card" style="flex:1">
-                <div class="kpi-label">成功率</div>
-                <div class="kpi-value" id="rt-success-rate">-</div>
-            </div>
-            <div class="kpi-card" style="flex:1">
-                <div class="kpi-label">失败数</div>
-                <div class="kpi-value" id="rt-fail-count">-</div>
-            </div>
-        </div>
-        <div class="chart-card" style="margin-bottom:1rem">
-            <h3>Pipeline DAG 状态</h3>
-            <div class="pipeline-flow" id="pipeline-flow"></div>
-        </div>
-        <div class="chart-card">
-            <h3>失败日志</h3>
-            <div class="log-table-wrapper">
-                <table class="log-table">
-                    <thead><tr><th>时间</th><th>阶段</th><th>Provider</th><th>标题</th></tr></thead>
-                    <tbody id="failure-tbody"></tbody>
-                </table>
-            </div>
-        </div>
-    </div>
-
     <div id="tab-consumption" class="tab-content">
-        <!-- 顶部 KPI -->
-        <div class="kpi-row" style="display:flex;gap:1rem;margin-bottom:1rem">
-            <div class="kpi-card" style="flex:1">
-                <div class="kpi-label">周期花费</div>
-                <div class="kpi-value" id="cs-period-cost">-</div>
+        <section class="dashboard-section">
+            <div class="section-title">资源消耗</div>
+            <div class="kpi-row">
+                <div class="kpi-card">
+                    <div class="kpi-label">周期花费</div>
+                    <div class="kpi-value" id="cs-period-cost">-</div>
+                </div>
+                <div class="kpi-card">
+                    <div class="kpi-label">日均花费</div>
+                    <div class="kpi-value" id="cs-daily-avg">-</div>
+                </div>
+                <div class="kpi-card">
+                    <div class="kpi-label">Token 效率</div>
+                    <div class="kpi-value" id="cs-token-eff">-</div>
+                    <div class="kpi-sub">$/M tokens</div>
+                </div>
+                <div class="kpi-card">
+                    <div class="kpi-label">预算进度</div>
+                    <div class="kpi-value" id="cs-budget-progress">-</div>
+                    <div class="progress-bar-wrapper"><div class="progress-bar" id="cs-progress-bar"></div></div>
+                </div>
             </div>
-            <div class="kpi-card" style="flex:1">
-                <div class="kpi-label">日均花费</div>
-                <div class="kpi-value" id="cs-daily-avg">-</div>
+            <div class="chart-card chart-spaced">
+                <h3>花费趋势</h3>
+                <div class="chart-canvas-wrapper"><canvas id="cs-trend-chart"></canvas></div>
             </div>
-            <div class="kpi-card" style="flex:1">
-                <div class="kpi-label">Token 效率</div>
-                <div class="kpi-value" id="cs-token-eff">-</div>
-                <div class="kpi-sub">$/M tokens</div>
+            <div class="charts-layout">
+                <div class="chart-card">
+                    <h3>来源费用分解</h3>
+                    <div class="chart-canvas-wrapper"><canvas id="cs-source-chart"></canvas></div>
+                </div>
+                <div class="chart-card">
+                    <h3>Provider 费用</h3>
+                    <div class="chart-canvas-wrapper"><canvas id="cs-provider-chart"></canvas></div>
+                </div>
             </div>
-            <div class="kpi-card" style="flex:1">
-                <div class="kpi-label">预算进度</div>
-                <div class="kpi-value" id="cs-budget-progress">-</div>
-                <div class="progress-bar-wrapper"><div class="progress-bar" id="cs-progress-bar"></div></div>
-            </div>
-        </div>
-
-        <!-- 花费趋势折线图 -->
-        <div class="chart-card" style="margin-bottom:1rem">
-            <h3>花费趋势</h3>
-            <div class="chart-canvas-wrapper"><canvas id="cs-trend-chart"></canvas></div>
-        </div>
-
-        <!-- 费用分解 -->
-        <div class="charts-layout">
-            <div class="chart-card">
-                <h3>来源费用分解</h3>
-                <div class="chart-canvas-wrapper"><canvas id="cs-source-chart"></canvas></div>
-            </div>
-            <div class="chart-card">
-                <h3>Provider 费用</h3>
-                <div class="chart-canvas-wrapper"><canvas id="cs-provider-chart"></canvas></div>
-            </div>
-        </div>
+        </section>
     </div>
 
     <div id="tab-sources" class="tab-content">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">
-            <h3 style="margin:0;font-size:0.875rem;color:#666;text-transform:uppercase">数据源健康监控</h3>
-        </div>
-        <div class="kpi-row" style="display:flex;gap:1rem;margin-bottom:1rem">
-            <div class="kpi-card" style="flex:1">
-                <div class="kpi-label">活跃数据源</div>
-                <div class="kpi-value" id="src-active-count">-</div>
+        <section class="dashboard-section">
+            <div class="section-title">数据源健康</div>
+            <div class="kpi-row">
+                <div class="kpi-card">
+                    <div class="kpi-label">活跃数据源</div>
+                    <div class="kpi-value" id="src-active-count">-</div>
+                </div>
+                <div class="kpi-card">
+                    <div class="kpi-label">平均通过率</div>
+                    <div class="kpi-value" id="src-avg-rate">-</div>
+                </div>
+                <div class="kpi-card">
+                    <div class="kpi-label">总采集量</div>
+                    <div class="kpi-value" id="src-total-collected">-</div>
+                </div>
+                <div class="kpi-card">
+                    <div class="kpi-label">平均评分</div>
+                    <div class="kpi-value" id="src-avg-score">-</div>
+                </div>
             </div>
-            <div class="kpi-card" style="flex:1">
-                <div class="kpi-label">平均通过率</div>
-                <div class="kpi-value" id="src-avg-rate">-</div>
+            <div class="charts-layout chart-spaced">
+                <div class="chart-card">
+                    <h3>各数据源 Approved 率</h3>
+                    <div class="chart-canvas-wrapper"><canvas id="src-approved-rate-chart"></canvas></div>
+                </div>
+                <div class="chart-card">
+                    <h3>贡献分布</h3>
+                    <div class="chart-canvas-wrapper"><canvas id="src-contribution-chart"></canvas></div>
+                </div>
             </div>
-            <div class="kpi-card" style="flex:1">
-                <div class="kpi-label">总采集量</div>
-                <div class="kpi-value" id="src-total-collected">-</div>
-            </div>
-            <div class="kpi-card" style="flex:1">
-                <div class="kpi-label">平均评分</div>
-                <div class="kpi-value" id="src-avg-score">-</div>
-            </div>
-        </div>
-        <div class="charts-layout" style="margin-bottom:1rem">
             <div class="chart-card">
-                <h3>各数据源 Approved 率</h3>
-                <div class="chart-canvas-wrapper"><canvas id="src-approved-rate-chart"></canvas></div>
+                <h3>质量排行</h3>
+                <div class="source-quality-table" id="src-quality-table"></div>
             </div>
-            <div class="chart-card">
-                <h3>贡献分布</h3>
-                <div class="chart-canvas-wrapper"><canvas id="src-contribution-chart"></canvas></div>
-            </div>
-        </div>
-        <div class="chart-card">
-            <h3>质量排行</h3>
-            <div class="source-quality-table" id="src-quality-table"></div>
-        </div>
+        </section>
     </div>
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script defer src="/static/js/dashboard/api.js"></script>
+<script defer src="/static/js/dashboard/state.js"></script>
+<script defer src="/static/js/dashboard/charts.js"></script>
+<script defer src="/static/js/dashboard/renderers.js"></script>
+<script defer src="/static/js/dashboard/main.js"></script>
 {% endblock %}

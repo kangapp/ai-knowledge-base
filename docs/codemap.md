@@ -77,8 +77,23 @@
   - 后续重构时保持模板只描述结构，不塞复杂逻辑。
 
 - `src/site/static/js/app.js`
-  - 当前包含首页筛选和 dashboard Tab 控制逻辑。
-  - 后续重构建议拆分：API 请求、状态管理、Chart.js 生命周期、DOM 渲染。
+  - 首页文章列表筛选、来源/标签/日期过滤。
+  - 不再承载 dashboard Tab 控制逻辑。
+
+- `src/site/static/js/dashboard/api.js`
+  - 仪表盘 API 请求封装，统一校验响应信封。
+
+- `src/site/static/js/dashboard/state.js`
+  - 仪表盘当前 Tab、周期、缓存状态。
+
+- `src/site/static/js/dashboard/charts.js`
+  - Chart.js 创建、销毁和通用图表封装。
+
+- `src/site/static/js/dashboard/renderers.js`
+  - 数据质量、资源消耗、数据源健康三个 Tab 的 DOM 和图表渲染。
+
+- `src/site/static/js/dashboard/main.js`
+  - 仪表盘初始化、Tab 切换、周期切换和数据调度。
 
 - `src/site/static/css/style.css`
   - 全站样式和 dashboard 样式。

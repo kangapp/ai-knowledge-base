@@ -29,10 +29,13 @@
 
 ## P1 后续建议
 
-- [ ] 仪表盘前端模块化
-  - 拆 `dashboardApi.js`、`dashboardState.js`、`dashboardCharts.js`、`dashboardRender.js`
+- [x] 仪表盘前端模块化
+  - 拆 `api.js`、`state.js`、`charts.js`、`renderers.js`、`main.js`
   - 首屏 KPI 使用 `/api/dashboard/summary`
   - 各 Tab 继续懒加载领域接口
+- [x] 移除仪表盘运行监控 Tab
+  - 运行监控由独立 DAG 页面承担
+  - 仪表盘保留数据质量、资源消耗、数据源健康三个 Tab
 - [ ] 统计服务层继续收口
   - 将 `quality/runtime/consumption` SQL 从 `src/db/operations.py` 逐步迁到更聚焦的统计服务文件
   - 每迁一个接口补一个契约测试
