@@ -300,7 +300,7 @@
 
 ### GET /api/stats/consumption-detail
 
-资源消耗详细统计（新版）。
+资源消耗详细统计（新版）。`period` 表示趋势粒度，而不是简单的等长过滤窗口。
 
 **参数:**
 
@@ -308,12 +308,22 @@
 |------|------|--------|------|
 | period | string | "week" | day/week/month |
 
+**period 口径:**
+
+| period | KPI/趋势窗口 | 趋势聚合粒度 |
+|--------|--------------|--------------|
+| day | 近 7 天 | 按天 |
+| week | 近 12 周（84 天） | 按周 |
+| month | 近 12 个月 | 按月 |
+
 **响应:**
 ```json
 {
   "code": 0,
   "data": {
     "period_cost": 0.1659,
+    "period_days": 8,
+    "period_tokens": 451000,
     "daily_avg": 0.0207,
     "cost_per_million_tokens": 0.37,
     "budget_progress": 0.017,
