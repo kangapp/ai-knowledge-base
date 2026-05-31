@@ -82,7 +82,7 @@ class SourceHealthTracker:
                 evicted.append({"source_id": source.id, "reason": reason})
         return evicted
 
-    async def get_all_sources_health(self, limit: int = 7) -> list[dict]:
+    async def get_all_sources_health(self, limit: int = 7, start_date: str | None = None) -> list[dict]:
         """获取所有数据源的最近健康数据"""
         rows = await self._db.fetch_all("""
             SELECT DISTINCT source_id FROM source_health
@@ -90,7 +90,17 @@ class SourceHealthTracker:
         result = []
         for row in rows:
             source_id = row["source_id"]
-            records = await self.get_recent_records(source_id, limit=limit)
+            if start_date:
+                records = [
+                    dict(r)
+                    for r in await self._db.fetch_all("""
+                        SELECT * FROM source_health
+                        WHERE source_id = ? AND date >= ?
+                        ORDER BY date DESC
+                    """, (source_id, start_date))
+                ]
+            else:
+                records = await self.get_recent_records(source_id, limit=limit)
             total_collected = sum(r["total_collected"] for r in records)
             total_approved = sum(r["approved"] for r in records)
             approved_rate = total_approved / total_collected if total_collected > 0 else 0

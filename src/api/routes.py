@@ -74,13 +74,13 @@ async def health():
 
 
 @router.get("/cost/summary")
-async def cost_summary(days: int = Query(default=30)):
+async def cost_summary(days: int = Query(default=30, ge=1, le=3650)):
     if not _db:
         raise HTTPException(500, "DB not initialized")
     rows = await _db.fetch_all(
         "SELECT provider, model, SUM(cost) as total_cost, SUM(tokens_in+tokens_out) as total_tokens "
         "FROM cost_logs WHERE created_at >= date('now', ?) GROUP BY provider, model",
-        (f"-{days} days",),
+        (operations.date_window_modifier(days),),
     )
     return envelope([dict(r) for r in rows])
 

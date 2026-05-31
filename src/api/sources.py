@@ -1,6 +1,6 @@
 # src/api/sources.py
 import logging
-from datetime import datetime, timezone, timedelta
+from datetime import date, datetime, timezone, timedelta
 from fastapi import APIRouter, HTTPException
 from ..core.database import Database
 from ..core.source_health import SourceHealthTracker
@@ -10,6 +10,10 @@ from .responses import envelope
 
 router = APIRouter(prefix="/api/sources", tags=["sources"])
 logger = logging.getLogger("api")
+
+
+def _today() -> str:
+    return datetime.now(timezone.utc).date().isoformat()
 
 
 def _source_to_dict(source: SourceConfig, health: dict | None = None) -> dict:
@@ -62,11 +66,13 @@ async def get_source_stats(period: str = "week"):
     """数据源健康统计（聚合数据）"""
     valid_periods = {"day": 1, "week": 7, "month": 30}
     days = valid_periods.get(period, 7)
+    end_date = date.fromisoformat(_today())
+    start_date = (end_date - timedelta(days=days - 1)).isoformat()
 
     db, should_close = await _get_request_db()
     try:
         tracker = SourceHealthTracker(db)
-        health_data = await tracker.get_all_sources_health(limit=days)
+        health_data = await tracker.get_all_sources_health(start_date=start_date)
 
         sources = SourceManager.load()
         source_ids = {s.id for s in sources}

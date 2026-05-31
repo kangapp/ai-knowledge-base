@@ -6,6 +6,10 @@ from ..core.database import Database
 from ..graph.state import AnalyzedItem, CostRecord, ReviewedItem, RawItem
 
 
+def date_window_modifier(days: int) -> str:
+    return f"-{max(days - 1, 0)} days"
+
+
 async def save_article(db: Database, raw: RawItem, analyzed: AnalyzedItem, reviewed: ReviewedItem, cost: float, tokens: int) -> int | None:
     """保存文章，返回 article id（新插入或已存在行的 id）"""
     extra = json.dumps({
@@ -101,7 +105,7 @@ def _article_filters(query: str = "", source: str = "", days: int = 30) -> tuple
         params.append(source)
     if days:
         where.append("a.collected_at >= date('now', ?)")
-        params.append(f"-{days} days")
+        params.append(date_window_modifier(days))
     return " AND ".join(where), params
 
 
@@ -146,11 +150,11 @@ async def search_articles(db: Database, query: str, source: str = "", days: int 
 
 async def get_stats(db: Database, days: int = 30) -> dict:
     total = await db.fetch_one("SELECT COUNT(*) as c FROM articles WHERE status='approved'")
-    period = await db.fetch_one("SELECT COUNT(*) as c FROM articles WHERE status='approved' AND collected_at >= date('now', ?)", (f"-{days} days",))
+    period = await db.fetch_one("SELECT COUNT(*) as c FROM articles WHERE status='approved' AND collected_at >= date('now', ?)", (date_window_modifier(days),))
     source_dist = await db.fetch_all("SELECT source, COUNT(*) as c FROM articles WHERE status='approved' GROUP BY source ORDER BY c DESC")
-    cost_period = await db.fetch_one("SELECT COALESCE(SUM(cost),0) as t FROM cost_logs WHERE created_at >= date('now', ?)", (f"-{days} days",))
+    cost_period = await db.fetch_one("SELECT COALESCE(SUM(cost),0) as t FROM cost_logs WHERE created_at >= date('now', ?)", (date_window_modifier(days),))
     cost_total = await db.fetch_one("SELECT COALESCE(SUM(cost),0) as t FROM cost_logs")
-    daily_cost = await db.fetch_all("SELECT date(created_at) as date, SUM(cost) as cost, COUNT(*) as articles FROM cost_logs WHERE created_at >= date('now', ?) GROUP BY date(created_at) ORDER BY date", (f"-{days} days",))
+    daily_cost = await db.fetch_all("SELECT date(created_at) as date, SUM(cost) as cost, COUNT(*) as articles FROM cost_logs WHERE created_at >= date('now', ?) GROUP BY date(created_at) ORDER BY date", (date_window_modifier(days),))
     top_tags = await db.fetch_all("SELECT t.name, COUNT(*) as c FROM tags t JOIN article_tags at ON t.id=at.tag_id GROUP BY t.id ORDER BY c DESC LIMIT 10")
     return {
         "total_articles": total["c"] if total else 0,
@@ -198,7 +202,7 @@ async def get_quality_stats(db: Database, days: int = 30) -> dict:
         FROM articles
         WHERE status='approved' AND collected_at >= date('now', ?)
         GROUP BY bucket
-    """, (f"-{days} days",))
+    """, (date_window_modifier(days),))
 
     # 来源细分评分
     source_scores = await db.fetch_all("""
@@ -209,7 +213,7 @@ async def get_quality_stats(db: Database, days: int = 30) -> dict:
         WHERE status='approved' AND collected_at >= date('now', ?)
         GROUP BY source, source_detail
         ORDER BY avg_score DESC
-    """, (f"-{days} days",))
+    """, (date_window_modifier(days),))
 
     # 标签云
     top_tags = await db.fetch_all("""
@@ -219,17 +223,17 @@ async def get_quality_stats(db: Database, days: int = 30) -> dict:
         WHERE a.status='approved' AND a.collected_at >= date('now', ?)
         GROUP BY t.id
         ORDER BY count DESC LIMIT 20
-    """, (f"-{days} days",))
+    """, (date_window_modifier(days),))
 
-    # 本周 vs 上月同期
+    # 近 7 个自然日 vs 前 7 个自然日
     this_week = await db.fetch_one("""
         SELECT COUNT(*) as c FROM articles
-        WHERE status='approved' AND collected_at >= date('now', '-7 days')
-    """)
+        WHERE status='approved' AND collected_at >= date('now', ?)
+    """, (date_window_modifier(7),))
     last_week = await db.fetch_one("""
         SELECT COUNT(*) as c FROM articles
-        WHERE collected_at >= date('now', '-14 days') AND collected_at < date('now', '-7 days')
-    """)
+        WHERE collected_at >= date('now', ?) AND collected_at < date('now', ?)
+    """, (date_window_modifier(14), date_window_modifier(7)))
 
     return {
         "score_distribution": [{"bucket": r["bucket"], "count": r["count"]} for r in score_buckets],
@@ -245,9 +249,12 @@ async def get_quality_stats(db: Database, days: int = 30) -> dict:
 
 async def get_runtime_stats(db: Database, days: int = 7) -> dict:
     """运行状态 Tab 查询"""
+    cutoff = date_window_modifier(days)
+
     # 最新一次 pipeline run
     last_run = await db.fetch_one(
-        "SELECT * FROM pipeline_runs ORDER BY started_at DESC LIMIT 1"
+        "SELECT * FROM pipeline_runs WHERE started_at >= date('now', ?) ORDER BY started_at DESC LIMIT 1",
+        (cutoff,),
     )
 
     if not last_run:
@@ -275,8 +282,10 @@ async def get_runtime_stats(db: Database, days: int = 7) -> dict:
     # Provider 健康状态（从 circuit_events 最近）
     provider_events = await db.fetch_all("""
         SELECT provider, event, reason, created_at
-        FROM circuit_events ORDER BY created_at DESC LIMIT 20
-    """)
+        FROM circuit_events
+        WHERE created_at >= date('now', ?)
+        ORDER BY created_at DESC LIMIT 20
+    """, (cutoff,))
 
     provider_latest = {}
     for e in provider_events:
@@ -313,7 +322,7 @@ async def get_consumption_stats(db: Database, days: int = 30) -> dict:
         WHERE created_at >= date('now', ?)
         GROUP BY date(created_at), provider
         ORDER BY date
-    """, (f"-{days} days",))
+    """, (date_window_modifier(days),))
 
     # Agent 费用分解（按日）
     agent_daily = await db.fetch_all("""
@@ -323,19 +332,19 @@ async def get_consumption_stats(db: Database, days: int = 30) -> dict:
         WHERE created_at >= date('now', ?)
         GROUP BY date(created_at), agent
         ORDER BY date
-    """, (f"-{days} days",))
+    """, (date_window_modifier(days),))
 
     # 周期总花费
     period_cost = await db.fetch_one("""
         SELECT COALESCE(SUM(cost), 0) as total FROM cost_logs
         WHERE created_at >= date('now', ?)
-    """, (f"-{days} days",))
+    """, (date_window_modifier(days),))
 
     # 周期总 token
     period_tokens = await db.fetch_one("""
         SELECT COALESCE(SUM(tokens_in + tokens_out), 0) as total FROM cost_logs
         WHERE created_at >= date('now', ?)
-    """, (f"-{days} days",))
+    """, (date_window_modifier(days),))
 
     # per-provider 汇总
     provider_summary = await db.fetch_all("""
@@ -343,7 +352,7 @@ async def get_consumption_stats(db: Database, days: int = 30) -> dict:
                SUM(tokens_in) as total_in, SUM(tokens_out) as total_out
         FROM cost_logs WHERE created_at >= date('now', ?)
         GROUP BY provider
-    """, (f"-{days} days",))
+    """, (date_window_modifier(days),))
 
     return {
         "provider_daily": [dict(r) for r in provider_daily],
@@ -362,11 +371,11 @@ async def get_consumption_stats(db: Database, days: int = 30) -> dict:
 async def get_consumption_detail_stats(db: Database, period: str = "week") -> dict:
     """
     资源消耗详细统计（Phase 2）
-    period 表示趋势粒度：
-    day = 近 7 天按天；week = 近 12 周按周；month = 近 12 个月按月。
+    period 表示日期窗口：
+    day = 今天；week = 近 7 个自然日；month = 近 30 个自然日。
     """
-    window_map = {"day": "-7 days", "week": "-84 days", "month": "-12 months"}
-    window = window_map.get(period, "-84 days")
+    window_map = {"day": "-0 days", "week": "-6 days", "month": "-29 days"}
+    window = window_map.get(period, "-6 days")
 
     # 1. 周期总花费和日均
     period_cost = await db.fetch_one("""
@@ -495,7 +504,7 @@ async def get_consumption_detail_stats(db: Database, period: str = "week") -> di
     budget = 10.0
     monthly_cost = await db.fetch_one("""
         SELECT COALESCE(SUM(cost), 0) as total FROM cost_logs
-        WHERE created_at >= date('now', '-30 days')
+        WHERE created_at >= date('now', '-29 days')
     """)
 
     return {
@@ -577,7 +586,7 @@ async def get_quality_detail_stats(db: Database, period: str = "week") -> dict:
     """
     days_map = {"day": 1, "week": 7, "month": 30}
     days = days_map.get(period, 7)
-    cutoff = f"-{days} days"
+    cutoff = date_window_modifier(days)
 
     total_articles = await db.fetch_one(
         "SELECT COUNT(*) as c FROM articles WHERE status='approved'"

@@ -52,6 +52,10 @@
   - Collector 累加 `total_collected/failed`
   - Reviewer 累加 `approved/rejected`，`avg_score` 按 approved 数加权合并
   - 新增 007 迁移合并历史 `36氪`、`cs.AI/cs.CL/cs.LG` 健康记录
+- [x] 统一 period 日期窗口口径
+  - `/api/sources/stats` 使用真实日期窗口，不再取最近 N 条健康记录
+  - `/api/stats/consumption-detail` 使用 day=今天、week=近 7 个自然日、month=近 30 个自然日
+  - `days=N` 查询窗口统一为含今天的 N 个自然日，成本汇总、运行状态与质量新鲜度比较同步修正
 - [ ] 统计服务层继续收口
   - 将 `quality/runtime/consumption` SQL 从 `src/db/operations.py` 逐步迁到更聚焦的统计服务文件
   - 每迁一个接口补一个契约测试
@@ -66,6 +70,6 @@
 
 - 已通过：`.venv/bin/python -m pytest tests/test_api_contracts.py -q`
 - 已通过：`.venv/bin/python -m pytest tests/test_stats_consumption_detail.py -q`
-- 已通过：`.venv/bin/python -m pytest -m "not integration and not e2e"`（66 passed）
+- 已通过：`.venv/bin/python -m pytest -m "not integration and not e2e"`（69 passed）
 
 说明：当前 shell 中 `uv` 不可用，使用项目 `.venv/bin/python` 执行测试。

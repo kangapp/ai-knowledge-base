@@ -3,10 +3,15 @@ import json
 from ..core.database import Database
 
 
+def _date_window_modifier(days: int) -> str:
+    return f"-{max(days - 1, 0)} days"
+
+
 async def get_dashboard_summary(db: Database, days: int = 30) -> dict:
+    cutoff = _date_window_modifier(days)
     pipeline_rows = await db.fetch_all(
         "SELECT summary FROM pipeline_runs WHERE started_at >= date('now', ?) AND status='completed'",
-        (f"-{days} days",),
+        (cutoff,),
     )
     pipeline_approved = 0
     pipeline_discarded = 0
@@ -26,12 +31,12 @@ async def get_dashboard_summary(db: Database, days: int = 30) -> dict:
     total = await db.fetch_one("SELECT COUNT(*) as c FROM articles WHERE status='approved'")
     period_cost = await db.fetch_one(
         "SELECT COALESCE(SUM(cost),0) as t FROM cost_logs WHERE created_at >= date('now', ?)",
-        (f"-{days} days",),
+        (cutoff,),
     )
     cost_total = await db.fetch_one("SELECT COALESCE(SUM(cost),0) as t FROM cost_logs")
     active_sources = await db.fetch_one(
         "SELECT COUNT(DISTINCT source) as c FROM articles WHERE status='approved' AND collected_at >= date('now', ?)",
-        (f"-{days} days",),
+        (cutoff,),
     )
     avg_score = await db.fetch_one("SELECT AVG(relevance_score) as avg FROM articles WHERE status='approved'")
 
@@ -49,6 +54,7 @@ async def get_dashboard_summary(db: Database, days: int = 30) -> dict:
 
 async def get_enhanced_stats(db: Database, days: int = 30) -> dict:
     summary = await get_dashboard_summary(db, days)
+    cutoff = _date_window_modifier(days)
 
     hourly = await db.fetch_all("""
         SELECT strftime('%Y-%m-%dT%H:00', created_at) as hour,
@@ -62,7 +68,7 @@ async def get_enhanced_stats(db: Database, days: int = 30) -> dict:
         FROM cost_logs
         WHERE created_at >= date('now', ?)
         GROUP BY date(created_at) ORDER BY date
-    """, (f"-{days} days",))
+    """, (cutoff,))
     weekly = await db.fetch_all("""
         SELECT strftime('%Y-W%W', created_at) as week,
                SUM(cost) as cost, COUNT(*) as articles
@@ -88,7 +94,7 @@ async def get_enhanced_stats(db: Database, days: int = 30) -> dict:
         WHERE status='approved' AND collected_at >= date('now', ?)
         GROUP BY source, source_detail
         ORDER BY count DESC
-    """, (f"-{days} days",))
+    """, (cutoff,))
 
     return {
         "summary": summary,
