@@ -6,6 +6,7 @@ from ..core.database import Database
 from ..core.source_health import SourceHealthTracker
 from ..core.source_manager import SourceManager
 from ..core.config import SourceConfig
+from .responses import envelope
 
 router = APIRouter(prefix="/api/sources", tags=["sources"])
 logger = logging.getLogger("api")
@@ -27,11 +28,22 @@ def _source_to_dict(source: SourceConfig, health: dict | None = None) -> dict:
     return result
 
 
+async def _get_request_db() -> tuple[Database, bool]:
+    from . import routes
+
+    db = getattr(routes, "_db", None)
+    if db is not None:
+        return db, False
+
+    fallback_db = Database("data/kb.db")
+    await fallback_db.initialize()
+    return fallback_db, True
+
+
 @router.get("/")
 async def list_sources():
     """数据源列表（含状态）"""
-    db = Database("data/kb.db")
-    await db.initialize()
+    db, should_close = await _get_request_db()
     try:
         sources = SourceManager.load()
         tracker = SourceHealthTracker(db)
@@ -39,9 +51,10 @@ async def list_sources():
         health_map = {h["source_id"]: h for h in health_data}
 
         items = [_source_to_dict(s, health_map.get(s.id)) for s in sources]
-        return {"code": 0, "data": {"items": items, "total": len(items)}, "message": "ok"}
+        return envelope({"items": items, "total": len(items)})
     finally:
-        await db.close()
+        if should_close:
+            await db.close()
 
 
 @router.get("/stats")
@@ -50,8 +63,7 @@ async def get_source_stats(period: str = "week"):
     valid_periods = {"day": 1, "week": 7, "month": 30}
     days = valid_periods.get(period, 7)
 
-    db = Database("data/kb.db")
-    await db.initialize()
+    db, should_close = await _get_request_db()
     try:
         tracker = SourceHealthTracker(db)
         health_data = await tracker.get_all_sources_health(limit=days)
@@ -94,9 +106,10 @@ async def get_source_stats(period: str = "week"):
                 "trend": trend,
             })
 
-        return {"code": 0, "data": {"period": period, "sources": stats}, "message": "ok"}
+        return envelope({"period": period, "sources": stats})
     finally:
-        await db.close()
+        if should_close:
+            await db.close()
 
 
 @router.post("/{source_id}/action")
@@ -112,51 +125,40 @@ async def source_action(source_id: str, action: str):
     if action == "remove":
         SourceManager.remove(source_id)
         logger.info(f"api.source.remove", extra={"source_id": source_id})
-        return {"code": 0, "data": {"message": f"Source {source_id} removed"}, "message": "ok"}
+        return envelope({"message": f"Source {source_id} removed"})
     elif action == "disable":
         SourceManager.update(source_id, enabled=False)
-        return {"code": 0, "data": {"message": f"Source {source_id} disabled"}, "message": "ok"}
+        return envelope({"message": f"Source {source_id} disabled"})
     elif action == "enable":
         SourceManager.update(source_id, enabled=True)
-        return {"code": 0, "data": {"message": f"Source {source_id} enabled"}, "message": "ok"}
+        return envelope({"message": f"Source {source_id} enabled"})
 
 
 @router.post("/maintenance/clear-health")
 async def clear_source_health():
     """清除所有 source_health 数据，下次采集自动重建（修正旧格式数据）"""
-    db = Database("data/kb.db")
-    await db.initialize()
+    db, should_close = await _get_request_db()
     try:
         await db.execute("DELETE FROM source_health")
         await db.commit()
         logger.info("api.source_health.cleared")
-        return {"code": 0, "data": {"message": "source_health cleared, will rebuild on next pipeline run"}, "message": "ok"}
+        return envelope({"message": "source_health cleared, will rebuild on next pipeline run"})
     finally:
-        await db.close()
-
-    if action == "remove":
-        SourceManager.remove(source_id)
-        logger.info(f"api.source.remove", extra={"source_id": source_id})
-        return {"code": 0, "data": {"message": f"Source {source_id} removed"}, "message": "ok"}
-    elif action == "disable":
-        SourceManager.update(source_id, enabled=False)
-        return {"code": 0, "data": {"message": f"Source {source_id} disabled"}, "message": "ok"}
-    elif action == "enable":
-        SourceManager.update(source_id, enabled=True)
-        return {"code": 0, "data": {"message": f"Source {source_id} enabled"}, "message": "ok"}
+        if should_close:
+            await db.close()
 
 
 @router.get("/discovered")
 async def list_discovered():
     """已发现待审核的数据源"""
-    db = Database("data/kb.db")
-    await db.initialize()
+    db, should_close = await _get_request_db()
     try:
         rows = await db.fetch_all("""
             SELECT * FROM discovered_sources
             WHERE status = 'candidate'
             ORDER BY discovered_at DESC
         """)
-        return {"code": 0, "data": {"items": [dict(r) for r in rows], "total": len(rows)}, "message": "ok"}
+        return envelope({"items": [dict(r) for r in rows], "total": len(rows)})
     finally:
-        await db.close()
+        if should_close:
+            await db.close()

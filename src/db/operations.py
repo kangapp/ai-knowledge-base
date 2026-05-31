@@ -83,29 +83,56 @@ async def batch_check_existing_urls(db: Database, urls: list[str]) -> set[str]:
     return {r["url"] for r in rows}
 
 
+def _article_filters(query: str = "", source: str = "", days: int = 30) -> tuple[str, list]:
+    where = ["a.status = 'approved'"]
+    params = []
+    if query:
+        where.append("articles_fts MATCH ?")
+        params.append(query)
+    if source:
+        where.append("a.source = ?")
+        params.append(source)
+    if days:
+        where.append("a.collected_at >= date('now', ?)")
+        params.append(f"-{days} days")
+    return " AND ".join(where), params
+
+
+async def get_article_tags(db: Database, article_id: int) -> list[str]:
+    rows = await db.fetch_all(
+        "SELECT t.name FROM tags t JOIN article_tags at ON t.id=at.tag_id WHERE at.article_id=? ORDER BY t.name",
+        (article_id,),
+    )
+    return [r["name"] for r in rows]
+
+
+async def count_articles(db: Database, query: str = "", source: str = "", days: int = 30) -> int:
+    where_sql, params = _article_filters(query, source, days)
+    if query:
+        sql = f"SELECT COUNT(*) as c FROM articles a JOIN articles_fts fts ON a.rowid = fts.rowid WHERE {where_sql}"
+    else:
+        sql = f"SELECT COUNT(*) as c FROM articles a WHERE {where_sql}"
+    row = await db.fetch_one(sql, tuple(params))
+    return row["c"] if row else 0
+
+
 async def search_articles(db: Database, query: str, source: str = "", days: int = 30, limit: int = 20, offset: int = 0) -> list[dict]:
+    where_sql, params = _article_filters(query, source, days)
+    params.extend([limit, offset])
     if query:
         rows = await db.fetch_all(
-            "SELECT a.* FROM articles a JOIN articles_fts fts ON a.rowid = fts.rowid WHERE articles_fts MATCH ? ORDER BY a.collected_at DESC LIMIT ? OFFSET ?",
-            (query, limit, offset))
+            f"SELECT a.* FROM articles a JOIN articles_fts fts ON a.rowid = fts.rowid WHERE {where_sql} ORDER BY a.collected_at DESC LIMIT ? OFFSET ?",
+            tuple(params))
     else:
-        where = ["status = 'approved'"]
-        params = []
-        if source:
-            where.append("source = ?"); params.append(source)
-        if days:
-            where.append("collected_at >= date('now', ?)"); params.append(f"-{days} days")
-        params.extend([limit, offset])
-        rows = await db.fetch_all(f"SELECT * FROM articles WHERE {' AND '.join(where)} ORDER BY collected_at DESC LIMIT ? OFFSET ?", tuple(params))
+        rows = await db.fetch_all(
+            f"SELECT a.* FROM articles a WHERE {where_sql} ORDER BY a.collected_at DESC LIMIT ? OFFSET ?",
+            tuple(params))
 
     # 查询标签
     articles_with_tags = []
     for r in rows:
         article = dict(r)
-        tag_rows = await db.fetch_all(
-            "SELECT t.name FROM tags t JOIN article_tags at ON t.id=at.tag_id WHERE at.article_id=?",
-            (article["id"],))
-        article["tags"] = [t["name"] for t in tag_rows]
+        article["tags"] = await get_article_tags(db, article["id"])
         articles_with_tags.append(article)
     return articles_with_tags
 

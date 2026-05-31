@@ -1,41 +1,19 @@
 from datetime import datetime, timedelta, timezone
-from fastapi import APIRouter, Query, HTTPException, Request
-from fastapi.responses import JSONResponse
+from fastapi import APIRouter, Query, HTTPException
 from ..core.database import Database
 from ..db import operations
+from .responses import (
+    envelope,
+    general_exception_handler,
+    http_exception_handler,
+    validation_exception_handler,
+)
 
 router = APIRouter(prefix="/api")
 _db: Database | None = None
 
-def set_db(db: Database):
+def set_db(db: Database | None):
     global _db; _db = db
-
-# ===== 统一响应信封 =====
-
-def envelope(data=None, message="ok", code=0):
-    """成功响应信封"""
-    return {"code": code, "data": data, "message": message}
-
-
-async def http_exception_handler(request: Request, exc: HTTPException):
-    """HTTPException → 结构化错误响应"""
-    return JSONResponse(
-        status_code=exc.status_code,
-        content={
-            "code": exc.status_code,
-            "data": None,
-            "message": exc.detail,
-        }
-    )
-
-
-async def general_exception_handler(request: Request, exc: Exception):
-    """未捕获异常 → 50001"""
-    return JSONResponse(
-        status_code=500,
-        content={"code": 50001, "data": None, "message": "服务内部错误"},
-    )
-
 
 # ===== 端点 =====
 
@@ -51,7 +29,7 @@ async def list_articles(
         raise HTTPException(500, "DB not initialized")
     offset = (page - 1) * page_size
     rows = await operations.search_articles(_db, query, source, days, page_size, offset)
-    total = len(rows)  # 简化：实际应 COUNT 查询
+    total = await operations.count_articles(_db, query, source, days)
     return envelope({
         "items": rows,
         "total": total,
@@ -67,7 +45,9 @@ async def get_article(article_id: int):
     row = await _db.fetch_one("SELECT * FROM articles WHERE id = ?", (article_id,))
     if not row:
         raise HTTPException(status_code=404, detail=f"文章 {article_id} 不存在")
-    return envelope(dict(row))
+    article = dict(row)
+    article["tags"] = await operations.get_article_tags(_db, article_id)
+    return envelope(article)
 
 
 @router.get("/search")

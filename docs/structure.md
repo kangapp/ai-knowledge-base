@@ -48,18 +48,19 @@ ai-knowledge-base/
 │   │       └── arxiv.py
 │   │
 │   ├── db/                 # 数据访问层
-│   │   ├── database.py     #   SQLite 连接 + 启动时自动 migration
-│   │   ├── articles.py     #   文章 CRUD + FTS5 全文搜索
-│   │   ├── tags.py         #   标签 CRUD（新标签自动收录）
-│   │   ├── queries.py      #   仪表盘聚合统计
+│   │   ├── operations.py   #   文章/标签/成本/pipeline/统计 SQL 操作
 │   │   └── migrations/     #   版本化 SQL 文件（001_init.sql, 002_xxx.sql, ...）
 │   │
 │   ├── api/                # FastAPI 路由
-│   │   ├── health.py       #   /api/health
-│   │   ├── search.py       #   /api/search?q=xxx (FTS5 全文检索)
-│   │   ├── article.py      #   /api/articles/{id} (详情页按需加载)
-│   │   ├── cost.py         #   /api/cost
-│   │   └── pipeline.py     #   /api/pipeline (手动触发、状态查询)
+│   │   ├── responses.py    #   统一响应信封 + 错误码映射 + exception handlers
+│   │   ├── routes.py       #   /api/articles /api/search /api/stats /api/cost /api/pipeline /api/health
+│   │   ├── stats.py        #   /api/stats/* 仪表盘统计接口
+│   │   ├── dashboard.py    #   /api/dashboard/summary 首屏 KPI 聚合
+│   │   ├── sources.py      #   /api/sources/* 数据源管理与健康统计
+│   │   └── config.py       #   /api/config/{llm|sources|agents}
+│   │
+│   ├── services/           # API-facing 服务层
+│   │   └── dashboard_stats.py # 仪表盘 summary/enhanced 统计口径
 │   │
 │   └── site/               # 静态站点生成
 │       ├── builder.py      #   去抖合并（5min 计时器）+ output.tmp 原子 rename
@@ -70,6 +71,8 @@ ai-knowledge-base/
 │
 ├── data/                   # SQLite + backup/ (volume mount)
 ├── output/                 # 静态站点产物 (volume mount, Caddy serve)
+├── docs/task.md            # 当前任务拆解、优先级和状态
+├── docs/codemap.md         # 模块职责和常见改动入口
 └── tests/                  # pytest 分层
     ├── unit/               #   CI 跑，LLM mock + HTTP fixture，<30s
     ├── integration/        #   手动跑（真实 API + 真实 LLM，少量数据）
@@ -86,3 +89,6 @@ ai-knowledge-base/
 - **数据校验在边界**：collector API 返回 → Pydantic 校验；analyzer 输出 → Pydantic 校验；入库前 → Pydantic 校验
 - **Prompt 变更需回归测试**：改 prompt 后跑 `test_prompt_regression.py` 验证输出结构合法
 - **错误隔离**：单源采集失败不影响其余源（try/except 隔离），空数据跳过 analyzer 不调 LLM；仅所有源全挂才标记 pipeline failed
+- **API 响应统一入口**：除 `/api/health` 外，成功响应走 `api.responses.envelope()`；`HTTPException`、参数校验错误、未捕获异常统一由 `src/main.py` 注册 handler。
+- **仪表盘统计口径集中化**：首屏 KPI 和 `/api/stats/enhanced` 的 summary 口径在 `src/services/dashboard_stats.py` 维护，避免前端重构时出现多个互相打架的统计来源。
+- **文章 API 契约**：`/api/articles` 的 `total` 是真实匹配总数；列表和详情都返回 `tags` 数组。

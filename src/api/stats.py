@@ -3,6 +3,7 @@ import sys
 from fastapi import APIRouter, Query
 
 from ..db import operations
+from ..services.dashboard_stats import get_enhanced_stats
 
 router = APIRouter(prefix="/api/stats")
 
@@ -21,113 +22,7 @@ def envelope(data=None, message="ok", code=0):
 @router.get("/enhanced")
 async def get_stats_enhanced(days: int = Query(default=30, ge=1, le=3650)):
     db = get_db()
-
-    # pass_rate 从 pipeline_runs 的 summary 计算（articles 表只有 approved）
-    pipeline_rows = await db.fetch_all(
-        "SELECT summary FROM pipeline_runs WHERE started_at >= date('now', ?) AND status='completed'",
-        (f"-{days} days",)
-    )
-    pipeline_approved = 0
-    pipeline_discarded = 0
-    pipeline_retry = 0
-    for row in pipeline_rows:
-        try:
-            import json
-            s = json.loads(row["summary"] or "{}")
-            pipeline_approved += s.get("approved", 0)
-            pipeline_discarded += s.get("discarded", 0)
-            pipeline_retry += s.get("retry", 0)
-        except Exception:
-            pass
-    period_total_collected = pipeline_approved + pipeline_discarded + pipeline_retry
-    pass_rate = pipeline_approved / period_total_collected if period_total_collected > 0 else 0
-
-    # 其他统计（从 articles 表查询）
-    total = await db.fetch_one("SELECT COUNT(*) as c FROM articles WHERE status='approved'")
-    period_approved_count = pipeline_approved  # 已从 pipeline 汇总得到
-
-    period_cost = await db.fetch_one(
-        "SELECT COALESCE(SUM(cost),0) as t FROM cost_logs WHERE created_at >= date('now', ?)",
-        (f"-{days} days",)
-    )
-    cost_total = await db.fetch_one("SELECT COALESCE(SUM(cost),0) as t FROM cost_logs")
-    active_sources = await db.fetch_one(
-        "SELECT COUNT(DISTINCT source) as c FROM articles WHERE status='approved' AND collected_at >= date('now', ?)",
-        (f"-{days} days",)
-    )
-    avg_score = await db.fetch_one("SELECT AVG(relevance_score) as avg FROM articles WHERE status='approved'")
-    hourly = await db.fetch_all("""
-        SELECT strftime('%Y-%m-%dT%H:00', created_at) as hour,
-               SUM(cost) as cost, COUNT(*) as articles
-        FROM cost_logs
-        WHERE created_at >= datetime('now', '-2 days')
-        GROUP BY hour ORDER BY hour
-    """)
-
-    # Daily
-    daily = await db.fetch_all("""
-        SELECT date(created_at) as date, SUM(cost) as cost, COUNT(*) as articles
-        FROM cost_logs
-        WHERE created_at >= date('now', ?)
-        GROUP BY date(created_at) ORDER BY date
-    """, (f"-{days} days",))
-
-    # Weekly (past 12 weeks)
-    weekly = await db.fetch_all("""
-        SELECT strftime('%Y-W%W', created_at) as week,
-               SUM(cost) as cost, COUNT(*) as articles
-        FROM cost_logs
-        WHERE created_at >= datetime('now', '-12 weeks')
-        GROUP BY week ORDER BY week
-    """)
-
-    # Monthly (past 12 months)
-    monthly = await db.fetch_all("""
-        SELECT strftime('%Y-%m', created_at) as month,
-               SUM(cost) as cost, COUNT(*) as articles
-        FROM cost_logs
-        WHERE created_at >= datetime('now', '-12 months')
-        GROUP BY month ORDER BY month
-    """)
-
-    # Source distribution (grouped by source)
-    source_dist = await db.fetch_all("""
-        SELECT source, COUNT(*) as count
-        FROM articles WHERE status='approved'
-        GROUP BY source ORDER BY count DESC
-    """)
-
-    # Active source details (RSS细分 + 其他大类)
-    active_detail = await db.fetch_all("""
-        SELECT source, source_detail, COUNT(*) as count
-        FROM articles
-        WHERE status='approved' AND collected_at >= date('now', ?)
-        GROUP BY source, source_detail
-        ORDER BY count DESC
-    """, (f"-{days} days",))
-
-    return {
-        "code": 0,
-        "data": {
-            "summary": {
-                "total_articles": total["c"] if total else 0,
-                "period_articles": period_approved_count,
-                "period_cost": round(period_cost["t"] if period_cost else 0, 4),
-                "total_cost": round(cost_total["t"] if cost_total else 0, 4),
-                "active_sources": active_sources["c"] if active_sources else 0,
-                "avg_score": round(avg_score["avg"], 1) if avg_score and avg_score["avg"] else 0,
-                "pass_rate": round(pass_rate, 3),
-                "period_total_collected": period_total_collected,
-            },
-            "hourly_cost": [dict(r) for r in hourly],
-            "daily_cost": [dict(r) for r in daily],
-            "weekly_cost": [dict(r) for r in weekly],
-            "monthly_cost": [dict(r) for r in monthly],
-            "source_distribution": [dict(r) for r in source_dist],
-            "active_source_details": [dict(r) for r in active_detail],
-        },
-        "message": "ok"
-    }
+    return envelope(await get_enhanced_stats(db, days))
 
 @router.get("/quality")
 async def get_stats_quality(days: int = Query(default=30, ge=1, le=3650)):
@@ -145,11 +40,11 @@ async def get_stats_consumption(days: int = Query(default=30, ge=1, le=3650)):
     return envelope(await operations.get_consumption_stats(db, days))
 
 @router.get("/quality-detail")
-async def get_stats_quality_detail(period: str = Query(default="week", regex="^(day|week|month)$")):
+async def get_stats_quality_detail(period: str = Query(default="week", pattern="^(day|week|month)$")):
     db = get_db()
     return envelope(await operations.get_quality_detail_stats(db, period))
 
 @router.get("/consumption-detail")
-async def get_stats_consumption_detail(period: str = Query(default="week", regex="^(day|week|month)$")):
+async def get_stats_consumption_detail(period: str = Query(default="week", pattern="^(day|week|month)$")):
     db = get_db()
     return envelope(await operations.get_consumption_detail_stats(db, period))

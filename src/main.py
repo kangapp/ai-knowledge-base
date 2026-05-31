@@ -5,6 +5,7 @@ from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 
 from fastapi import FastAPI, HTTPException
+from fastapi.exceptions import RequestValidationError
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
 from .core.config import load_llm_config, load_sources_config, load_agents_config
@@ -18,6 +19,7 @@ from .api.routes import router, set_db, set_run_pipeline, set_builder
 from .api.config import router as config_router
 from .api.stats import router as stats_router
 from .api.sources import router as sources_router
+from .api.dashboard import router as dashboard_router
 from .scheduler.source_scheduler import setup_source_scheduler
 from .db.operations import (
     start_pipeline_run, end_pipeline_run, save_article, save_tags,
@@ -301,14 +303,20 @@ async def lifespan(app: FastAPI):
 
 
 def create_app() -> FastAPI:
-    from .api.routes import http_exception_handler, general_exception_handler
+    from .api.routes import (
+        general_exception_handler,
+        http_exception_handler,
+        validation_exception_handler,
+    )
 
     app = FastAPI(lifespan=lifespan, title="AI Knowledge Base")
     app.include_router(router)
     app.include_router(config_router)
     app.include_router(stats_router)
     app.include_router(sources_router)
+    app.include_router(dashboard_router)
     app.add_exception_handler(HTTPException, http_exception_handler)
+    app.add_exception_handler(RequestValidationError, validation_exception_handler)
     app.add_exception_handler(Exception, general_exception_handler)
     return app
 

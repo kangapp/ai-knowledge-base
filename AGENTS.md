@@ -252,8 +252,12 @@ POST   /api/pipeline/build      # 手动触发站点构建
 - `@docs/bug-progress.md` — Bug 处理记录（踩坑记录 + 修复方案），后续同类问题可参考
 - `@docs/vps-access.md` — VPS 连接信息、SSH 密钥、常用运维命令
 - `@docs/api.md` — 所有 API 接口详细信息（请求/响应格式、错误码、变更记录）
+- `@docs/task.md` — 当前任务拆解、优先级和状态
+- `@docs/codemap.md` — 代码地图：模块位置、职责、常见改动入口
 
 **文档维护原则：** 项目代码变更时，同步更新对应的引用文档。例如：
 - 新增/修改 API 端点 → 更新 `docs/api.md`
 - 修改数据模型 → 更新 `docs/data-model.md`
 - 修改部署流程 → 更新 `docs/operations.md`
+- 调整模块职责或常见入口 → 更新 `docs/codemap.md`
+- 拆解/推进阶段性任务 → 更新 `docs/task.md`

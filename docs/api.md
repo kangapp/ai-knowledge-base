@@ -31,6 +31,11 @@
 | 50003 | 上游 API 超时 | 504 |
 | 50004 | LLM Provider 不可用 | 503 |
 
+当前实现中：
+- `HTTPException` 会按 HTTP 状态映射到项目错误码，例如 404 → `40401`。
+- FastAPI 参数校验错误统一返回 HTTP 422 + `code=40001`。
+- 未捕获异常统一返回 HTTP 500 + `code=50001`。
+
 ---
 
 ## 健康检查
@@ -50,13 +55,13 @@
 
 ### GET /api/articles
 
-文章列表（支持分页、来源筛选）。
+文章列表（支持分页、来源筛选）。只返回 `status='approved'` 的文章。
 
 **参数:**
 
 | 参数 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
-| query | string | "" | 搜索关键词 |
+| query | string | "" | 搜索关键词，走 FTS5 |
 | source | string | "" | 来源筛选 |
 | days | int | 30 | 近N天 |
 | page | int | 1 | 页码 |
@@ -67,7 +72,15 @@
 {
   "code": 0,
   "data": {
-    "items": [...],
+    "items": [
+      {
+        "id": 1,
+        "title": "Example",
+        "url": "https://example.com",
+        "source": "rss",
+        "tags": ["AI"]
+      }
+    ],
     "total": 18250,
     "page": 1,
     "page_size": 20
@@ -86,7 +99,7 @@
 |------|------|------|
 | article_id | int | 文章ID |
 
-**响应:** 返回完整 articles 表记录。
+**响应:** 返回完整 articles 表记录，并附加 `tags` 数组。
 
 **错误:** 40401 - 文章不存在
 
@@ -101,7 +114,7 @@
 | q | string | - | 搜索关键词（必填） |
 | limit | int | 20 | 返回条数 |
 
-**响应:**
+**响应:** `total` 为本次返回数量。
 ```json
 {
   "code": 0,
@@ -116,6 +129,39 @@
 ---
 
 ## 统计接口
+
+### GET /api/dashboard/summary
+
+仪表盘首屏 KPI 聚合接口。该接口只返回首屏需要的摘要数据；各 Tab 仍使用对应领域接口懒加载。
+
+**参数:**
+
+| 参数 | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| days | int | 7 | 近N天 (1-3650) |
+
+**响应:**
+```json
+{
+  "code": 0,
+  "data": {
+    "total_articles": 125,
+    "period_articles": 40,
+    "period_cost": 0.5,
+    "total_cost": 5.0,
+    "active_sources": 4,
+    "avg_score": 78.5,
+    "pass_rate": 0.39,
+    "period_total_collected": 102
+  },
+  "message": "ok"
+}
+```
+
+**口径说明:**
+- `period_articles`、`pass_rate`、`period_total_collected` 来自 `pipeline_runs.summary`，表示流水线审核口径。
+- `total_articles`、`active_sources`、`avg_score` 来自 `articles` 表，仅统计 approved 文章。
+- 成本字段来自 `cost_logs`。
 
 ### GET /api/stats
 
@@ -144,7 +190,7 @@
 
 ### GET /api/stats/enhanced
 
-增强版统计（含成本趋势）。
+增强版统计（含成本趋势）。`summary` 与 `/api/dashboard/summary` 使用同一口径。
 
 **参数:**
 
@@ -365,7 +411,7 @@
 
 ## 数据源接口
 
-### GET /api/sources
+### GET /api/sources/
 
 数据源列表（含状态）。
 
@@ -401,7 +447,7 @@
 
 | 参数 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
-| period | string | "week" | day/week/month |
+| period | string | "week" | day/week/month，其他值按 week 处理 |
 
 **响应:**
 ```json
@@ -478,5 +524,6 @@
 
 | 日期 | 变更内容 |
 |------|----------|
+| 2026-05-31 | 统一 API 错误信封；新增 `/api/dashboard/summary`；修正 `/api/articles` total 和详情 tags；数据源接口复用注入 DB |
 | 2026-05-24 | 新增 `/api/stats/quality-detail` 端点 |
 | 2026-05-24 | 新增 `/api/stats/consumption-detail` 端点 |
