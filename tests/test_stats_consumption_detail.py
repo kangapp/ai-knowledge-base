@@ -17,6 +17,7 @@ async def _insert_cost(
     provider: str,
     cost: float,
     days_ago: int,
+    ref_url: str | None = None,
 ):
     await db.execute(
         """
@@ -28,10 +29,27 @@ async def _insert_cost(
     await db.execute(
         """
         INSERT INTO cost_logs
-        (run_id, agent, provider, model, tokens_in, tokens_out, cost, created_at)
-        VALUES (?, ?, ?, 'test-model', 100, 100, ?, datetime('now', ?))
+        (run_id, agent, provider, model, tokens_in, tokens_out, cost, created_at, ref_url)
+        VALUES (?, ?, ?, 'test-model', 100, 100, ?, datetime('now', ?), ?)
         """,
-        (run_id, agent, provider, cost, f"-{days_ago} days"),
+        (run_id, agent, provider, cost, f"-{days_ago} days", ref_url),
+    )
+
+
+async def _insert_article(
+    db: Database,
+    *,
+    title: str,
+    url: str,
+    source: str,
+    source_detail: str | None = None,
+):
+    await db.execute(
+        """
+        INSERT INTO articles (title, url, description, source, source_detail, status, collected_at)
+        VALUES (?, ?, 'test article', ?, ?, 'approved', datetime('now'))
+        """,
+        (title, url, source, source_detail),
     )
 
 
@@ -75,5 +93,35 @@ async def test_consumption_detail_week_uses_recent_12_weeks_weekly_window(tmp_pa
         assert all("W" in row["label"] for row in data["trend"])
         assert sum(row["cost"] for row in data["trend"]) == 0.5
         assert {row["provider"] for row in data["provider_trend"]} == {"deepseek"}
+    finally:
+        await db.close()
+
+
+@pytest.mark.asyncio
+async def test_consumption_detail_source_trend_uses_article_source_detail(tmp_path):
+    db = Database(tmp_path / "test.db", migrations_dir=_MIGRATIONS_DIR)
+    try:
+        await db.initialize()
+        rss_url = "https://36kr.com/p/123"
+        arxiv_url = "https://arxiv.org/abs/2605.00001"
+        await _insert_article(db, title="36kr item", url=rss_url, source="rss", source_detail="36氪")
+        await _insert_article(db, title="arxiv item", url=arxiv_url, source="arxiv", source_detail="cs.AI")
+        await _insert_cost(db, run_id="r1", agent="rss_analyzer", provider="deepseek", cost=0.2, days_ago=0, ref_url=rss_url)
+        await _insert_cost(db, run_id="r1", agent="reviewer", provider="deepseek", cost=0.3, days_ago=0, ref_url=rss_url)
+        await _insert_cost(db, run_id="r2", agent="arxiv_analyzer", provider="minimax", cost=0.4, days_ago=0, ref_url=arxiv_url)
+        await _insert_cost(db, run_id="r2", agent="reviewer", provider="minimax", cost=0.5, days_ago=0, ref_url=arxiv_url)
+        await db.commit()
+
+        data = await get_consumption_detail_stats(db, "day")
+
+        source_costs = {
+            (row["source"], row["type"]): row["cost"]
+            for row in data["source_trend"]
+        }
+        assert source_costs[("36氪", "analyze")] == 0.2
+        assert source_costs[("36氪", "review")] == 0.3
+        assert source_costs[("arxiv", "analyze")] == 0.4
+        assert source_costs[("arxiv", "review")] == 0.5
+        assert "review" not in {row["source"] for row in data["source_trend"]}
     finally:
         await db.close()

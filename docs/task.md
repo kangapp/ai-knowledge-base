@@ -36,6 +36,10 @@
 - [x] 移除仪表盘运行监控 Tab
   - 运行监控由独立 DAG 页面承担
   - 仪表盘保留数据质量、资源消耗、数据源健康三个 Tab
+- [x] 修正资源消耗来源费用口径
+  - 来源费用构成优先按文章真实来源归因
+  - RSS 子来源展示 `source_detail`，如 `36氪`
+  - Reviewer 成本跟随文章来源，不再显示为独立 `review` 来源
 - [ ] 统计服务层继续收口
   - 将 `quality/runtime/consumption` SQL 从 `src/db/operations.py` 逐步迁到更聚焦的统计服务文件
   - 每迁一个接口补一个契约测试
@@ -46,6 +50,7 @@
 ## 验证命令
 
 - 已通过：`.venv/bin/python -m pytest tests/test_api_contracts.py -q`
+- 已通过：`.venv/bin/python -m pytest tests/test_stats_consumption_detail.py -q`
 - 待全量确认：`.venv/bin/python -m pytest -m "not integration and not e2e"`
 
 说明：当前 shell 中 `uv` 不可用，使用项目 `.venv/bin/python` 执行测试。

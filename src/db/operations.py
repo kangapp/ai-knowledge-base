@@ -403,49 +403,51 @@ async def get_consumption_detail_stats(db: Database, period: str = "week") -> di
 
     trend = await db.fetch_all(trend_sql, (window,))
 
-    # 4. 来源费用趋势（分析 + 审核）
+    # 4. 来源费用构成（按文章真实来源归因，历史数据回退到 agent 推断）
+    source_expr = """
+        CASE
+            WHEN a.source = 'rss' AND NULLIF(TRIM(a.source_detail), '') IS NOT NULL THEN a.source_detail
+            WHEN NULLIF(TRIM(a.source), '') IS NOT NULL THEN a.source
+            WHEN cl.agent LIKE '%_analyzer' THEN SUBSTR(cl.agent, 1, LENGTH(cl.agent) - 9)
+            WHEN cl.agent = 'reviewer' THEN 'review'
+            ELSE cl.agent
+        END
+    """
     if period == "day":
-        source_trend = await db.fetch_all("""
+        source_trend = await db.fetch_all(f"""
             SELECT
-                CASE
-                    WHEN agent LIKE '%_analyzer' THEN SUBSTR(agent, 1, LENGTH(agent) - 8)
-                    WHEN agent = 'reviewer' THEN 'review'
-                    ELSE agent
-                END as source,
-                CASE WHEN agent LIKE '%_analyzer' THEN 'analyze' ELSE 'review' END as type,
-                date(created_at) as label,
-                SUM(cost) as cost
-            FROM cost_logs
-            WHERE created_at >= date('now', ?)
-            GROUP BY source, type, date(created_at)
+                {source_expr} as source,
+                CASE WHEN cl.agent LIKE '%_analyzer' THEN 'analyze' ELSE 'review' END as type,
+                date(cl.created_at) as label,
+                SUM(cl.cost) as cost
+            FROM cost_logs cl
+            LEFT JOIN articles a ON a.url = cl.ref_url
+            WHERE cl.created_at >= date('now', ?)
+            GROUP BY source, type, date(cl.created_at)
             ORDER BY label
         """, (window,))
     elif period == "week":
-        source_trend = await db.fetch_all("""
+        source_trend = await db.fetch_all(f"""
             SELECT
-                CASE
-                    WHEN agent LIKE '%_analyzer' THEN SUBSTR(agent, 1, LENGTH(agent) - 8)
-                    WHEN agent = 'reviewer' THEN 'review'
-                    ELSE agent
-                END as source,
-                CASE WHEN agent LIKE '%_analyzer' THEN 'analyze' ELSE 'review' END as type,
-                strftime('%Y-W%W', created_at) as label,
-                SUM(cost) as cost
-            FROM cost_logs WHERE created_at >= date('now', ?)
+                {source_expr} as source,
+                CASE WHEN cl.agent LIKE '%_analyzer' THEN 'analyze' ELSE 'review' END as type,
+                strftime('%Y-W%W', cl.created_at) as label,
+                SUM(cl.cost) as cost
+            FROM cost_logs cl
+            LEFT JOIN articles a ON a.url = cl.ref_url
+            WHERE cl.created_at >= date('now', ?)
             GROUP BY source, type, label ORDER BY label
         """, (window,))
     else:
-        source_trend = await db.fetch_all("""
+        source_trend = await db.fetch_all(f"""
             SELECT
-                CASE
-                    WHEN agent LIKE '%_analyzer' THEN SUBSTR(agent, 1, LENGTH(agent) - 8)
-                    WHEN agent = 'reviewer' THEN 'review'
-                    ELSE agent
-                END as source,
-                CASE WHEN agent LIKE '%_analyzer' THEN 'analyze' ELSE 'review' END as type,
-                strftime('%Y-%m', created_at) as label,
-                SUM(cost) as cost
-            FROM cost_logs WHERE created_at >= date('now', ?)
+                {source_expr} as source,
+                CASE WHEN cl.agent LIKE '%_analyzer' THEN 'analyze' ELSE 'review' END as type,
+                strftime('%Y-%m', cl.created_at) as label,
+                SUM(cl.cost) as cost
+            FROM cost_logs cl
+            LEFT JOIN articles a ON a.url = cl.ref_url
+            WHERE cl.created_at >= date('now', ?)
             GROUP BY source, type, label ORDER BY label
         """, (window,))
 

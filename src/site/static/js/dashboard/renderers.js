@@ -15,7 +15,12 @@
     }
 
     function sourceLabel(source) {
-        return rssLabels[source] || source;
+        if (!source) return '未知来源';
+        if (rssLabels[source]) return rssLabels[source];
+        if (/^https?:\/\//.test(source)) {
+            return source.replace(/^https?:\/\//, '').split('/')[0];
+        }
+        return source;
     }
 
     function dimScore(dim) {
@@ -119,7 +124,7 @@
         const sources = [...new Set((data.source_trend || []).map(s => s.source))];
         DashboardCharts.stackedBar(
             'cs-source-chart',
-            sources,
+            sources.map(sourceLabel),
             [
                 {
                     label: '分析',
