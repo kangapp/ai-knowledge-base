@@ -182,9 +182,11 @@ UNIQUE(source_id, date)
 **数据源健康主键口径：**
 
 - `source_id` 始终使用 `config/sources.yaml` 中的配置 id。
-- Collector 阶段采集成功/失败直接按配置 id 写入。
-- Reviewer 阶段通过 `RawItem.raw_metadata.source_id` 归并审核结果；`source_detail` 只作为展示和文章来源细分，不作为健康统计主键。
+- Collector 阶段采集成功/失败直接按配置 id 写入，并按天累加 `total_collected/failed`。
+- Reviewer 阶段通过 `RawItem.raw_metadata.source_id` 归并审核结果，并按天累加 `approved/rejected`；`avg_score` 按 approved 数加权合并。
+- `source_detail` 只作为展示和文章来源细分，不作为健康统计主键。
 - 这样 RSS 展示名（如 `36氪`）和 arXiv 分类（如 `cs.AI`）不会被误当成数据源 id。
+- 迁移 `007_normalize_source_health_ids.sql` 会将历史 `36氪` 合并到 `rss_36kr`，将历史 `cs.AI/cs.CL/cs.LG` 合并到 `rss_arxiv`。
 
 ### discovered_sources — 已发现待审核的数据源
 

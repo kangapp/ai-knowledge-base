@@ -28,7 +28,7 @@ async def test_initialize_and_migrate(tmp_path):
 
         # 验证迁移版本
         v = await db.fetch_one("SELECT version FROM schema_version")
-        assert v["version"] == 6
+        assert v["version"] == 7
 
         cost_log_columns = await db.fetch_all("PRAGMA table_info(cost_logs)")
         column_names = {row["name"] for row in cost_log_columns}

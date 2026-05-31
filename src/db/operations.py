@@ -516,17 +516,27 @@ async def record_source_health(db: Database, record: "CollectResult"):
     """记录数据源健康数据"""
     from ..graph.state import CollectResult as CR
     today = datetime.now().strftime("%Y-%m-%d")
+    has_review_stats = record.approved > 0 or record.rejected > 0 or record.avg_score is not None
+    total_collected = 0 if has_review_stats else record.total
     await db.execute("""
         INSERT INTO source_health (source_id, date, total_collected, approved, rejected, failed, avg_score)
         VALUES (?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(source_id, date) DO UPDATE SET
-            total_collected=excluded.total_collected,
-            approved=excluded.approved,
-            rejected=excluded.rejected,
-            failed=excluded.failed,
-            avg_score=excluded.avg_score,
+            total_collected=source_health.total_collected + excluded.total_collected,
+            approved=source_health.approved + excluded.approved,
+            rejected=source_health.rejected + excluded.rejected,
+            failed=source_health.failed + excluded.failed,
+            avg_score=CASE
+                WHEN excluded.avg_score IS NULL OR excluded.approved = 0 THEN source_health.avg_score
+                WHEN source_health.avg_score IS NULL OR source_health.approved = 0 THEN excluded.avg_score
+                ELSE ROUND(
+                    (source_health.avg_score * source_health.approved + excluded.avg_score * excluded.approved)
+                    / (source_health.approved + excluded.approved),
+                    1
+                )
+            END,
             recorded_at=datetime('now')
-    """, (record.source_id, today, record.total, record.approved, record.rejected, record.failed, record.avg_score))
+    """, (record.source_id, today, total_collected, record.approved, record.rejected, record.failed, record.avg_score))
     await db.commit()
 
 

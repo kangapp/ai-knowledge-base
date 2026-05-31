@@ -475,6 +475,7 @@
 - `approved_rate` 为窗口内 `approved / total_collected`。
 - `avg_score` 为窗口内每日 `avg_score` 的简单平均。
 - `trend` 通过窗口前后半段 approved rate 对比得出：超过 10% 为 `rising`，低于 10% 为 `falling`，否则 `stable`。
+- `source_health` 按天合并：Collector 累加 `total_collected/failed`，Reviewer 累加 `approved/rejected`，`avg_score` 按 approved 数加权合并。
 
 **响应:**
 ```json

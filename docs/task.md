@@ -48,6 +48,10 @@
   - `source_health.source_id` 统一使用 `config/sources.yaml` 的配置 id
   - RSS/arXiv/飞书采集结果在 `raw_metadata.source_id` 保留配置 id
   - Reviewer 阶段按配置 id 汇总通过率和平均分，避免展示名或分类名被过滤
+- [x] 修正 source_health 同日覆盖问题
+  - Collector 累加 `total_collected/failed`
+  - Reviewer 累加 `approved/rejected`，`avg_score` 按 approved 数加权合并
+  - 新增 007 迁移合并历史 `36氪`、`cs.AI/cs.CL/cs.LG` 健康记录
 - [ ] 统计服务层继续收口
   - 将 `quality/runtime/consumption` SQL 从 `src/db/operations.py` 逐步迁到更聚焦的统计服务文件
   - 每迁一个接口补一个契约测试
@@ -62,6 +66,6 @@
 
 - 已通过：`.venv/bin/python -m pytest tests/test_api_contracts.py -q`
 - 已通过：`.venv/bin/python -m pytest tests/test_stats_consumption_detail.py -q`
-- 已通过：`.venv/bin/python -m pytest -m "not integration and not e2e"`（64 passed）
+- 已通过：`.venv/bin/python -m pytest -m "not integration and not e2e"`（66 passed）
 
 说明：当前 shell 中 `uv` 不可用，使用项目 `.venv/bin/python` 执行测试。
