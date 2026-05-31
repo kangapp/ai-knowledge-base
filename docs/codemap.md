@@ -39,7 +39,7 @@
 
 - `src/db/operations.py`
   - 数据库操作集合：文章保存、标签保存、成本记录、统计查询、备份等。
-  - 常见改动入口：文章查询、统计 SQL、pipeline run 记录。
+  - 常见改动入口：文章查询、统计 SQL、pipeline run 记录、`cost_logs` 来源归因。
   - 目前仍包含较多统计 SQL；后续仪表盘重构时建议逐步拆到 service 层。
 
 - `src/core/database.py`
@@ -63,9 +63,11 @@
 
 - `src/graph/analyzers/`
   - 各源 Analyzer 薄层；通用实现位于 `base.py`。
+  - Analyzer 成本记录在 `base.py` 写入 `CostRecord`，来源字段来自 `RawItem`。
 
 - `src/graph/reviewer.py`
   - 四维评分审核。
+  - Reviewer 成本记录先保留 `ref_url`，图外入库前由 `src/main.py` 按本轮 `RawItem` 补齐来源字段。
 
 ## 静态站与仪表盘前端
 

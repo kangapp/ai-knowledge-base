@@ -110,7 +110,18 @@ async def analyze_items(
 
                 # parse 成功，记录 CostRecord 并 break
                 results.append(analyzed)
-                costs.append(CostRecord(agent=agent_name, provider=provider, model=model_id, tokens_in=tokens_in, tokens_out=tokens_out, cost=cost, ref_url=item.url))
+                costs.append(CostRecord(
+                    agent=agent_name,
+                    provider=provider,
+                    model=model_id,
+                    tokens_in=tokens_in,
+                    tokens_out=tokens_out,
+                    cost=cost,
+                    ref_url=item.url,
+                    source=item.source,
+                    source_detail=item.source_detail,
+                    source_id=item.raw_metadata.get("source_id", item.source_detail or item.source),
+                ))
                 logger.debug("analyzer.item", extra={
                     "agent": agent_name,
                     "url": item.url,

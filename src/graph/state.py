@@ -44,6 +44,9 @@ class CostRecord(BaseModel):
     tokens_out: int
     cost: float
     ref_url: str = ""
+    source: str = ""
+    source_detail: str = ""
+    source_id: str = ""
 
 
 class PipelineState(BaseModel):

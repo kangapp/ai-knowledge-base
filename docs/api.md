@@ -318,9 +318,10 @@
 
 **来源费用口径:**
 
-- `source_trend.source` 优先通过 `cost_logs.ref_url = articles.url` 归因到文章真实来源。
-- RSS 文章优先展示 `articles.source_detail`（例如 `36氪`、`OpenAI Blog`）；`arxiv`、`github`、`feishu` 等非 RSS 来源展示 `articles.source`。
-- 无法关联文章的历史成本记录回退到 `cost_logs.agent` 推断来源，避免旧数据丢失。
+- `source_trend.source` 优先读取 `cost_logs.source/source_detail`，这是新成本记录的显式来源快照。
+- 旧成本记录没有显式来源时，通过 `cost_logs.ref_url = articles.url` 归因到文章真实来源。
+- RSS 文章优先展示 `source_detail`（例如 `36氪`、`OpenAI Blog`）；`arxiv`、`github`、`feishu` 等非 RSS 来源展示 `source`。
+- 如果历史成本记录无法关联文章，则根据 `ref_url` 域名兜底识别常见来源（例如 `36kr.com → 36氪`、`github.com → github`、`arxiv.org → arxiv`），最后才回退到 `cost_logs.agent`。
 - `source_trend.type` 表示费用阶段：`analyze` 为 Analyzer 成本，`review` 为 Reviewer 成本；Reviewer 成本同样归到文章真实来源，不再把 `review` 当作来源。
 
 **响应:**

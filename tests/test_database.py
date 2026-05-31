@@ -28,7 +28,11 @@ async def test_initialize_and_migrate(tmp_path):
 
         # 验证迁移版本
         v = await db.fetch_one("SELECT version FROM schema_version")
-        assert v["version"] == 5
+        assert v["version"] == 6
+
+        cost_log_columns = await db.fetch_all("PRAGMA table_info(cost_logs)")
+        column_names = {row["name"] for row in cost_log_columns}
+        assert {"source", "source_detail", "source_id"}.issubset(column_names)
     finally:
         await db.close()
 

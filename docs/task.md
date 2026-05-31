@@ -40,9 +40,16 @@
   - 来源费用构成优先按文章真实来源归因
   - RSS 子来源展示 `source_detail`，如 `36氪`
   - Reviewer 成本跟随文章来源，不再显示为独立 `review` 来源
+- [x] 补充成本来源快照和历史兜底
+  - `cost_logs` 新增 `source/source_detail/source_id`
+  - 新成本记录写入时保存来源快照，统计优先使用显式字段
+  - 历史成本无法 JOIN 文章时按 `ref_url` 域名兜底识别来源
 - [ ] 统计服务层继续收口
   - 将 `quality/runtime/consumption` SQL 从 `src/db/operations.py` 逐步迁到更聚焦的统计服务文件
   - 每迁一个接口补一个契约测试
+- [ ] 历史成本来源回填
+  - 可选执行一次性脚本，将已有 `cost_logs` 的 `source/source_detail/source_id` 按 `articles` 和 URL 域名回填
+  - 回填后统计接口仍保留 URL 兜底，兼容漏网历史数据
 - [ ] API 错误码细分
   - 数据库异常目前仍归入 `50001`
   - 如需严格区分，可补 DB exception handler 映射到 `50002`
@@ -51,6 +58,6 @@
 
 - 已通过：`.venv/bin/python -m pytest tests/test_api_contracts.py -q`
 - 已通过：`.venv/bin/python -m pytest tests/test_stats_consumption_detail.py -q`
-- 待全量确认：`.venv/bin/python -m pytest -m "not integration and not e2e"`
+- 已通过：`.venv/bin/python -m pytest -m "not integration and not e2e"`
 
 说明：当前 shell 中 `uv` 不可用，使用项目 `.venv/bin/python` 执行测试。

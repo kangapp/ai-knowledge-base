@@ -136,14 +136,25 @@ FTS5 全文索引：`articles_fts` over (title, summary, description)
 | tokens_in | INTEGER | |
 | tokens_out | INTEGER | |
 | cost | REAL | |
+| ref_url | TEXT | LLM 调用关联的原始文章 URL |
+| source | TEXT | 成本记录时的来源快照：github / rss / feishu / arxiv |
+| source_detail | TEXT | 成本记录时的来源细分；RSS 存 feed 名称或展示名 |
+| source_id | TEXT | 成本记录时的源 ID；GitHub 用 source_id，RSS 用 feed URL |
 | created_at | TEXT DEFAULT CURRENT_TIMESTAMP | |
 
 **样例数据：**
 
-| id | run_id | agent | provider | model | tokens_in | tokens_out | cost | created_at |
-|----|--------|-------|----------|-------|----------|-----------|------|------------|
-| 1 | run_20260524_090000 | github_analyzer | deepseek | deepseek-chat | 1200 | 350 | 0.0021 | 2026-05-24T09:01:00Z |
-| 2 | run_20260524_090000 | reviewer | deepseek | deepseek-chat | 2800 | 420 | 0.0048 | 2026-05-24T09:03:00Z |
+| id | run_id | agent | provider | model | tokens_in | tokens_out | cost | ref_url | source | source_detail | source_id | created_at |
+|----|--------|-------|----------|-------|----------|-----------|------|---------|--------|---------------|-----------|------------|
+| 1 | run_20260524_090000 | github_analyzer | deepseek | deepseek-chat | 1200 | 350 | 0.0021 | https://github.com/org/repo | github | | github_trending | 2026-05-24T09:01:00Z |
+| 2 | run_20260524_090000 | reviewer | deepseek | deepseek-chat | 2800 | 420 | 0.0048 | https://36kr.com/p/123 | rss | 36氪 | https://36kr.com/feed | 2026-05-24T09:03:00Z |
+
+**成本来源记录口径：**
+
+- 新记录写入时应保存 `source/source_detail/source_id` 快照，统计接口优先使用这些字段，避免审核未通过、重复或未入库文章无法归因。
+- Analyzer 成本由 `RawItem` 直接填充来源字段。
+- Reviewer 成本在图外入库阶段按 `ref_url` 从本轮 `RawItem` 映射补齐来源字段。
+- 历史记录缺少来源字段时，统计接口按 `articles` JOIN 和 URL 域名兜底归因。
 
 ### source_health — 数据源健康统计
 

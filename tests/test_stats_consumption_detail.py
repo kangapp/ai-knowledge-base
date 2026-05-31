@@ -3,7 +3,8 @@ from pathlib import Path
 import pytest
 
 from src.core.database import Database
-from src.db.operations import get_consumption_detail_stats
+from src.db.operations import get_consumption_detail_stats, save_cost_log
+from src.graph.state import CostRecord
 
 
 _MIGRATIONS_DIR = Path(__file__).parent.parent / "src" / "db" / "migrations"
@@ -123,5 +124,91 @@ async def test_consumption_detail_source_trend_uses_article_source_detail(tmp_pa
         assert source_costs[("arxiv", "analyze")] == 0.4
         assert source_costs[("arxiv", "review")] == 0.5
         assert "review" not in {row["source"] for row in data["source_trend"]}
+    finally:
+        await db.close()
+
+
+@pytest.mark.asyncio
+async def test_consumption_detail_source_trend_falls_back_to_ref_url_origin(tmp_path):
+    db = Database(tmp_path / "test.db", migrations_dir=_MIGRATIONS_DIR)
+    try:
+        await db.initialize()
+        await _insert_cost(
+            db,
+            run_id="r1",
+            agent="reviewer",
+            provider="deepseek",
+            cost=0.2,
+            days_ago=0,
+            ref_url="https://36kr.com/p/3831073348855433?f=rss",
+        )
+        await _insert_cost(
+            db,
+            run_id="r2",
+            agent="reviewer",
+            provider="deepseek",
+            cost=0.3,
+            days_ago=0,
+            ref_url="https://github.com/baoweise-bot/aimili-vpngate",
+        )
+        await _insert_cost(
+            db,
+            run_id="r3",
+            agent="reviewer",
+            provider="deepseek",
+            cost=0.4,
+            days_ago=0,
+            ref_url="https://arxiv.org/abs/2605.00001",
+        )
+        await db.commit()
+
+        data = await get_consumption_detail_stats(db, "day")
+
+        source_costs = {
+            (row["source"], row["type"]): row["cost"]
+            for row in data["source_trend"]
+        }
+        assert source_costs[("36氪", "review")] == 0.2
+        assert source_costs[("github", "review")] == 0.3
+        assert source_costs[("arxiv", "review")] == 0.4
+        assert "review" not in {row["source"] for row in data["source_trend"]}
+    finally:
+        await db.close()
+
+
+@pytest.mark.asyncio
+async def test_consumption_detail_source_trend_prefers_cost_log_source_fields(tmp_path):
+    db = Database(tmp_path / "test.db", migrations_dir=_MIGRATIONS_DIR)
+    try:
+        await db.initialize()
+        await db.execute(
+            """
+            INSERT OR IGNORE INTO pipeline_runs (id, started_at, status, trigger, summary)
+            VALUES ('r1', datetime('now'), 'completed', 'test', '{}')
+            """
+        )
+        await save_cost_log(
+            db,
+            "r1",
+            CostRecord(
+                agent="reviewer",
+                provider="deepseek",
+                model="test-model",
+                tokens_in=100,
+                tokens_out=100,
+                cost=0.2,
+                ref_url="https://unknown.example/item",
+                source="rss",
+                source_detail="36氪",
+                source_id="https://36kr.com/feed",
+            ),
+        )
+
+        data = await get_consumption_detail_stats(db, "day")
+
+        assert {
+            (row["source"], row["type"]): row["cost"]
+            for row in data["source_trend"]
+        } == {("36氪", "review"): 0.2}
     finally:
         await db.close()

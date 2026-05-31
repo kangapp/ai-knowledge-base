@@ -191,6 +191,10 @@ async def run_pipeline(trigger: str = "cron", source_filter: str | None = None):
         passed_count = 0
         retry_count = 0
         discarded_count = 0
+        cost_source_map = {}
+        for item in new_items:
+            source_id = item.raw_metadata.get("source_id") if item.source == "github" else item.source_detail
+            cost_source_map[item.url] = (item.source, item.source_detail, source_id or item.source)
 
         for reviewed in all_reviewed:
             raw = next((r for r in new_items if r.url == reviewed.ref_url), None)
@@ -220,6 +224,8 @@ async def run_pipeline(trigger: str = "cron", source_filter: str | None = None):
                 discarded_count += 1
 
         for record in all_costs:
+            if not record.source and record.ref_url in cost_source_map:
+                record.source, record.source_detail, record.source_id = cost_source_map[record.ref_url]
             await save_cost_log(_db, run_id, record)
 
         summary = json.dumps({

@@ -69,8 +69,15 @@ async def end_pipeline_run(db: Database, run_id: str, status: str, summary: str)
 
 
 async def save_cost_log(db: Database, run_id: str, record: CostRecord):
-    await db.execute("INSERT INTO cost_logs (run_id, agent, provider, model, tokens_in, tokens_out, cost, ref_url) VALUES (?,?,?,?,?,?,?,?)",
-        (run_id, record.agent, record.provider, record.model, record.tokens_in, record.tokens_out, record.cost, record.ref_url))
+    await db.execute("""
+        INSERT INTO cost_logs
+        (run_id, agent, provider, model, tokens_in, tokens_out, cost, ref_url, source, source_detail, source_id)
+        VALUES (?,?,?,?,?,?,?,?,?,?,?)
+    """, (
+        run_id, record.agent, record.provider, record.model,
+        record.tokens_in, record.tokens_out, record.cost, record.ref_url,
+        record.source, record.source_detail, record.source_id,
+    ))
     await db.commit()
 
 
@@ -406,8 +413,21 @@ async def get_consumption_detail_stats(db: Database, period: str = "week") -> di
     # 4. 来源费用构成（按文章真实来源归因，历史数据回退到 agent 推断）
     source_expr = """
         CASE
+            WHEN cl.source = 'rss' AND NULLIF(TRIM(cl.source_detail), '') IS NOT NULL THEN cl.source_detail
+            WHEN NULLIF(TRIM(cl.source), '') IS NOT NULL THEN cl.source
             WHEN a.source = 'rss' AND NULLIF(TRIM(a.source_detail), '') IS NOT NULL THEN a.source_detail
             WHEN NULLIF(TRIM(a.source), '') IS NOT NULL THEN a.source
+            WHEN cl.ref_url LIKE 'https://36kr.com/%' OR cl.ref_url LIKE 'http://36kr.com/%' THEN '36氪'
+            WHEN cl.ref_url LIKE 'https://www.huxiu.com/%' OR cl.ref_url LIKE 'http://www.huxiu.com/%' THEN '虎嗅'
+            WHEN cl.ref_url LIKE 'https://juejin.cn/%' OR cl.ref_url LIKE 'https://api.juejin.cn/%' THEN '稀土掘金'
+            WHEN cl.ref_url LIKE 'https://www.ithome.com/%' OR cl.ref_url LIKE 'http://www.ithome.com/%' THEN 'IT之家'
+            WHEN cl.ref_url LIKE 'https://techcrunch.com/%' OR cl.ref_url LIKE 'http://techcrunch.com/%' THEN 'TechCrunch AI'
+            WHEN cl.ref_url LIKE 'https://www.theverge.com/%' OR cl.ref_url LIKE 'http://www.theverge.com/%' THEN 'The Verge AI'
+            WHEN cl.ref_url LIKE 'https://arstechnica.com/%' OR cl.ref_url LIKE 'http://arstechnica.com/%' THEN 'Ars Technica'
+            WHEN cl.ref_url LIKE 'https://www.reuters.com/%' OR cl.ref_url LIKE 'http://www.reuters.com/%' THEN 'Reuters Science'
+            WHEN cl.ref_url LIKE 'https://www.producthunt.com/%' OR cl.ref_url LIKE 'http://www.producthunt.com/%' THEN 'Product Hunt'
+            WHEN cl.ref_url LIKE 'https://github.com/%' OR cl.ref_url LIKE 'http://github.com/%' THEN 'github'
+            WHEN cl.ref_url LIKE 'https://arxiv.org/%' OR cl.ref_url LIKE 'http://arxiv.org/%' THEN 'arxiv'
             WHEN cl.agent LIKE '%_analyzer' THEN SUBSTR(cl.agent, 1, LENGTH(cl.agent) - 9)
             WHEN cl.agent = 'reviewer' THEN 'review'
             ELSE cl.agent
@@ -423,7 +443,7 @@ async def get_consumption_detail_stats(db: Database, period: str = "week") -> di
             FROM cost_logs cl
             LEFT JOIN articles a ON a.url = cl.ref_url
             WHERE cl.created_at >= date('now', ?)
-            GROUP BY source, type, date(cl.created_at)
+            GROUP BY 1, 2, 3
             ORDER BY label
         """, (window,))
     elif period == "week":
@@ -436,7 +456,7 @@ async def get_consumption_detail_stats(db: Database, period: str = "week") -> di
             FROM cost_logs cl
             LEFT JOIN articles a ON a.url = cl.ref_url
             WHERE cl.created_at >= date('now', ?)
-            GROUP BY source, type, label ORDER BY label
+            GROUP BY 1, 2, 3 ORDER BY label
         """, (window,))
     else:
         source_trend = await db.fetch_all(f"""
@@ -448,7 +468,7 @@ async def get_consumption_detail_stats(db: Database, period: str = "week") -> di
             FROM cost_logs cl
             LEFT JOIN articles a ON a.url = cl.ref_url
             WHERE cl.created_at >= date('now', ?)
-            GROUP BY source, type, label ORDER BY label
+            GROUP BY 1, 2, 3 ORDER BY label
         """, (window,))
 
     # 5. Provider 费用趋势
