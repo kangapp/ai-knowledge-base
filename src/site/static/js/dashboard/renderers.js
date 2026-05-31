@@ -23,6 +23,10 @@
         return source;
     }
 
+    function sourceDisplayName(source) {
+        return sourceLabel(source.name || source.label || source.source_detail || source.source || source.id);
+    }
+
     function dimScore(dim) {
         if (!dim || !dim.max_score) return 0;
         return Math.round((dim.avg_score || 0) / dim.max_score * 100);
@@ -166,8 +170,8 @@
         text('src-total-collected', totalCollected);
         text('src-avg-score', avgScore == null ? '-' : avgScore.toFixed(1));
 
-        DashboardCharts.line('src-approved-rate-chart', sources.map(s => s.id), sources.map(s => (s.approved_rate || 0) * 100), '#22c55e');
-        DashboardCharts.bar('src-contribution-chart', sources.map(s => s.id), sources.map(s => s.total_collected || 0), '#3b82f6');
+        DashboardCharts.line('src-approved-rate-chart', sources.map(sourceDisplayName), sources.map(s => (s.approved_rate || 0) * 100), '#22c55e');
+        DashboardCharts.bar('src-contribution-chart', sources.map(sourceDisplayName), sources.map(s => s.total_collected || 0), '#3b82f6');
 
         const table = document.getElementById('src-quality-table');
         if (!table) return;
@@ -178,7 +182,7 @@
                 <tbody>
                     ${rows.map(s => `
                         <tr>
-                            <td>${s.id}</td>
+                            <td>${sourceDisplayName(s)}</td>
                             <td>${s.total_collected || 0}</td>
                             <td>${((s.approved_rate || 0) * 100).toFixed(1)}%</td>
                             <td>${(s.avg_score || 0).toFixed(1)}</td>

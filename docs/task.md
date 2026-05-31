@@ -48,6 +48,9 @@
   - `source_health.source_id` 统一使用 `config/sources.yaml` 的配置 id
   - RSS/arXiv/飞书采集结果在 `raw_metadata.source_id` 保留配置 id
   - Reviewer 阶段按配置 id 汇总通过率和平均分，避免展示名或分类名被过滤
+- [x] 数据源健康展示统一使用数据源简称
+  - `/api/sources/stats` 保留 `id` 作为稳定主键，同时返回 `name/type`
+  - 仪表盘数据源健康图表和表格优先展示 `name`，不再直接展示 `rss_36kr` 等存储 id
 - [x] 修正 source_health 同日覆盖问题
   - Collector 累加 `total_collected/failed`
   - Reviewer 累加 `approved/rejected`，`avg_score` 按 approved 数加权合并

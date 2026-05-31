@@ -75,11 +75,12 @@ async def get_source_stats(period: str = "week"):
         health_data = await tracker.get_all_sources_health(start_date=start_date)
 
         sources = SourceManager.load()
-        source_ids = {s.id for s in sources}
+        source_map = {s.id: s for s in sources}
 
         stats = []
         for h in health_data:
-            if h["source_id"] not in source_ids:
+            source = source_map.get(h["source_id"])
+            if not source:
                 continue
             total = h["recent_total"]
             approved = sum(r["approved"] for r in h["records"]) if h["records"] else 0
@@ -106,6 +107,8 @@ async def get_source_stats(period: str = "week"):
 
             stats.append({
                 "id": h["source_id"],
+                "name": source.name,
+                "type": source.type,
                 "approved_rate": round(approved_rate, 3),
                 "total_collected": total,
                 "avg_score": h["avg_score"],

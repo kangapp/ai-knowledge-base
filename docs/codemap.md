@@ -28,6 +28,7 @@
   - 数据源列表、数据源健康统计、启用/停用/删除、清理 source health、候选源列表。
   - 优先复用 `src/api/routes.py` 注入的全局 DB，测试或单独调用时 fallback 到 `data/kb.db`。
   - `/api/sources/stats` 只展示能与 `config/sources.yaml` 配置 id 对齐的健康数据。
+  - 健康统计响应中 `id` 是存储主键，`name` 是前端展示用的来源简称。
 
 - `src/api/config.py`
   - 配置查看接口：读取 `llm/sources/agents` YAML，返回 raw + parsed。

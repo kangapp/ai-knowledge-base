@@ -470,6 +470,8 @@
 **统计口径:**
 
 - `sources[].id` 使用 `config/sources.yaml` 中的数据源配置 id，例如 `rss_36kr`、`github_trending`、`rss_arxiv`。
+- `sources[].name` 使用 `config/sources.yaml` 中的数据源展示名，例如 `36氪`、`arXiv AI/ML`；前端图表和表格展示该简称，不直接展示存储 id。
+- `sources[].type` 使用配置中的数据源类型，例如 `rss`、`github`、`arxiv`。
 - `period` 映射到真实日期窗口：day=今天、week=近 7 个自然日（含今天）、month=近 30 个自然日（含今天）。
 - `total_collected` 为窗口内 `source_health.total_collected` 求和。
 - `approved_rate` 为窗口内 `approved / total_collected`。
@@ -486,6 +488,8 @@
     "sources": [
       {
         "id": "github_trending",
+        "name": "GitHub Trending AI",
+        "type": "github",
         "approved_rate": 0.75,
         "total_collected": 20,
         "avg_score": 82.5,

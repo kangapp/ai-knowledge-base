@@ -40,3 +40,12 @@ def test_dashboard_loads_dedicated_scripts_and_app_js_has_no_dashboard_controlle
     assert "Dashboard Tab Controller" not in app_js
     assert "loadQualityTab" not in app_js
     assert "renderConsumptionDetail" not in app_js
+
+
+def test_dashboard_source_health_uses_display_names_not_storage_ids():
+    renderers = (ROOT / "src/site/static/js/dashboard/renderers.js").read_text()
+
+    assert "function sourceDisplayName" in renderers
+    assert "sources.map(sourceDisplayName)" in renderers
+    assert "<td>${sourceDisplayName(s)}</td>" in renderers
+    assert "sources.map(s => s.id)" not in renderers

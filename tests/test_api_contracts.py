@@ -197,6 +197,8 @@ async def test_source_stats_period_uses_calendar_window(api_client, api_db, monk
     day = api_client.get("/api/sources/stats?period=day").json()["data"]["sources"][0]
     week = api_client.get("/api/sources/stats?period=week").json()["data"]["sources"][0]
 
+    assert day["id"] == "rss_test"
+    assert day["name"] == "RSS Test"
     assert day["total_collected"] == 10
     assert day["approved_rate"] == 0.4
     assert day["avg_score"] == 80.0
