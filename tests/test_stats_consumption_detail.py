@@ -23,7 +23,7 @@ async def _insert_cost(
     await db.execute(
         """
         INSERT OR IGNORE INTO pipeline_runs (id, started_at, status, trigger, summary)
-        VALUES (?, datetime('now', ?), 'completed', 'test', '{}')
+        VALUES (?, datetime('now', '+8 hours', ?), 'completed', 'test', '{}')
         """,
         (run_id, f"-{days_ago} days"),
     )
@@ -31,7 +31,7 @@ async def _insert_cost(
         """
         INSERT INTO cost_logs
         (run_id, agent, provider, model, tokens_in, tokens_out, cost, created_at, ref_url)
-        VALUES (?, ?, ?, 'test-model', 100, 100, ?, datetime('now', ?), ?)
+        VALUES (?, ?, ?, 'test-model', 100, 100, ?, datetime('now', '+8 hours', ?), ?)
         """,
         (run_id, agent, provider, cost, f"-{days_ago} days", ref_url),
     )
@@ -48,7 +48,7 @@ async def _insert_article(
     await db.execute(
         """
         INSERT INTO articles (title, url, description, source, source_detail, status, collected_at)
-        VALUES (?, ?, 'test article', ?, ?, 'approved', datetime('now'))
+        VALUES (?, ?, 'test article', ?, ?, 'approved', datetime('now', '+8 hours'))
         """,
         (title, url, source, source_detail),
     )
@@ -222,7 +222,7 @@ async def test_consumption_detail_source_trend_prefers_cost_log_source_fields(tm
         await db.execute(
             """
             INSERT OR IGNORE INTO pipeline_runs (id, started_at, status, trigger, summary)
-            VALUES ('r1', datetime('now'), 'completed', 'test', '{}')
+            VALUES ('r1', datetime('now', '+8 hours'), 'completed', 'test', '{}')
             """
         )
         await save_cost_log(

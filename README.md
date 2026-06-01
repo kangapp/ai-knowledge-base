@@ -301,6 +301,19 @@ sources:
       languages: [python, typescript]
       topics: [ai, llm, agent]
 
+  - id: github_ai_devtools
+    name: GitHub AI 开发工具
+    type: github
+    enabled: true
+    cron: "0 */6 * * *"
+    max_items: 10
+    config:
+      topics: []
+      keywords: ["interactive knowledge graph", "codebase knowledge graph", "code understanding", "codebase understanding", "repository analysis"]
+      lookback_type: pushed
+      lookback_days: 90
+      min_stars: 100
+
   - id: rss_the_batch
     name: The Batch
     type: rss

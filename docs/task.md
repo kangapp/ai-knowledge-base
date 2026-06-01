@@ -68,6 +68,12 @@
 - [x] 修复 GitHub Search 422
   - Search query 最多拼 5 个 include 条件，避免超过 GitHub `AND/OR/NOT` 操作符限制
   - `exclude_terms` 改为 API 返回后的本地过滤，保留噪音剔除能力
+- [x] 修复 GitHub 数据源健康采集量为 0
+  - GitHub Search 不支持对 `topic:` qualifier 使用 `OR`，旧查询会稳定返回 0
+  - 改为最多 5 个单条件 Search 请求，合并去重后再应用 stars/forks/watchers 阈值
+- [x] 新增 GitHub AI 开发工具数据源
+  - 新增 `github_ai_devtools`，面向 Understand-Anything、GitNexus、probe 这类代码库理解/知识图谱/AI 开发工具仓库
+  - 使用 `pushed` 90 天窗口和用途型关键词：`interactive knowledge graph`、`codebase knowledge graph`、`code understanding`、`codebase understanding`、`repository analysis`
 - [x] 收紧 RSS 数据源采集口径
   - 英文关键词按词边界匹配，避免 `AI` 命中 `raises`、`chair` 等普通单词片段
   - 综合媒体 RSS 使用 `filter_scope: title`，避免长正文/推荐内容里偶然出现 AI 词导致误采集
@@ -93,6 +99,10 @@
   - `/api/stats/consumption-detail` 新增 `trend_window`，KPI 窗口继续由 `period` 控制
   - 默认趋势窗口：day=14d、week=12w、month=12m
   - `trend/source_trend/provider_trend` 使用同一个趋势窗口，避免选日时趋势只剩今天
+- [x] 统一项目业务时间为北京时间
+  - 新增 `src/core/time.py` 作为 Python 业务时间唯一入口
+  - 采集、pipeline run、phase log、cost log、source health、GitHub 快照、静态站构建时间统一写入北京时间
+  - 所有 API/仪表盘 SQL 日期窗口使用北京时间自然日，避免 UTC 日界导致选日数据为 0
 - [x] MiniMax 默认模型升级到 M3
   - `config/llm.yaml` 注册模型改为 `MiniMax-M3`
   - `config/agents.yaml` 中所有 analyzer/reviewer primary model 统一改为 `MiniMax-M3`
@@ -112,10 +122,13 @@
 - 已通过：`.venv/bin/python -m pytest tests/test_api_contracts.py -q`
 - 已通过：`.venv/bin/python -m pytest tests/test_stats_consumption_detail.py -q`
 - 已通过：`.venv/bin/python -m pytest tests/test_collector.py tests/test_database.py tests/test_pipeline_github.py -q`
+- 已通过：`.venv/bin/python -m pytest -m "not integration and not e2e"`
 - 已通过：`.venv/bin/pytest tests/test_collector.py -q`（10 passed）
 - 已通过：`.venv/bin/python -m pytest tests/test_reviewer.py tests/test_stats_quality_detail.py tests/test_prompt_regression.py -q`
 - 已通过：`.venv/bin/python -m pytest tests/test_analyzer.py tests/test_reviewer.py tests/test_cost_accounting.py tests/test_stats_consumption_detail.py -q`
 - 已通过：`.venv/bin/python -m pytest -m "not integration and not e2e"`（93 passed）
 - 已通过：`.venv/bin/pytest tests/test_config.py tests/test_llm_client.py tests/test_analyzer.py tests/test_reviewer.py tests/test_pipeline.py -q`（24 passed）
+- 已通过：`.venv/bin/pytest tests/test_collector.py -q`（11 passed）
+- 已通过：`.venv/bin/python -m pytest -m "not integration and not e2e"`（95 passed）
 
 说明：当前 shell 中 `uv` 不可用，使用项目 `.venv/bin/python` 执行测试。

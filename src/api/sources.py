@@ -1,11 +1,12 @@
 # src/api/sources.py
 import logging
-from datetime import date, datetime, timezone, timedelta
+from datetime import date, timedelta
 from fastapi import APIRouter, HTTPException
 from ..core.database import Database
 from ..core.source_health import SourceHealthTracker
 from ..core.source_manager import SourceManager
 from ..core.config import SourceConfig
+from ..core.time import today_bj
 from .responses import envelope
 
 router = APIRouter(prefix="/api/sources", tags=["sources"])
@@ -13,7 +14,7 @@ logger = logging.getLogger("api")
 
 
 def _today() -> str:
-    return datetime.now(timezone.utc).date().isoformat()
+    return today_bj()
 
 
 def _source_to_dict(source: SourceConfig, health: dict | None = None) -> dict:

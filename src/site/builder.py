@@ -1,9 +1,9 @@
 import asyncio, json, re, shutil
 from pathlib import Path
-from datetime import datetime
 from html import unescape
 from jinja2 import Environment, FileSystemLoader
 from ..core.database import Database
+from ..core.time import now_bj, now_bj_iso
 from ..db.operations import search_articles, get_stats
 
 
@@ -35,7 +35,7 @@ class SiteBuilder:
 
     async def build(self):
         # 用时间戳生成临时目录，避免删除 volume mount 的 /app/output
-        tmp_dir = self.output_dir.parent / f"output.tmp.{datetime.now().strftime('%Y%m%d%H%M%S')}"
+        tmp_dir = self.output_dir.parent / f"output.tmp.{now_bj().strftime('%Y%m%d%H%M%S')}"
         tmp_dir.mkdir(parents=True, exist_ok=True)
         (tmp_dir / "articles").mkdir()
 
@@ -52,7 +52,7 @@ class SiteBuilder:
         for a in recent:
             a["description"] = clean_text(a.get("description", "") or "", 200)
         index_html = self.env.get_template("index.html").render(
-            articles=recent, stats=stats, updated=datetime.now().isoformat()
+            articles=recent, stats=stats, updated=now_bj_iso()
         )
         (tmp_dir / "index.html").write_text(index_html, encoding="utf-8")
 

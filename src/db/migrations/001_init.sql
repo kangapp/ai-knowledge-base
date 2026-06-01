@@ -20,8 +20,8 @@ CREATE TABLE IF NOT EXISTS articles (
     extra_data      TEXT,
     analysis_cost   REAL DEFAULT 0.0,
     analysis_tokens INTEGER DEFAULT 0,
-    created_at      TEXT DEFAULT (datetime('now')),
-    updated_at      TEXT DEFAULT (datetime('now'))
+    created_at      TEXT DEFAULT (datetime('now', '+8 hours')),
+    updated_at      TEXT DEFAULT (datetime('now', '+8 hours'))
 );
 
 CREATE INDEX IF NOT EXISTS idx_articles_url ON articles(url);
@@ -77,7 +77,7 @@ CREATE TABLE IF NOT EXISTS cost_logs (
     tokens_in  INTEGER DEFAULT 0,
     tokens_out INTEGER DEFAULT 0,
     cost       REAL NOT NULL DEFAULT 0.0,
-    created_at TEXT DEFAULT (datetime('now'))
+    created_at TEXT DEFAULT (datetime('now', '+8 hours'))
 );
 
 CREATE TABLE IF NOT EXISTS provider_health (
@@ -96,7 +96,7 @@ CREATE TABLE IF NOT EXISTS circuit_events (
     provider   TEXT NOT NULL,
     event      TEXT NOT NULL,
     reason     TEXT,
-    created_at TEXT DEFAULT (datetime('now'))
+    created_at TEXT DEFAULT (datetime('now', '+8 hours'))
 );
 
 -- 更新 schema_version

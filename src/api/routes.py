@@ -1,6 +1,6 @@
-from datetime import datetime, timedelta, timezone
 from fastapi import APIRouter, Query, HTTPException
 from ..core.database import Database
+from ..core.time import parse_bj_datetime
 from ..db import operations
 from .responses import (
     envelope,
@@ -79,7 +79,7 @@ async def cost_summary(days: int = Query(default=30, ge=1, le=3650)):
         raise HTTPException(500, "DB not initialized")
     rows = await _db.fetch_all(
         "SELECT provider, model, SUM(cost) as total_cost, SUM(tokens_in+tokens_out) as total_tokens "
-        "FROM cost_logs WHERE created_at >= date('now', ?) GROUP BY provider, model",
+        "FROM cost_logs WHERE created_at >= date('now', '+8 hours', ?) GROUP BY provider, model",
         (operations.date_window_modifier(days),),
     )
     return envelope([dict(r) for r in rows])
@@ -137,11 +137,9 @@ async def get_pipeline_dag():
     logs = []
     for p in phases:
         started_at = p["started_at"]
-        # 转换为北京时间，格式化为 HH:mm:ss
         if started_at:
-            dt = datetime.fromisoformat(started_at.replace("Z", "+00:00"))
-            bj = dt + timedelta(hours=8)
-            time_str = bj.strftime("%H:%M:%S")
+            dt = parse_bj_datetime(started_at)
+            time_str = dt.strftime("%H:%M:%S")
         else:
             time_str = ""
         if p["status"] == "done":
@@ -155,13 +153,9 @@ async def get_pipeline_dag():
                 msg += f" ({p['details']})"
             logs.append({"time": time_str, "message": msg, "level": "info"})
 
-    # run_id 显示用北京时间
-    bj_now = datetime.now(timezone.utc) + timedelta(hours=8)
-    bj_run_id = f"run_{bj_now.strftime('%Y%m%d_%H%M%S')}"
-
     return envelope({
         "run_id": run_id,
-        "run_id_bj": bj_run_id,
+        "run_id_bj": run_id,
         "status": last_run["status"],
         "current_phase": phases[-1]["phase"] if phases and phases[-1]["status"] == "running" else None,
         "phases": [dict(p) for p in phases],

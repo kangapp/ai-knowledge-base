@@ -742,3 +742,15 @@ if m:
 3. `style.css` 补充 `.card-header/.tags/.tag` 样式
 
 **相关文件**: `src/site/templates/index.html`, `src/site/static/js/app.js`, `src/site/static/css/style.css`
+
+---
+
+## Bug 36: GitHub 数据源健康采集量为 0
+
+**发现时间**: 2026-06-02
+**发现场景**: 数据源健康 Tab 中 GitHub Trending、持续热门、趋势增速采集量均为 0；DB 中 `source_health.failed=0`，说明不是请求失败。
+**根因**: GitHub Search API 不支持对 `topic:` qualifier 使用 `OR`。`topic:llm` 单独可返回数据，但 `(topic:llm OR topic:machine-learning)` 会返回 0，`topic:llm OR topic:machine-learning` 会返回 422。
+
+**处理**: GitHub collector 将 `topics/keywords` 拆成最多 5 个单条件 Search 请求，分别请求后本地按 URL 合并去重、按 stars 排序，再应用 `exclude_terms` 和 stars/forks/watchers 阈值。
+
+**相关文件**: `src/graph/collector.py`, `tests/test_collector.py`

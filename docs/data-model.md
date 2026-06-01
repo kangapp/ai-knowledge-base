@@ -1,5 +1,12 @@
 # 数据模型
 
+## 时间约定
+
+- 项目业务时间统一使用北京时间（Asia/Shanghai / UTC+8）。
+- Python 代码统一通过 `src/core/time.py` 获取当前时间；SQLite 当前日期窗口使用 `date('now', '+8 hours', ...)`。
+- `collected_at/created_at/updated_at/started_at/ended_at/recorded_at` 等项目生成字段存储为北京时间本地 ISO 字符串，不再带 `Z`。
+- 外部源自身的 `published_at` 保留上游原始格式，不强制转换。
+
 ## SQLite Schema
 
 ### articles — 文章主表
@@ -16,13 +23,13 @@
 | relevance_score | INTEGER | 0-100 |
 | status | TEXT | pending / approved / retry / discarded |
 | retry_count | INTEGER DEFAULT 0 | |
-| collected_at | TEXT | ISO 8601 |
-| published_at | TEXT | ISO 8601 |
+| collected_at | TEXT | 北京时间 ISO 字符串 |
+| published_at | TEXT | 上游原始发布时间 |
 | extra_data | TEXT | JSON: 四维评分 detail + reason_keywords + language |
 | analysis_cost | REAL | 该条分析总花费 ($) |
 | analysis_tokens | INTEGER | 该条分析 token 总量 |
-| created_at | TEXT DEFAULT CURRENT_TIMESTAMP | |
-| updated_at | TEXT DEFAULT CURRENT_TIMESTAMP | |
+| created_at | TEXT DEFAULT (datetime('now', '+8 hours')) | 北京时间 |
+| updated_at | TEXT DEFAULT (datetime('now', '+8 hours')) | 北京时间 |
 
 FTS5 全文索引：`articles_fts` over (title, summary, description)
 
@@ -40,13 +47,13 @@ FTS5 全文索引：`articles_fts` over (title, summary, description)
   "relevance_score": 85,
   "status": "approved",
   "retry_count": 0,
-  "collected_at": "2026-05-24T08:30:00Z",
+  "collected_at": "2026-05-24T08:30:00",
   "published_at": "2026-05-23T14:00:00Z",
   "extra_data": "{\"dimensions\":{\"ai_relevance\":{\"avg_score\":34.4,\"high_rate\":1.0,\"mid_rate\":0,\"low_rate\":0},\"内容深度\":{\"avg_score\":0,\"high_rate\":0,\"mid_rate\":0,\"low_rate\":0},\"信息密度\":{\"avg_score\":0,\"high_rate\":0,\"mid_rate\":0,\"low_rate\":0},\"时效性\":{\"avg_score\":16.0,\"high_rate\":0.008,\"mid_rate\":0,\"low_rate\":0}},\"reason_keywords\":[{\"word\":\"核心\",\"count\":47},{\"word\":\"属于\",\"count\":35}],\"language\":\"en\"}",
   "analysis_cost": 0.0032,
   "analysis_tokens": 1240,
-  "created_at": "2026-05-24T08:30:05Z",
-  "updated_at": "2026-05-24T08:30:05Z"
+  "created_at": "2026-05-24T08:30:05",
+  "updated_at": "2026-05-24T08:30:05"
 }
 ```
 
@@ -86,8 +93,8 @@ FTS5 全文索引：`articles_fts` over (title, summary, description)
 | 列 | 类型 | 说明 |
 |----|------|------|
 | id | TEXT PK | run_YYYYMMDD_HHMMSS |
-| started_at | TEXT | |
-| ended_at | TEXT | |
+| started_at | TEXT | 北京时间 |
+| ended_at | TEXT | 北京时间 |
 | status | TEXT | running / completed / failed |
 | trigger | TEXT | cron / manual |
 | summary | TEXT | JSON: approved / discarded / retry 数统计 |
@@ -97,8 +104,8 @@ FTS5 全文索引：`articles_fts` over (title, summary, description)
 | 字段 | 值 |
 |------|-----|
 | id | run_20260524_090000 |
-| started_at | 2026-05-24T09:00:00Z |
-| ended_at | 2026-05-24T09:05:32Z |
+| started_at | 2026-05-24T09:00:00 |
+| ended_at | 2026-05-24T09:05:32 |
 | status | completed |
 | trigger | cron |
 | summary | {"approved": 15, "discarded": 3, "retry": 2, "total_collected": 20, "cost": 0.15, "sources": {"github_trending": {"collected": 10, "approved": 8}, "rss_the_batch": {"collected": 10, "approved": 7}}} |
@@ -119,10 +126,10 @@ FTS5 全文索引：`articles_fts` over (title, summary, description)
 
 | id | run_id | phase | source | event | message | created_at |
 |----|--------|-------|--------|-------|---------|------------|
-| 1 | run_20260524_090000 | collector | - | started | 开始采集 | 2026-05-24T09:00:00Z |
-| 2 | run_20260524_090000 | collector | - | completed | 采集完成 | 2026-05-24T09:00:45Z |
-| 3 | run_20260524_090000 | analyzer | github_trending | started | 开始分析 | 2026-05-24T09:00:45Z |
-| 4 | run_20260524_090000 | analyzer | github_trending | completed | 分析完成 | 2026-05-24T09:02:30Z |
+| 1 | run_20260524_090000 | collector | - | started | 开始采集 | 2026-05-24T09:00:00 |
+| 2 | run_20260524_090000 | collector | - | completed | 采集完成 | 2026-05-24T09:00:45 |
+| 3 | run_20260524_090000 | analyzer | github_trending | started | 开始分析 | 2026-05-24T09:00:45 |
+| 4 | run_20260524_090000 | analyzer | github_trending | completed | 分析完成 | 2026-05-24T09:02:30 |
 
 ### cost_logs — LLM 调用花费
 
@@ -140,14 +147,14 @@ FTS5 全文索引：`articles_fts` over (title, summary, description)
 | source | TEXT | 成本记录时的来源快照：github / rss / feishu / arxiv |
 | source_detail | TEXT | 成本记录时的来源细分；RSS 存 feed 名称或展示名 |
 | source_id | TEXT | 成本记录时的源 ID；统一使用 `config/sources.yaml` 中的配置 id |
-| created_at | TEXT DEFAULT CURRENT_TIMESTAMP | |
+| created_at | TEXT DEFAULT (datetime('now', '+8 hours')) | 北京时间 |
 
 **样例数据：**
 
 | id | run_id | agent | provider | model | tokens_in | tokens_out | cost | ref_url | source | source_detail | source_id | created_at |
 |----|--------|-------|----------|-------|----------|-----------|------|---------|--------|---------------|-----------|------------|
-| 1 | run_20260524_090000 | github_analyzer | deepseek | deepseek-chat | 1200 | 350 | 0.0021 | https://github.com/org/repo | github | | github_trending | 2026-05-24T09:01:00Z |
-| 2 | run_20260524_090000 | reviewer | deepseek | deepseek-chat | 2800 | 420 | 0.0048 | https://36kr.com/p/123 | rss | 36氪 | rss_36kr | 2026-05-24T09:03:00Z |
+| 1 | run_20260524_090000 | github_analyzer | deepseek | deepseek-chat | 1200 | 350 | 0.0021 | https://github.com/org/repo | github | | github_trending | 2026-05-24T09:01:00 |
+| 2 | run_20260524_090000 | reviewer | deepseek | deepseek-chat | 2800 | 420 | 0.0048 | https://36kr.com/p/123 | rss | 36氪 | rss_36kr | 2026-05-24T09:03:00 |
 
 **成本来源记录口径：**
 
@@ -185,8 +192,8 @@ UNIQUE(source_id, date)
 
 | id | source_id | date | total_collected | approved | rejected | failed | avg_score | recorded_at |
 |----|-----------|------|-----------------|----------|----------|--------|---------|------------|
-| 1 | github_trending | 2026-05-23 | 20 | 15 | 4 | 1 | 82.5 | 2026-05-23T09:00:05Z |
-| 2 | rss_36kr | 2026-05-23 | 10 | 9 | 1 | 0 | 78.3 | 2026-05-23T09:00:10Z |
+| 1 | github_trending | 2026-05-23 | 20 | 15 | 4 | 1 | 82.5 | 2026-05-23T09:00:05 |
+| 2 | rss_36kr | 2026-05-23 | 10 | 9 | 1 | 0 | 78.3 | 2026-05-23T09:00:10 |
 
 **数据源健康主键口径：**
 
@@ -215,8 +222,8 @@ UNIQUE(source_id, date)
 
 | id | url | name | type | discovered_at | status | added_at | rejected_at | reject_reason |
 |----|-----|------|------|---------------|--------|----------|-------------|--------------|
-| 1 | https://example.com/feed.xml | Example RSS | rss | 2026-05-20T10:00:00Z | candidate | null | null | null |
-| 2 | https://github.com/foo/bar | foo/bar | github | 2026-05-18T08:00:00Z | enabled | 2026-05-19T09:00:00Z | null | null |
+| 1 | https://example.com/feed.xml | Example RSS | rss | 2026-05-20T10:00:00 | candidate | null | null | null |
+| 2 | https://github.com/foo/bar | foo/bar | github | 2026-05-18T08:00:00 | enabled | 2026-05-19T09:00:00 | null | null |
 
 ### github_repo_snapshots — GitHub 仓库星标快照
 
@@ -237,7 +244,7 @@ UNIQUE(repo_url, snapshot_date)
 
 | id | repo_url | repo_name | stars | forks | watchers | snapshot_date | created_at |
 |----|----------|-----------|-------|-------|----------|---------------|------------|
-| 1 | https://github.com/meta-llama/llama4 | meta-llama/llama4 | 12400 | 1800 | 560 | 2026-05-24 | 2026-05-24T00:00:00Z |
+| 1 | https://github.com/meta-llama/llama4 | meta-llama/llama4 | 12400 | 1800 | 560 | 2026-05-24 | 2026-05-24T00:00:00 |
 
 **趋势增速口径：**
 
@@ -261,8 +268,8 @@ UNIQUE(repo_url, snapshot_date)
 
 | provider | status | latency_ms | error_count | last_error | last_check | circuit |
 |----------|---------|-----------|-------------|-----------|------------|---------|
-| deepseek | healthy | 850 | 0 | null | 2026-05-24T09:00:00Z | closed |
-| minimax | degraded | 2200 | 3 | rate limit | 2026-05-24T09:00:00Z | half_open |
+| deepseek | healthy | 850 | 0 | null | 2026-05-24T09:00:00 | closed |
+| minimax | degraded | 2200 | 3 | rate limit | 2026-05-24T09:00:00 | half_open |
 
 ### circuit_events — 熔断事件记录
 
@@ -278,9 +285,9 @@ UNIQUE(repo_url, snapshot_date)
 
 | id | provider | event | reason | created_at |
 |----|----------|-------|--------|------------|
-| 1 | minimax | open | 连续 3 次 rate limit | 2026-05-24T08:45:00Z |
-| 2 | minimax | half_open | 尝试恢复 | 2026-05-24T08:50:00Z |
-| 3 | minimax | close | 连续 5 次成功 | 2026-05-24T09:00:00Z |
+| 1 | minimax | open | 连续 3 次 rate limit | 2026-05-24T08:45:00 |
+| 2 | minimax | half_open | 尝试恢复 | 2026-05-24T08:50:00 |
+| 3 | minimax | close | 连续 5 次成功 | 2026-05-24T09:00:00 |
 
 ### schema_version — 数据库迁移版本
 
@@ -380,6 +387,21 @@ sources:
       min_forks: 10
       min_watchers: 20
       lookback_days: 7
+
+  - id: github_ai_devtools
+    name: GitHub AI 开发工具
+    type: github
+    enabled: true
+    priority: 1
+    cron: "0 */6 * * *"
+    max_items: 10
+    config:
+      topics: []
+      keywords: ["interactive knowledge graph", "codebase knowledge graph", "code understanding", "codebase understanding", "repository analysis"]
+      exclude_terms: [wallpaper, porn, nsfw, account, registration, card]
+      lookback_type: pushed
+      lookback_days: 90
+      min_stars: 100
 
   - id: rss_the_batch
     name: The Batch

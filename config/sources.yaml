@@ -50,6 +50,23 @@ sources:
       trend_mode: true
       trend_velocity_threshold: 10
 
+  - id: github_ai_devtools
+    name: GitHub AI 开发工具
+    type: github
+    enabled: true
+    priority: 1
+    cron: "0 */6 * * *"
+    max_items: 10
+    config:
+      topics: []
+      keywords: ["interactive knowledge graph", "codebase knowledge graph", "code understanding", "codebase understanding", "repository analysis"]
+      exclude_terms: [wallpaper, porn, nsfw, account, registration, card]
+      lookback_type: pushed
+      lookback_days: 90
+      min_stars: 100
+      min_forks: 0
+      min_watchers: 0
+
   # ===== 中文科技媒体 =====
   - id: rss_36kr
     name: 36氪

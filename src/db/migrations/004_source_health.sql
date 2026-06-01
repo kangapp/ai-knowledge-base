@@ -9,7 +9,7 @@ CREATE TABLE IF NOT EXISTS source_health (
     rejected        INTEGER DEFAULT 0,
     failed          INTEGER DEFAULT 0,
     avg_score       REAL,
-    recorded_at     TEXT DEFAULT (datetime('now')),
+    recorded_at     TEXT DEFAULT (datetime('now', '+8 hours')),
     UNIQUE(source_id, date)
 );
 
@@ -20,7 +20,7 @@ CREATE TABLE IF NOT EXISTS discovered_sources (
     url             TEXT UNIQUE NOT NULL,
     name            TEXT,
     type            TEXT NOT NULL,
-    discovered_at   TEXT DEFAULT (datetime('now')),
+    discovered_at   TEXT DEFAULT (datetime('now', '+8 hours')),
     status          TEXT DEFAULT 'candidate',
     added_at        TEXT,
     rejected_at     TEXT,

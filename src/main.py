@@ -2,7 +2,6 @@
 import os, json, logging, sys, uuid
 from pathlib import Path
 from contextlib import asynccontextmanager
-from datetime import datetime, timezone
 from functools import partial
 
 from fastapi import FastAPI, HTTPException
@@ -12,6 +11,7 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from .core.config import load_llm_config, load_sources_config, load_agents_config
 from .core.database import Database
 from .core.llm_client import LLMRegistry
+from .core.time import now_bj_iso, run_id_bj
 from .graph.pipeline import build_pipeline, record_phase_start, record_phase_end, set_pipeline_db, reset_analyzer_counter
 from .graph.state import PipelineState, ReviewedItem
 from .graph.collector import collect_all
@@ -40,7 +40,7 @@ class JSONFormatter(logging.Formatter):
 
     def format(self, record):
         entry = {
-            "ts": datetime.now(timezone.utc).isoformat(),
+            "ts": now_bj_iso(),
             "level": record.levelname,
             "msg": record.getMessage(),
         }
@@ -180,7 +180,7 @@ async def run_pipeline(trigger: str = "cron", source_filter: str | list[str] | t
             logger.error("pipeline.not_initialized")
             return
 
-        run_id = f"run_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}"
+        run_id = run_id_bj()
         await start_pipeline_run(_db, run_id, trigger)
         await record_phase_start(_db, run_id, "collect")
 

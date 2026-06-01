@@ -1,9 +1,10 @@
 # src/db/operations.py
 import json
 from pathlib import Path
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta
 import yaml
 from ..core.database import Database
+from ..core.time import now_bj, now_bj_iso, today_bj
 from ..graph.state import AnalyzedItem, CostRecord, ReviewedItem, RawItem
 
 
@@ -36,6 +37,7 @@ def _load_monthly_budget(default: float = 10.0) -> float:
 
 async def save_article(db: Database, raw: RawItem, analyzed: AnalyzedItem, reviewed: ReviewedItem, cost: float, tokens: int) -> int | None:
     """保存文章，返回 article id（新插入或已存在行的 id）"""
+    now = now_bj_iso()
     extra = json.dumps({
         "dimensions": reviewed.dimensions,
         "language": analyzed.language,
@@ -56,19 +58,20 @@ async def save_article(db: Database, raw: RawItem, analyzed: AnalyzedItem, revie
             UPDATE articles SET
                 title=?, description=?, summary=?, relevance_score=?,
                 status=?, retry_count=?, extra_data=?,
-                analysis_cost=?, analysis_tokens=?, updated_at=datetime('now')
+                analysis_cost=?, analysis_tokens=?, updated_at=?
             WHERE url=?
         """, (analyzed.title, raw.description, analyzed.summary, reviewed.total_score,
-              reviewed.verdict, analyzed.retry_count, extra, cost, tokens, raw.url))
+              reviewed.verdict, analyzed.retry_count, extra, cost, tokens, now, raw.url))
         await db.commit()
         return existing["id"]
     else:
         await db.execute("""
             INSERT INTO articles
             (title, url, description, summary, source, source_detail,
-             relevance_score, status, retry_count, collected_at, published_at, extra_data, analysis_cost, analysis_tokens)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """, params)
+             relevance_score, status, retry_count, collected_at, published_at, extra_data,
+             analysis_cost, analysis_tokens, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, (*params, now, now))
         await db.commit()
         row = await db.fetch_one("SELECT last_insert_rowid() as id")
         return row["id"] if row else None
@@ -85,13 +88,13 @@ async def save_tags(db: Database, article_id: int, tags: list[str]):
 
 
 async def start_pipeline_run(db: Database, run_id: str, trigger: str):
-    now = datetime.now(timezone.utc).isoformat()
+    now = now_bj_iso()
     await db.execute("INSERT INTO pipeline_runs (id, status, started_at, trigger) VALUES (?, 'running', ?, ?)", (run_id, now, trigger))
     await db.commit()
 
 
 async def end_pipeline_run(db: Database, run_id: str, status: str, summary: str):
-    now = datetime.now(timezone.utc).isoformat()
+    now = now_bj_iso()
     await db.execute("UPDATE pipeline_runs SET ended_at=?, status=?, summary=? WHERE id=?", (now, status, summary, run_id))
     await db.commit()
 
@@ -99,12 +102,12 @@ async def end_pipeline_run(db: Database, run_id: str, status: str, summary: str)
 async def save_cost_log(db: Database, run_id: str, record: CostRecord):
     await db.execute("""
         INSERT INTO cost_logs
-        (run_id, agent, provider, model, tokens_in, tokens_out, cost, ref_url, source, source_detail, source_id)
-        VALUES (?,?,?,?,?,?,?,?,?,?,?)
+        (run_id, agent, provider, model, tokens_in, tokens_out, cost, ref_url, source, source_detail, source_id, created_at)
+        VALUES (?,?,?,?,?,?,?,?,?,?,?,?)
     """, (
         run_id, record.agent, record.provider, record.model,
         record.tokens_in, record.tokens_out, record.cost, record.ref_url,
-        record.source, record.source_detail, record.source_id,
+        record.source, record.source_detail, record.source_id, now_bj_iso(),
     ))
     await db.commit()
 
@@ -128,7 +131,7 @@ def _article_filters(query: str = "", source: str = "", days: int = 30) -> tuple
         where.append("a.source = ?")
         params.append(source)
     if days:
-        where.append("a.collected_at >= date('now', ?)")
+        where.append("a.collected_at >= date('now', '+8 hours', ?)")
         params.append(date_window_modifier(days))
     return " AND ".join(where), params
 
@@ -174,11 +177,11 @@ async def search_articles(db: Database, query: str, source: str = "", days: int 
 
 async def get_stats(db: Database, days: int = 30) -> dict:
     total = await db.fetch_one("SELECT COUNT(*) as c FROM articles WHERE status='approved'")
-    period = await db.fetch_one("SELECT COUNT(*) as c FROM articles WHERE status='approved' AND collected_at >= date('now', ?)", (date_window_modifier(days),))
+    period = await db.fetch_one("SELECT COUNT(*) as c FROM articles WHERE status='approved' AND collected_at >= date('now', '+8 hours', ?)", (date_window_modifier(days),))
     source_dist = await db.fetch_all("SELECT source, COUNT(*) as c FROM articles WHERE status='approved' GROUP BY source ORDER BY c DESC")
-    cost_period = await db.fetch_one("SELECT COALESCE(SUM(cost),0) as t FROM cost_logs WHERE created_at >= date('now', ?)", (date_window_modifier(days),))
+    cost_period = await db.fetch_one("SELECT COALESCE(SUM(cost),0) as t FROM cost_logs WHERE created_at >= date('now', '+8 hours', ?)", (date_window_modifier(days),))
     cost_total = await db.fetch_one("SELECT COALESCE(SUM(cost),0) as t FROM cost_logs")
-    daily_cost = await db.fetch_all("SELECT date(created_at) as date, SUM(cost) as cost, COUNT(*) as articles FROM cost_logs WHERE created_at >= date('now', ?) GROUP BY date(created_at) ORDER BY date", (date_window_modifier(days),))
+    daily_cost = await db.fetch_all("SELECT date(created_at) as date, SUM(cost) as cost, COUNT(*) as articles FROM cost_logs WHERE created_at >= date('now', '+8 hours', ?) GROUP BY date(created_at) ORDER BY date", (date_window_modifier(days),))
     top_tags = await db.fetch_all("SELECT t.name, COUNT(*) as c FROM tags t JOIN article_tags at ON t.id=at.tag_id GROUP BY t.id ORDER BY c DESC LIMIT 10")
     return {
         "total_articles": total["c"] if total else 0,
@@ -194,12 +197,12 @@ async def get_stats(db: Database, days: int = 30) -> dict:
 async def backup_database(db: Database, backup_dir: str):
     """aiosqlite .backup() 在线热备份，保留 7 天"""
     Path(backup_dir).mkdir(parents=True, exist_ok=True)
-    today = datetime.now().strftime("%Y%m%d")
+    today = now_bj().strftime("%Y%m%d")
     backup_file = Path(backup_dir) / f"knowledge-{today}.db"
     await db.backup(str(backup_file))
 
     # 清理 7 天前
-    cutoff = datetime.now() - timedelta(days=7)
+    cutoff = now_bj().replace(tzinfo=None) - timedelta(days=7)
     for f in Path(backup_dir).glob("knowledge-*.db"):
         try:
             date_str = f.stem.replace("knowledge-", "")
@@ -224,7 +227,7 @@ async def get_quality_stats(db: Database, days: int = 30) -> dict:
             END as bucket,
             COUNT(*) as count
         FROM articles
-        WHERE status='approved' AND collected_at >= date('now', ?)
+        WHERE status='approved' AND collected_at >= date('now', '+8 hours', ?)
         GROUP BY bucket
     """, (date_window_modifier(days),))
 
@@ -234,7 +237,7 @@ async def get_quality_stats(db: Database, days: int = 30) -> dict:
                COUNT(*) as article_count,
                AVG(relevance_score) as avg_score
         FROM articles
-        WHERE status='approved' AND collected_at >= date('now', ?)
+        WHERE status='approved' AND collected_at >= date('now', '+8 hours', ?)
         GROUP BY source, source_detail
         ORDER BY avg_score DESC
     """, (date_window_modifier(days),))
@@ -244,7 +247,7 @@ async def get_quality_stats(db: Database, days: int = 30) -> dict:
         SELECT t.name, COUNT(*) as count
         FROM tags t JOIN article_tags at ON t.id=at.tag_id
         JOIN articles a ON a.id=at.article_id
-        WHERE a.status='approved' AND a.collected_at >= date('now', ?)
+        WHERE a.status='approved' AND a.collected_at >= date('now', '+8 hours', ?)
         GROUP BY t.id
         ORDER BY count DESC LIMIT 20
     """, (date_window_modifier(days),))
@@ -252,11 +255,11 @@ async def get_quality_stats(db: Database, days: int = 30) -> dict:
     # 近 7 个自然日 vs 前 7 个自然日
     this_week = await db.fetch_one("""
         SELECT COUNT(*) as c FROM articles
-        WHERE status='approved' AND collected_at >= date('now', ?)
+        WHERE status='approved' AND collected_at >= date('now', '+8 hours', ?)
     """, (date_window_modifier(7),))
     last_week = await db.fetch_one("""
         SELECT COUNT(*) as c FROM articles
-        WHERE collected_at >= date('now', ?) AND collected_at < date('now', ?)
+        WHERE collected_at >= date('now', '+8 hours', ?) AND collected_at < date('now', '+8 hours', ?)
     """, (date_window_modifier(14), date_window_modifier(7)))
 
     return {
@@ -277,7 +280,7 @@ async def get_runtime_stats(db: Database, days: int = 7) -> dict:
 
     # 最新一次 pipeline run
     last_run = await db.fetch_one(
-        "SELECT * FROM pipeline_runs WHERE started_at >= date('now', ?) ORDER BY started_at DESC LIMIT 1",
+        "SELECT * FROM pipeline_runs WHERE started_at >= date('now', '+8 hours', ?) ORDER BY started_at DESC LIMIT 1",
         (cutoff,),
     )
 
@@ -307,7 +310,7 @@ async def get_runtime_stats(db: Database, days: int = 7) -> dict:
     provider_events = await db.fetch_all("""
         SELECT provider, event, reason, created_at
         FROM circuit_events
-        WHERE created_at >= date('now', ?)
+        WHERE created_at >= date('now', '+8 hours', ?)
         ORDER BY created_at DESC LIMIT 20
     """, (cutoff,))
 
@@ -343,7 +346,7 @@ async def get_consumption_stats(db: Database, days: int = 30) -> dict:
         SELECT date(created_at) as date, provider,
                SUM(cost) as cost, SUM(tokens_in+tokens_out) as tokens
         FROM cost_logs
-        WHERE created_at >= date('now', ?)
+        WHERE created_at >= date('now', '+8 hours', ?)
         GROUP BY date(created_at), provider
         ORDER BY date
     """, (date_window_modifier(days),))
@@ -353,7 +356,7 @@ async def get_consumption_stats(db: Database, days: int = 30) -> dict:
         SELECT date(created_at) as date, agent,
                SUM(cost) as cost, SUM(tokens_in+tokens_out) as tokens
         FROM cost_logs
-        WHERE created_at >= date('now', ?)
+        WHERE created_at >= date('now', '+8 hours', ?)
         GROUP BY date(created_at), agent
         ORDER BY date
     """, (date_window_modifier(days),))
@@ -361,20 +364,20 @@ async def get_consumption_stats(db: Database, days: int = 30) -> dict:
     # 周期总花费
     period_cost = await db.fetch_one("""
         SELECT COALESCE(SUM(cost), 0) as total FROM cost_logs
-        WHERE created_at >= date('now', ?)
+        WHERE created_at >= date('now', '+8 hours', ?)
     """, (date_window_modifier(days),))
 
     # 周期总 token
     period_tokens = await db.fetch_one("""
         SELECT COALESCE(SUM(tokens_in + tokens_out), 0) as total FROM cost_logs
-        WHERE created_at >= date('now', ?)
+        WHERE created_at >= date('now', '+8 hours', ?)
     """, (date_window_modifier(days),))
 
     # per-provider 汇总
     provider_summary = await db.fetch_all("""
         SELECT provider, SUM(cost) as total_cost,
                SUM(tokens_in) as total_in, SUM(tokens_out) as total_out
-        FROM cost_logs WHERE created_at >= date('now', ?)
+        FROM cost_logs WHERE created_at >= date('now', '+8 hours', ?)
         GROUP BY provider
     """, (date_window_modifier(days),))
 
@@ -412,18 +415,18 @@ async def get_consumption_detail_stats(
     # 1. 周期总花费和日均
     period_cost = await db.fetch_one("""
         SELECT COALESCE(SUM(cost), 0) as total FROM cost_logs
-        WHERE created_at >= date('now', ?)
+        WHERE created_at >= date('now', '+8 hours', ?)
     """, (window,))
 
     period_days = await db.fetch_one("""
         SELECT COUNT(DISTINCT date(created_at)) as days FROM cost_logs
-        WHERE created_at >= date('now', ?)
+        WHERE created_at >= date('now', '+8 hours', ?)
     """, (window,))
 
     # 2. Token 效率
     period_tokens = await db.fetch_one("""
         SELECT COALESCE(SUM(tokens_in + tokens_out), 0) as total FROM cost_logs
-        WHERE created_at >= date('now', ?)
+        WHERE created_at >= date('now', '+8 hours', ?)
     """, (window,))
 
     # 3. 花费趋势（按周，支持日/月切换）
@@ -431,21 +434,21 @@ async def get_consumption_detail_stats(
         trend_sql = """
             SELECT date(created_at) as label,
                    SUM(cost) as cost, COUNT(*) as llm_calls
-            FROM cost_logs WHERE created_at >= date('now', ?)
+            FROM cost_logs WHERE created_at >= date('now', '+8 hours', ?)
             GROUP BY date(created_at) ORDER BY label
         """
     elif period == "week":
         trend_sql = """
             SELECT strftime('%Y-W%W', created_at) as label,
                    SUM(cost) as cost, COUNT(*) as llm_calls
-            FROM cost_logs WHERE created_at >= date('now', ?)
+            FROM cost_logs WHERE created_at >= date('now', '+8 hours', ?)
             GROUP BY label ORDER BY label
         """
     else:  # month
         trend_sql = """
             SELECT strftime('%Y-%m', created_at) as label,
                    SUM(cost) as cost, COUNT(*) as llm_calls
-            FROM cost_logs WHERE created_at >= date('now', ?)
+            FROM cost_logs WHERE created_at >= date('now', '+8 hours', ?)
             GROUP BY label ORDER BY label
         """
 
@@ -483,7 +486,7 @@ async def get_consumption_detail_stats(
                 SUM(cl.cost) as cost
             FROM cost_logs cl
             LEFT JOIN articles a ON a.url = cl.ref_url
-            WHERE cl.created_at >= date('now', ?)
+            WHERE cl.created_at >= date('now', '+8 hours', ?)
             GROUP BY 1, 2, 3
             ORDER BY label
         """, (trend_cutoff,))
@@ -496,7 +499,7 @@ async def get_consumption_detail_stats(
                 SUM(cl.cost) as cost
             FROM cost_logs cl
             LEFT JOIN articles a ON a.url = cl.ref_url
-            WHERE cl.created_at >= date('now', ?)
+            WHERE cl.created_at >= date('now', '+8 hours', ?)
             GROUP BY 1, 2, 3 ORDER BY label
         """, (trend_cutoff,))
     else:
@@ -508,7 +511,7 @@ async def get_consumption_detail_stats(
                 SUM(cl.cost) as cost
             FROM cost_logs cl
             LEFT JOIN articles a ON a.url = cl.ref_url
-            WHERE cl.created_at >= date('now', ?)
+            WHERE cl.created_at >= date('now', '+8 hours', ?)
             GROUP BY 1, 2, 3 ORDER BY label
         """, (trend_cutoff,))
 
@@ -516,19 +519,19 @@ async def get_consumption_detail_stats(
     if period == "day":
         provider_trend = await db.fetch_all("""
             SELECT date(created_at) as label, provider, SUM(cost) as cost
-            FROM cost_logs WHERE created_at >= date('now', ?)
+            FROM cost_logs WHERE created_at >= date('now', '+8 hours', ?)
             GROUP BY provider, date(created_at) ORDER BY label
         """, (trend_cutoff,))
     elif period == "week":
         provider_trend = await db.fetch_all("""
             SELECT strftime('%Y-W%W', created_at) as label, provider, SUM(cost) as cost
-            FROM cost_logs WHERE created_at >= date('now', ?)
+            FROM cost_logs WHERE created_at >= date('now', '+8 hours', ?)
             GROUP BY provider, label ORDER BY label
         """, (trend_cutoff,))
     else:
         provider_trend = await db.fetch_all("""
             SELECT strftime('%Y-%m', created_at) as label, provider, SUM(cost) as cost
-            FROM cost_logs WHERE created_at >= date('now', ?)
+            FROM cost_logs WHERE created_at >= date('now', '+8 hours', ?)
             GROUP BY provider, label ORDER BY label
         """, (trend_cutoff,))
 
@@ -537,7 +540,7 @@ async def get_consumption_detail_stats(
     budget = max(float(budget), 0.01)
     monthly_cost = await db.fetch_one("""
         SELECT COALESCE(SUM(cost), 0) as total FROM cost_logs
-        WHERE created_at >= date('now', '-29 days')
+        WHERE created_at >= date('now', '+8 hours', '-29 days')
     """)
 
     return {
@@ -567,7 +570,7 @@ async def get_consumption_detail_stats(
 async def record_source_health(db: Database, record: "CollectResult"):
     """记录数据源健康数据"""
     from ..graph.state import CollectResult as CR
-    today = datetime.now().strftime("%Y-%m-%d")
+    today = today_bj()
     has_review_stats = record.approved > 0 or record.rejected > 0 or record.avg_score is not None
     total_collected = 0 if has_review_stats else record.total
     await db.execute("""
@@ -587,14 +590,14 @@ async def record_source_health(db: Database, record: "CollectResult"):
                     1
                 )
             END,
-            recorded_at=datetime('now')
+            recorded_at=datetime('now', '+8 hours')
     """, (record.source_id, today, total_collected, record.approved, record.rejected, record.failed, record.avg_score))
     await db.commit()
 
 
 async def batch_save_github_snapshots(db: Database, items: list[RawItem]):
     """批量写入 GitHub repo 快照（同一 repo_url + date 唯一）"""
-    today = datetime.now().strftime("%Y-%m-%d")
+    today = today_bj()
     for item in items:
         if item.source != "github":
             continue
@@ -656,7 +659,7 @@ async def get_quality_detail_stats(db: Database, period: str = "week") -> dict:
             SUM(CASE WHEN status='approved' THEN 1 ELSE 0 END) as approved,
             AVG(CASE WHEN status='approved' THEN relevance_score END) as avg_score
         FROM articles
-        WHERE collected_at >= date('now', ?)
+        WHERE collected_at >= date('now', '+8 hours', ?)
     """, (cutoff,))
     period_total = period_status["total"] if period_status else 0
     period_approved = period_status["approved"] if period_status and period_status["approved"] else 0
@@ -664,47 +667,47 @@ async def get_quality_detail_stats(db: Database, period: str = "week") -> dict:
 
     # 1. 内容完整性指标
     summary_coverage = await db.fetch_one("""
-        SELECT COUNT(*) * 1.0 / (SELECT COUNT(*) FROM articles WHERE status='approved' AND collected_at >= date('now', ?)) as rate
-        FROM articles WHERE status='approved' AND summary IS NOT NULL AND summary != '' AND collected_at >= date('now', ?)
+        SELECT COUNT(*) * 1.0 / (SELECT COUNT(*) FROM articles WHERE status='approved' AND collected_at >= date('now', '+8 hours', ?)) as rate
+        FROM articles WHERE status='approved' AND summary IS NOT NULL AND summary != '' AND collected_at >= date('now', '+8 hours', ?)
     """, (cutoff, cutoff))
 
     desc_len = await db.fetch_one("""
-        SELECT AVG(LENGTH(description)) as avg_len FROM articles WHERE status='approved' AND collected_at >= date('now', ?)
+        SELECT AVG(LENGTH(description)) as avg_len FROM articles WHERE status='approved' AND collected_at >= date('now', '+8 hours', ?)
     """, (cutoff,))
 
     summary_len = await db.fetch_one("""
-        SELECT AVG(LENGTH(summary)) as avg_len FROM articles WHERE status='approved' AND summary IS NOT NULL AND collected_at >= date('now', ?)
+        SELECT AVG(LENGTH(summary)) as avg_len FROM articles WHERE status='approved' AND summary IS NOT NULL AND collected_at >= date('now', '+8 hours', ?)
     """, (cutoff,))
 
     # 2. 审核效率指标
     one_pass = await db.fetch_one("""
-        SELECT COUNT(*) * 1.0 / (SELECT COUNT(*) FROM articles WHERE status='approved' AND collected_at >= date('now', ?)) as rate
-        FROM articles WHERE status='approved' AND retry_count = 0 AND collected_at >= date('now', ?)
+        SELECT COUNT(*) * 1.0 / (SELECT COUNT(*) FROM articles WHERE status='approved' AND collected_at >= date('now', '+8 hours', ?)) as rate
+        FROM articles WHERE status='approved' AND retry_count = 0 AND collected_at >= date('now', '+8 hours', ?)
     """, (cutoff, cutoff))
 
     retry_rate = await db.fetch_one("""
-        SELECT COUNT(*) * 1.0 / (SELECT COUNT(*) FROM articles WHERE collected_at >= date('now', ?)) as rate
-        FROM articles WHERE status='retry' AND collected_at >= date('now', ?)
+        SELECT COUNT(*) * 1.0 / (SELECT COUNT(*) FROM articles WHERE collected_at >= date('now', '+8 hours', ?)) as rate
+        FROM articles WHERE status='retry' AND collected_at >= date('now', '+8 hours', ?)
     """, (cutoff, cutoff))
 
     exhausted_rate = await db.fetch_one("""
-        SELECT COUNT(*) * 1.0 / (SELECT COUNT(*) FROM articles WHERE collected_at >= date('now', ?)) as rate
-        FROM articles WHERE retry_count >= 2 AND collected_at >= date('now', ?)
+        SELECT COUNT(*) * 1.0 / (SELECT COUNT(*) FROM articles WHERE collected_at >= date('now', '+8 hours', ?)) as rate
+        FROM articles WHERE retry_count >= 2 AND collected_at >= date('now', '+8 hours', ?)
     """, (cutoff, cutoff))
 
     # 3. 标签覆盖指标
     tagged_rate = await db.fetch_one("""
-        SELECT COUNT(DISTINCT at.article_id) * 1.0 / (SELECT COUNT(*) FROM articles WHERE status='approved' AND collected_at >= date('now', ?)) as rate
+        SELECT COUNT(DISTINCT at.article_id) * 1.0 / (SELECT COUNT(*) FROM articles WHERE status='approved' AND collected_at >= date('now', '+8 hours', ?)) as rate
         FROM article_tags at
         JOIN articles a ON a.id = at.article_id
-        WHERE a.collected_at >= date('now', ?)
+        WHERE a.collected_at >= date('now', '+8 hours', ?)
     """, (cutoff, cutoff))
 
     avg_tags = await db.fetch_one("""
         SELECT AVG(tag_count) as avg FROM (
             SELECT COUNT(*) as tag_count FROM article_tags at
             JOIN articles a ON a.id = at.article_id
-            WHERE a.collected_at >= date('now', ?)
+            WHERE a.collected_at >= date('now', '+8 hours', ?)
             GROUP BY at.article_id
         )
     """, (cutoff,))
@@ -713,7 +716,7 @@ async def get_quality_detail_stats(db: Database, period: str = "week") -> dict:
     source_rows = await db.fetch_all("""
         SELECT source, source_detail, COUNT(*) as article_count, AVG(relevance_score) as avg_score
         FROM articles
-        WHERE status='approved' AND collected_at >= date('now', ?)
+        WHERE status='approved' AND collected_at >= date('now', '+8 hours', ?)
         GROUP BY source, source_detail
         ORDER BY avg_score DESC, article_count DESC
         LIMIT 12
@@ -745,7 +748,7 @@ async def get_quality_detail_stats(db: Database, period: str = "week") -> dict:
                 COUNT(CASE WHEN {score_expr} >= ? AND {score_expr} < ? THEN 1 END) * 1.0 / NULLIF(COUNT({score_expr}), 0) as mid_rate,
                 COUNT(CASE WHEN {score_expr} < ? THEN 1 END) * 1.0 / NULLIF(COUNT({score_expr}), 0) as low_rate
             FROM articles
-            WHERE status='approved' AND extra_data IS NOT NULL AND collected_at >= date('now', ?)
+            WHERE status='approved' AND extra_data IS NOT NULL AND collected_at >= date('now', '+8 hours', ?)
         """, (high_threshold, mid_threshold, high_threshold, mid_threshold, cutoff))
         dimension_stats[name] = {
             "avg_score": round(stats["avg_score"] or 0, 1),
@@ -758,7 +761,7 @@ async def get_quality_detail_stats(db: Database, period: str = "week") -> dict:
     # 6. Reason 关键词
     reason_rows = await db.fetch_all("""
         SELECT JSON_EXTRACT(extra_data, '$.dimensions.ai_relevance.reason') as reason
-        FROM articles WHERE status='approved' AND extra_data IS NOT NULL AND collected_at >= date('now', ?)
+        FROM articles WHERE status='approved' AND extra_data IS NOT NULL AND collected_at >= date('now', '+8 hours', ?)
     """, (cutoff,))
 
     keyword_count = {}

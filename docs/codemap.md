@@ -1,6 +1,6 @@
 # 代码地图
 
-更新时间：2026-06-01
+更新时间：2026-06-02
 
 ## API 入口
 
@@ -40,11 +40,13 @@
 - `src/services/dashboard_stats.py`
   - 仪表盘 summary 和 enhanced stats 的共享统计口径。
   - 常见改动入口：首屏 KPI、通过率、周期成本、活跃来源统计。
+  - 日期窗口按北京时间自然日计算，SQL 使用 `date('now', '+8 hours', ...)`。
 
 - `src/db/operations.py`
   - 数据库操作集合：文章保存、标签保存、成本记录、统计查询、备份等。
   - 常见改动入口：文章查询、统计 SQL、pipeline run 记录、`cost_logs` 来源归因、GitHub repo 增速快照查询。
   - 费用统计读取 `cost_logs`，资源消耗预算使用 `config/agents.yaml` 的 `budget.monthly`。
+  - 所有 `days=N` 查询窗口按北京时间“含今天的 N 个自然日”计算。
   - 目前仍包含较多统计 SQL；后续仪表盘重构时建议逐步拆到 service 层。
 
 - `src/core/database.py`
@@ -56,11 +58,17 @@
   - 新增配置字段时先改这里，再改对应 YAML 和文档。
   - MiniMax 当前默认模型在 `config/llm.yaml` 注册为 `MiniMax-M3`，各 Agent 在 `config/agents.yaml` 绑定。
 
+- `src/core/time.py`
+  - 项目业务时间统一入口，当前使用北京时间（Asia/Shanghai / UTC+8）。
+  - 常见改动入口：日志时间、run_id、采集入库时间、站点构建更新时间。
+  - 代码中不要直接使用 `datetime.now(timezone.utc)` 或 SQLite 裸 `datetime('now')` 作为业务时间。
+
 ## Pipeline
 
 - `src/graph/collector.py`
   - 多源采集和 DB 查重。
-  - GitHub 采集使用 `topics`/`keywords` 生成最多 5 个 Search include 条件，避免 GitHub `AND/OR/NOT` 操作符上限；`exclude_terms` 在返回 repo 后本地过滤。
+  - GitHub 采集将 `topics`/`keywords` 拆成最多 5 个单条件 Search 请求后合并去重，避免对 `topic:` qualifier 使用无效 `OR`；`exclude_terms` 在返回 repo 后本地过滤。
+  - `github_ai_devtools` 用于抓取代码库理解、交互式知识图谱、AI 编程工具类仓库，关键词在 `config/sources.yaml` 维护。
   - RSS 采集先用 `httpx.AsyncClient(timeout=30)` 拉取 feed 文本，再交给 `feedparser` 解析；关键词过滤使用 `_matches_rss_keywords()`，英文关键词按词边界匹配，综合媒体可用 `filter_scope: title` 避免长正文噪音。
   - `RawItem.raw_metadata.source_id` 保存配置 id，供 source health、成本归因等后续阶段使用。
 

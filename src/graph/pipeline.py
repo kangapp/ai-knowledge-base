@@ -1,5 +1,4 @@
 # src/graph/pipeline.py
-from datetime import datetime, timezone
 import logging
 from langgraph.graph import StateGraph, START, END
 from langgraph.types import Send
@@ -12,6 +11,7 @@ from .analyzers.rss import analyze_rss
 from .analyzers.feishu import analyze_feishu
 from .analyzers.arxiv import analyze_arxiv
 from ..core.llm_client import LLMRegistry
+from ..core.time import now_bj, now_bj_iso, parse_bj_datetime
 
 logger = logging.getLogger("pipeline")
 
@@ -42,7 +42,7 @@ def reset_analyzer_counter():
 
 
 async def record_phase_start(db, run_id: str, phase: str):
-    started_at = datetime.now(timezone.utc).isoformat()
+    started_at = now_bj_iso()
     await db.execute(
         "INSERT INTO pipeline_phase_logs (run_id, phase, status, started_at) VALUES (?, ?, ?, ?)",
         (run_id, phase, "running", started_at)
@@ -52,16 +52,15 @@ async def record_phase_start(db, run_id: str, phase: str):
 
 
 async def record_phase_end(db, run_id: str, phase: str, status: str, details: str = None):
-    ended_at = datetime.now(timezone.utc).isoformat()
+    ended_at = now_bj_iso()
     row = await db.fetch_one(
         "SELECT started_at FROM pipeline_phase_logs WHERE run_id=? AND phase=? AND status='running' ORDER BY id DESC LIMIT 1",
         (run_id, phase)
     )
     duration_ms = None
     if row and row["started_at"]:
-        start_str = row["started_at"].replace("Z", "+00:00")
-        start = datetime.fromisoformat(start_str)
-        duration_ms = int((datetime.now(timezone.utc) - start).total_seconds() * 1000)
+        start = parse_bj_datetime(row["started_at"])
+        duration_ms = int((now_bj().replace(tzinfo=None) - start).total_seconds() * 1000)
     await db.execute(
         "UPDATE pipeline_phase_logs SET status=?, ended_at=?, duration_ms=?, details=? WHERE run_id=? AND phase=? AND status='running'",
         (status, ended_at, duration_ms, details, run_id, phase)

@@ -3,7 +3,6 @@ import logging
 import httpx
 import feedparser
 import hashlib
-from datetime import datetime, timezone, timedelta
 from .source_manager import SourceManager
 from .config import SourceConfig
 
@@ -173,7 +172,7 @@ class SourceDiscovery:
         try:
             await self._db.execute("""
                 INSERT OR IGNORE INTO discovered_sources (url, name, type, status, discovered_at)
-                VALUES (?, ?, ?, 'candidate', datetime('now'))
+                VALUES (?, ?, ?, 'candidate', datetime('now', '+8 hours'))
             """, (source.config.get("url", ""), source.name, source.type))
             await self._db.commit()
             logger.info("discovered_source.recorded", extra={"source_id": source.id, "type": source.type})

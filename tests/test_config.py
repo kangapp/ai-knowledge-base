@@ -43,3 +43,23 @@ def test_project_minimax_model_is_m3(monkeypatch):
         if agent.model.primary.provider == "minimax"
     }
     assert minimax_agent_models == {"MiniMax-M3"}
+
+
+def test_project_sources_include_github_ai_devtools():
+    cfg = load_sources_config(Path("config/sources.yaml"))
+    sources = {source.id: source for source in cfg.sources}
+
+    source = sources["github_ai_devtools"]
+    assert source.type == "github"
+    assert source.enabled is True
+    assert source.config["lookback_type"] == "pushed"
+    assert source.config["lookback_days"] == 90
+    assert source.config["min_stars"] == 100
+    assert source.config["topics"] == []
+    assert source.config["keywords"] == [
+        "interactive knowledge graph",
+        "codebase knowledge graph",
+        "code understanding",
+        "codebase understanding",
+        "repository analysis",
+    ]

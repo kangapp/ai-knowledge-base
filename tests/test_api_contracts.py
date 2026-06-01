@@ -54,7 +54,7 @@ async def _insert_article(db: Database, *, title: str, url: str, source: str = "
         INSERT INTO articles
         (title, url, description, summary, source, source_detail, relevance_score,
          status, collected_at)
-        VALUES (?, ?, 'desc', 'summary', ?, 'detail', 80, 'approved', datetime('now'))
+        VALUES (?, ?, 'desc', 'summary', ?, 'detail', 80, 'approved', datetime('now', '+8 hours'))
         """,
         (title, url, source),
     )
@@ -213,7 +213,7 @@ async def test_dashboard_summary_returns_first_screen_contract(api_client, api_d
     await api_db.execute(
         """
         INSERT INTO pipeline_runs (id, started_at, status, trigger, summary)
-        VALUES ('run_1', datetime('now'), 'completed', 'manual', ?)
+        VALUES ('run_1', datetime('now', '+8 hours'), 'completed', 'manual', ?)
         """,
         ('{"approved": 1, "discarded": 1, "retry": 0}',),
     )
@@ -248,27 +248,27 @@ async def test_cost_and_stats_days_use_natural_day_window(api_client, api_db):
     await api_db.execute(
         """
         INSERT INTO pipeline_runs (id, started_at, status, trigger)
-        VALUES ('run_today', datetime('now'), 'completed', 'manual')
+        VALUES ('run_today', datetime('now', '+8 hours'), 'completed', 'manual')
         """
     )
     await api_db.execute(
         """
         INSERT INTO pipeline_runs (id, started_at, status, trigger)
-        VALUES ('run_yesterday', datetime('now', '-1 day'), 'completed', 'manual')
+        VALUES ('run_yesterday', datetime('now', '+8 hours', '-1 day'), 'completed', 'manual')
         """
     )
     await api_db.execute(
         """
         INSERT INTO cost_logs
         (run_id, agent, provider, model, tokens_in, tokens_out, cost, created_at)
-        VALUES ('run_today', 'reviewer', 'openai', 'gpt-test', 100, 50, 0.25, datetime('now'))
+        VALUES ('run_today', 'reviewer', 'openai', 'gpt-test', 100, 50, 0.25, datetime('now', '+8 hours'))
         """
     )
     await api_db.execute(
         """
         INSERT INTO cost_logs
         (run_id, agent, provider, model, tokens_in, tokens_out, cost, created_at)
-        VALUES ('run_yesterday', 'reviewer', 'openai', 'gpt-test', 100, 50, 9.0, datetime('now', '-1 day'))
+        VALUES ('run_yesterday', 'reviewer', 'openai', 'gpt-test', 100, 50, 9.0, datetime('now', '+8 hours', '-1 day'))
         """
     )
     await api_db.commit()
@@ -292,25 +292,25 @@ async def test_runtime_stats_days_use_natural_day_window(api_client, api_db):
     await api_db.execute(
         """
         INSERT INTO pipeline_runs (id, started_at, status, trigger)
-        VALUES ('run_today', datetime('now'), 'completed', 'manual')
+        VALUES ('run_today', datetime('now', '+8 hours'), 'completed', 'manual')
         """
     )
     await api_db.execute(
         """
         INSERT INTO pipeline_runs (id, started_at, status, trigger)
-        VALUES ('run_yesterday', datetime('now', '-1 day'), 'completed', 'manual')
+        VALUES ('run_yesterday', datetime('now', '+8 hours', '-1 day'), 'completed', 'manual')
         """
     )
     await api_db.execute(
         """
         INSERT INTO circuit_events (provider, event, reason, created_at)
-        VALUES ('openai', 'closed', 'ok', datetime('now'))
+        VALUES ('openai', 'closed', 'ok', datetime('now', '+8 hours'))
         """
     )
     await api_db.execute(
         """
         INSERT INTO circuit_events (provider, event, reason, created_at)
-        VALUES ('deepseek', 'open', 'old', datetime('now', '-1 day'))
+        VALUES ('deepseek', 'open', 'old', datetime('now', '+8 hours', '-1 day'))
         """
     )
     await api_db.commit()
@@ -327,27 +327,27 @@ async def test_consumption_detail_api_passes_trend_window(api_client, api_db):
     await api_db.execute(
         """
         INSERT INTO pipeline_runs (id, started_at, status, trigger)
-        VALUES ('run_today', datetime('now'), 'completed', 'manual')
+        VALUES ('run_today', datetime('now', '+8 hours'), 'completed', 'manual')
         """
     )
     await api_db.execute(
         """
         INSERT INTO pipeline_runs (id, started_at, status, trigger)
-        VALUES ('run_old', datetime('now', '-3 days'), 'completed', 'manual')
+        VALUES ('run_old', datetime('now', '+8 hours', '-3 days'), 'completed', 'manual')
         """
     )
     await api_db.execute(
         """
         INSERT INTO cost_logs
         (run_id, agent, provider, model, tokens_in, tokens_out, cost, created_at)
-        VALUES ('run_today', 'reviewer', 'openai', 'gpt-test', 100, 50, 0.25, datetime('now'))
+        VALUES ('run_today', 'reviewer', 'openai', 'gpt-test', 100, 50, 0.25, datetime('now', '+8 hours'))
         """
     )
     await api_db.execute(
         """
         INSERT INTO cost_logs
         (run_id, agent, provider, model, tokens_in, tokens_out, cost, created_at)
-        VALUES ('run_old', 'reviewer', 'openai', 'gpt-test', 100, 50, 9.0, datetime('now', '-3 days'))
+        VALUES ('run_old', 'reviewer', 'openai', 'gpt-test', 100, 50, 9.0, datetime('now', '+8 hours', '-3 days'))
         """
     )
     await api_db.commit()

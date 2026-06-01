@@ -3,12 +3,13 @@ import asyncio
 import logging
 import re
 import time
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 import httpx
 import feedparser
 
 from .state import RawItem, CollectResult
 from ..core.config import SourceConfig
+from ..core.time import now_bj, now_bj_iso
 from ..db.operations import record_source_health
 
 logger = logging.getLogger("pipeline")
@@ -21,21 +22,22 @@ def _quote_github_term(term: str) -> str:
     return term
 
 
-def _build_github_query(cfg: dict, now: datetime | None = None) -> str:
+def _build_github_queries(cfg: dict, now: datetime | None = None) -> list[str]:
     topics = [f"topic:{topic}" for topic in cfg.get("topics", ["ai"])]
     keywords = [_quote_github_term(keyword) for keyword in cfg.get("keywords", [])]
     include_terms = (topics + keywords)[:5]
     if not include_terms:
         include_terms = ["topic:ai"]
-    query = include_terms[0] if len(include_terms) == 1 else f"({' OR '.join(include_terms)})"
 
     lookback_days = cfg.get("lookback_days", 7)
     lookback_type = cfg.get("lookback_type", "created")  # "created" 或 "pushed"
-    current_time = now or datetime.now(timezone.utc)
+    current_time = now or now_bj()
     since = (current_time - timedelta(days=lookback_days)).strftime("%Y-%m-%d")
-    query = f"{query} {lookback_type}:>{since}"
+    return [f"{term} {lookback_type}:>{since}" for term in include_terms]
 
-    return query
+
+def _build_github_query(cfg: dict, now: datetime | None = None) -> str:
+    return _build_github_queries(cfg, now=now)[0]
 
 
 def _matches_github_exclude(repo: dict, exclude_terms: list[str]) -> bool:
@@ -67,26 +69,33 @@ def _matches_rss_keywords(text: str, keywords: list[str]) -> bool:
 
 async def collect_github(source: SourceConfig) -> list[RawItem]:
     cfg = source.config
-    q = _build_github_query(cfg)
     url = "https://api.github.com/search/repositories"
-    params = {"q": q, "sort": "stars", "order": "desc", "per_page": source.max_items}
     headers = {"Accept": "application/vnd.github.v3+json"}
     import os
     if token := os.environ.get("GITHUB_TOKEN"):
         headers["Authorization"] = f"Bearer {token}"
 
+    repos_by_url = {}
     async with httpx.AsyncClient(timeout=30, follow_redirects=True) as client:
-        resp = await client.get(url, params=params, headers=headers)
-        resp.raise_for_status()
-        data = resp.json()
+        for q in _build_github_queries(cfg):
+            params = {"q": q, "sort": "stars", "order": "desc", "per_page": source.max_items}
+            resp = await client.get(url, params=params, headers=headers)
+            resp.raise_for_status()
+            for repo in resp.json().get("items", []):
+                repos_by_url[repo["html_url"]] = repo
 
     items = []
-    now = datetime.now(timezone.utc).isoformat()
+    now = now_bj_iso()
     min_stars = cfg.get("min_stars", 0)
     min_forks = cfg.get("min_forks", 0)
     min_watchers = cfg.get("min_watchers", 0)
     exclude_terms = cfg.get("exclude_terms", [])
-    for repo in data.get("items", []):
+    repos = sorted(
+        repos_by_url.values(),
+        key=lambda repo: repo.get("stargazers_count", 0),
+        reverse=True,
+    )
+    for repo in repos:
         if _matches_github_exclude(repo, exclude_terms):
             continue
         if repo.get("stargazers_count", 0) < min_stars:
@@ -105,13 +114,15 @@ async def collect_github(source: SourceConfig) -> list[RawItem]:
             raw_metadata={"stars": repo.get("stargazers_count", 0), "forks": repo.get("forks_count", 0), "watchers": repo.get("watchers_count", 0), "language": repo.get("language", ""), "topics": repo.get("topics", []), "source_id": source.id},
             collected_at=now,
         ))
+        if len(items) >= source.max_items:
+            break
     return items
 
 
 async def collect_rss(source: SourceConfig) -> list[RawItem]:
     cfg = source.config
     items = []
-    now = datetime.now(timezone.utc).isoformat()
+    now = now_bj_iso()
     keywords = cfg.get("filter_keywords", [])
     filter_scope = cfg.get("filter_scope", "title_summary")
 
@@ -174,7 +185,7 @@ async def collect_feishu(source: SourceConfig) -> list[RawItem]:
         return []
     cfg = source.config
     items = []
-    now = datetime.now(timezone.utc).isoformat()
+    now = now_bj_iso()
     token = await _feishu_auth.get_token()
     headers = {"Authorization": f"Bearer {token}"}
 
@@ -220,7 +231,7 @@ async def collect_feishu(source: SourceConfig) -> list[RawItem]:
 async def collect_arxiv(source: SourceConfig) -> list[RawItem]:
     cfg = source.config
     items = []
-    now = datetime.now(timezone.utc).isoformat()
+    now = now_bj_iso()
     for cat in cfg.get("categories", []):
         url = f"http://export.arxiv.org/api/query?search_query=cat:{cat}&start=0&max_results={source.max_items}&sortBy=submittedDate&sortOrder=descending"
         async with httpx.AsyncClient(timeout=30, follow_redirects=True) as client:

@@ -26,7 +26,7 @@ async def _insert_article(
         INSERT INTO articles
         (title, url, description, summary, source, source_detail, relevance_score,
          status, retry_count, collected_at, extra_data)
-        VALUES (?, ?, ?, ?, ?, ?, ?, 'approved', ?, datetime('now'), ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, 'approved', ?, datetime('now', '+8 hours'), ?)
         """,
         (
             title,

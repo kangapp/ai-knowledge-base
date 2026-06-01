@@ -3,7 +3,7 @@ import pytest
 from unittest.mock import AsyncMock, patch
 from datetime import datetime, timezone
 
-from src.graph.collector import _build_github_query, _matches_rss_keywords, collect_github, collect_rss, collect_all
+from src.graph.collector import _build_github_queries, _matches_rss_keywords, collect_github, collect_rss, collect_all
 from src.graph.state import RawItem
 from src.core.config import SourceConfig
 
@@ -14,8 +14,8 @@ def make_source(**kw):
     return SourceConfig(**defaults)
 
 
-def test_build_github_query_stays_under_github_operator_limit():
-    query = _build_github_query(
+def test_build_github_queries_do_not_or_topic_qualifiers():
+    queries = _build_github_queries(
         {
             "topics": ["llm", "machine-learning", "rag"],
             "keywords": ["AI agent", "RAG", "MCP"],
@@ -26,12 +26,15 @@ def test_build_github_query_stays_under_github_operator_limit():
         now=datetime(2026, 6, 1, tzinfo=timezone.utc),
     )
 
-    assert query == (
-        '(topic:llm OR topic:machine-learning OR topic:rag OR "AI agent" OR RAG) '
-        "created:>2026-05-25"
-    )
-    assert query.count(" OR ") <= 4
-    assert " NOT " not in query
+    assert queries == [
+        "topic:llm created:>2026-05-25",
+        "topic:machine-learning created:>2026-05-25",
+        "topic:rag created:>2026-05-25",
+        '"AI agent" created:>2026-05-25',
+        "RAG created:>2026-05-25",
+    ]
+    assert all(" OR " not in query for query in queries)
+    assert all(" NOT " not in query for query in queries)
 
 
 def test_matches_rss_keywords_does_not_match_ai_inside_words():
@@ -77,6 +80,43 @@ async def test_collect_github_filters_excluded_terms_after_search():
         items = await collect_github(source)
 
     assert [item.url for item in items] == ["https://github.com/b/useful-ai"]
+
+
+@pytest.mark.asyncio
+async def test_collect_github_merges_multiple_queries_and_deduplicates():
+    source = make_source(
+        type="github",
+        max_items=2,
+        config={
+            "topics": ["llm", "rag"],
+            "min_stars": 1,
+            "lookback_days": 7,
+        },
+    )
+    repo_a = {"full_name": "a/llm", "name": "llm", "html_url": "https://github.com/a/llm", "description": "LLM", "stargazers_count": 100, "forks_count": 50, "watchers_count": 30, "language": "Python", "topics": ["llm"], "pushed_at": "2026-05-15T10:00:00Z"}
+    repo_b = {"full_name": "b/rag", "name": "rag", "html_url": "https://github.com/b/rag", "description": "RAG", "stargazers_count": 200, "forks_count": 50, "watchers_count": 30, "language": "Python", "topics": ["rag"], "pushed_at": "2026-05-15T10:00:00Z"}
+
+    responses = [
+        AsyncMock(status_code=200, json=lambda: {"items": [repo_a]}),
+        AsyncMock(status_code=200, json=lambda: {"items": [repo_a, repo_b]}),
+    ]
+    for response in responses:
+        response.raise_for_status = lambda: None
+
+    fixed_now = datetime(2026, 6, 1, tzinfo=timezone.utc)
+    with patch("src.graph.collector.now_bj", return_value=fixed_now), \
+            patch("httpx.AsyncClient.get", side_effect=responses) as mock_get:
+        items = await collect_github(source)
+
+    queries = [call.kwargs["params"]["q"] for call in mock_get.call_args_list]
+    assert queries == [
+        "topic:llm created:>2026-05-25",
+        "topic:rag created:>2026-05-25",
+    ]
+    assert [item.url for item in items] == [
+        "https://github.com/b/rag",
+        "https://github.com/a/llm",
+    ]
 
 
 @pytest.mark.asyncio

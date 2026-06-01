@@ -10,7 +10,7 @@ def _date_window_modifier(days: int) -> str:
 async def get_dashboard_summary(db: Database, days: int = 30) -> dict:
     cutoff = _date_window_modifier(days)
     pipeline_rows = await db.fetch_all(
-        "SELECT summary FROM pipeline_runs WHERE started_at >= date('now', ?) AND status='completed'",
+        "SELECT summary FROM pipeline_runs WHERE started_at >= date('now', '+8 hours', ?) AND status='completed'",
         (cutoff,),
     )
     pipeline_approved = 0
@@ -30,12 +30,12 @@ async def get_dashboard_summary(db: Database, days: int = 30) -> dict:
 
     total = await db.fetch_one("SELECT COUNT(*) as c FROM articles WHERE status='approved'")
     period_cost = await db.fetch_one(
-        "SELECT COALESCE(SUM(cost),0) as t FROM cost_logs WHERE created_at >= date('now', ?)",
+        "SELECT COALESCE(SUM(cost),0) as t FROM cost_logs WHERE created_at >= date('now', '+8 hours', ?)",
         (cutoff,),
     )
     cost_total = await db.fetch_one("SELECT COALESCE(SUM(cost),0) as t FROM cost_logs")
     active_sources = await db.fetch_one(
-        "SELECT COUNT(DISTINCT source) as c FROM articles WHERE status='approved' AND collected_at >= date('now', ?)",
+        "SELECT COUNT(DISTINCT source) as c FROM articles WHERE status='approved' AND collected_at >= date('now', '+8 hours', ?)",
         (cutoff,),
     )
     avg_score = await db.fetch_one("SELECT AVG(relevance_score) as avg FROM articles WHERE status='approved'")
@@ -60,27 +60,27 @@ async def get_enhanced_stats(db: Database, days: int = 30) -> dict:
         SELECT strftime('%Y-%m-%dT%H:00', created_at) as hour,
                SUM(cost) as cost, COUNT(*) as articles
         FROM cost_logs
-        WHERE created_at >= datetime('now', '-2 days')
+        WHERE created_at >= datetime('now', '+8 hours', '-2 days')
         GROUP BY hour ORDER BY hour
     """)
     daily = await db.fetch_all("""
         SELECT date(created_at) as date, SUM(cost) as cost, COUNT(*) as articles
         FROM cost_logs
-        WHERE created_at >= date('now', ?)
+        WHERE created_at >= date('now', '+8 hours', ?)
         GROUP BY date(created_at) ORDER BY date
     """, (cutoff,))
     weekly = await db.fetch_all("""
         SELECT strftime('%Y-W%W', created_at) as week,
                SUM(cost) as cost, COUNT(*) as articles
         FROM cost_logs
-        WHERE created_at >= datetime('now', '-12 weeks')
+        WHERE created_at >= datetime('now', '+8 hours', '-12 weeks')
         GROUP BY week ORDER BY week
     """)
     monthly = await db.fetch_all("""
         SELECT strftime('%Y-%m', created_at) as month,
                SUM(cost) as cost, COUNT(*) as articles
         FROM cost_logs
-        WHERE created_at >= datetime('now', '-12 months')
+        WHERE created_at >= datetime('now', '+8 hours', '-12 months')
         GROUP BY month ORDER BY month
     """)
     source_dist = await db.fetch_all("""
@@ -91,7 +91,7 @@ async def get_enhanced_stats(db: Database, days: int = 30) -> dict:
     active_detail = await db.fetch_all("""
         SELECT source, source_detail, COUNT(*) as count
         FROM articles
-        WHERE status='approved' AND collected_at >= date('now', ?)
+        WHERE status='approved' AND collected_at >= date('now', '+8 hours', ?)
         GROUP BY source, source_detail
         ORDER BY count DESC
     """, (cutoff,))

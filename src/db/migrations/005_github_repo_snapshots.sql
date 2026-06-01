@@ -8,7 +8,7 @@ CREATE TABLE IF NOT EXISTS github_repo_snapshots (
     forks           INTEGER DEFAULT 0,
     watchers        INTEGER DEFAULT 0,
     snapshot_date   TEXT NOT NULL,          -- YYYY-MM-DD
-    created_at      TEXT DEFAULT CURRENT_TIMESTAMP,
+    created_at      TEXT DEFAULT (datetime('now', '+8 hours')),
     UNIQUE(repo_url, snapshot_date)
 );
 
