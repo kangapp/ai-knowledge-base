@@ -49,3 +49,15 @@ def test_dashboard_source_health_uses_display_names_not_storage_ids():
     assert "sources.map(sourceDisplayName)" in renderers
     assert "<td>${sourceDisplayName(s)}</td>" in renderers
     assert "sources.map(s => s.id)" not in renderers
+
+
+def test_dashboard_consumption_passes_trend_window_separately():
+    api_js = (ROOT / "src/site/static/js/dashboard/api.js").read_text()
+    state_js = (ROOT / "src/site/static/js/dashboard/state.js").read_text()
+    main_js = (ROOT / "src/site/static/js/dashboard/main.js").read_text()
+
+    assert "trendWindow" in state_js
+    assert "currentTrendWindow" in state_js
+    assert "loadConsumption(period, trendWindow)" in api_js
+    assert "trend_window=${trendWindow}" in api_js
+    assert "DashboardApi.loadConsumption(period, DashboardState.currentTrendWindow)" in main_js

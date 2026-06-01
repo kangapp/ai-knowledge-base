@@ -1,8 +1,8 @@
 (function() {
     const periods = {
-        day: { days: 1, label: '今日' },
-        week: { days: 7, label: '近 7 天' },
-        month: { days: 30, label: '近 30 天' },
+        day: { days: 1, label: '今日', trendWindow: '14d' },
+        week: { days: 7, label: '近 7 天', trendWindow: '12w' },
+        month: { days: 30, label: '近 30 天', trendWindow: '12m' },
     };
 
     const state = {
@@ -28,6 +28,9 @@
         },
         get currentLabel() {
             return periods[state.period].label;
+        },
+        get currentTrendWindow() {
+            return periods[state.period].trendWindow;
         },
         setTab(tab) {
             state.activeTab = tab;

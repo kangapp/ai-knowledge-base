@@ -15,8 +15,8 @@
         loadQuality(period) {
             return requestJson(`/api/stats/quality-detail?period=${period}`);
         },
-        loadConsumption(period) {
-            return requestJson(`/api/stats/consumption-detail?period=${period}`);
+        loadConsumption(period, trendWindow) {
+            return requestJson(`/api/stats/consumption-detail?period=${period}&trend_window=${trendWindow}`);
         },
         loadSources(period) {
             return requestJson(`/api/sources/stats?period=${period}`);

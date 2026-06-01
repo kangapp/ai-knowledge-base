@@ -21,7 +21,7 @@
                 const data = await loadCached('quality', () => DashboardApi.loadQuality(period));
                 DashboardRenderers.renderQuality(data, label);
             } else if (DashboardState.activeTab === 'consumption') {
-                const data = await loadCached('consumption', () => DashboardApi.loadConsumption(period));
+                const data = await loadCached('consumption', () => DashboardApi.loadConsumption(period, DashboardState.currentTrendWindow));
                 DashboardRenderers.renderConsumption(data);
             } else if (DashboardState.activeTab === 'sources') {
                 const data = await loadCached('sources', () => DashboardApi.loadSources(period));

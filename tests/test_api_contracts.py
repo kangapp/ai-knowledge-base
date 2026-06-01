@@ -320,3 +320,41 @@ async def test_runtime_stats_days_use_natural_day_window(api_client, api_db):
     assert body["code"] == 0
     assert body["data"]["run"]["id"] == "run_today"
     assert [provider["name"] for provider in body["data"]["providers"]] == ["openai"]
+
+
+@pytest.mark.asyncio
+async def test_consumption_detail_api_passes_trend_window(api_client, api_db):
+    await api_db.execute(
+        """
+        INSERT INTO pipeline_runs (id, started_at, status, trigger)
+        VALUES ('run_today', datetime('now'), 'completed', 'manual')
+        """
+    )
+    await api_db.execute(
+        """
+        INSERT INTO pipeline_runs (id, started_at, status, trigger)
+        VALUES ('run_old', datetime('now', '-3 days'), 'completed', 'manual')
+        """
+    )
+    await api_db.execute(
+        """
+        INSERT INTO cost_logs
+        (run_id, agent, provider, model, tokens_in, tokens_out, cost, created_at)
+        VALUES ('run_today', 'reviewer', 'openai', 'gpt-test', 100, 50, 0.25, datetime('now'))
+        """
+    )
+    await api_db.execute(
+        """
+        INSERT INTO cost_logs
+        (run_id, agent, provider, model, tokens_in, tokens_out, cost, created_at)
+        VALUES ('run_old', 'reviewer', 'openai', 'gpt-test', 100, 50, 9.0, datetime('now', '-3 days'))
+        """
+    )
+    await api_db.commit()
+
+    body = api_client.get("/api/stats/consumption-detail?period=day&trend_window=2d").json()
+
+    assert body["code"] == 0
+    assert body["data"]["period_cost"] == 0.25
+    assert body["data"]["trend_window"] == "2d"
+    assert sum(row["cost"] for row in body["data"]["trend"]) == 0.25

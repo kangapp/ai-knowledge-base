@@ -10,6 +10,20 @@ def date_window_modifier(days: int) -> str:
     return f"-{max(days - 1, 0)} days"
 
 
+def _trend_window_modifier(trend_window: str) -> str:
+    value = trend_window.strip().lower()
+    if len(value) < 2 or not value[:-1].isdigit() or value[-1] not in {"d", "w", "m"}:
+        return "-13 days"
+
+    amount = max(int(value[:-1]), 1)
+    unit = value[-1]
+    if unit == "d":
+        return date_window_modifier(amount)
+    if unit == "w":
+        return date_window_modifier(amount * 7)
+    return f"-{max(amount - 1, 0)} months"
+
+
 async def save_article(db: Database, raw: RawItem, analyzed: AnalyzedItem, reviewed: ReviewedItem, cost: float, tokens: int) -> int | None:
     """保存文章，返回 article id（新插入或已存在行的 id）"""
     extra = json.dumps({
@@ -368,14 +382,17 @@ async def get_consumption_stats(db: Database, days: int = 30) -> dict:
     }
 
 
-async def get_consumption_detail_stats(db: Database, period: str = "week") -> dict:
+async def get_consumption_detail_stats(db: Database, period: str = "week", trend_window: str | None = None) -> dict:
     """
     资源消耗详细统计（Phase 2）
     period 表示日期窗口：
     day = 今天；week = 近 7 个自然日；month = 近 30 个自然日。
+    trend_window 表示趋势回看窗口：day 默认 14d，week 默认 12w，month 默认 12m。
     """
     window_map = {"day": "-0 days", "week": "-6 days", "month": "-29 days"}
     window = window_map.get(period, "-6 days")
+    trend_window = trend_window or {"day": "14d", "week": "12w", "month": "12m"}.get(period, "12w")
+    trend_cutoff = _trend_window_modifier(trend_window)
 
     # 1. 周期总花费和日均
     period_cost = await db.fetch_one("""
@@ -417,7 +434,7 @@ async def get_consumption_detail_stats(db: Database, period: str = "week") -> di
             GROUP BY label ORDER BY label
         """
 
-    trend = await db.fetch_all(trend_sql, (window,))
+    trend = await db.fetch_all(trend_sql, (trend_cutoff,))
 
     # 4. 来源费用构成（按文章真实来源归因，历史数据回退到 agent 推断）
     source_expr = """
@@ -454,7 +471,7 @@ async def get_consumption_detail_stats(db: Database, period: str = "week") -> di
             WHERE cl.created_at >= date('now', ?)
             GROUP BY 1, 2, 3
             ORDER BY label
-        """, (window,))
+        """, (trend_cutoff,))
     elif period == "week":
         source_trend = await db.fetch_all(f"""
             SELECT
@@ -466,7 +483,7 @@ async def get_consumption_detail_stats(db: Database, period: str = "week") -> di
             LEFT JOIN articles a ON a.url = cl.ref_url
             WHERE cl.created_at >= date('now', ?)
             GROUP BY 1, 2, 3 ORDER BY label
-        """, (window,))
+        """, (trend_cutoff,))
     else:
         source_trend = await db.fetch_all(f"""
             SELECT
@@ -478,7 +495,7 @@ async def get_consumption_detail_stats(db: Database, period: str = "week") -> di
             LEFT JOIN articles a ON a.url = cl.ref_url
             WHERE cl.created_at >= date('now', ?)
             GROUP BY 1, 2, 3 ORDER BY label
-        """, (window,))
+        """, (trend_cutoff,))
 
     # 5. Provider 费用趋势
     if period == "day":
@@ -486,19 +503,19 @@ async def get_consumption_detail_stats(db: Database, period: str = "week") -> di
             SELECT date(created_at) as label, provider, SUM(cost) as cost
             FROM cost_logs WHERE created_at >= date('now', ?)
             GROUP BY provider, date(created_at) ORDER BY label
-        """, (window,))
+        """, (trend_cutoff,))
     elif period == "week":
         provider_trend = await db.fetch_all("""
             SELECT strftime('%Y-W%W', created_at) as label, provider, SUM(cost) as cost
             FROM cost_logs WHERE created_at >= date('now', ?)
             GROUP BY provider, label ORDER BY label
-        """, (window,))
+        """, (trend_cutoff,))
     else:
         provider_trend = await db.fetch_all("""
             SELECT strftime('%Y-%m', created_at) as label, provider, SUM(cost) as cost
             FROM cost_logs WHERE created_at >= date('now', ?)
             GROUP BY provider, label ORDER BY label
-        """, (window,))
+        """, (trend_cutoff,))
 
     # 6. 预算进度（硬编码月度预算 $10，与 config/agents.yaml budget.monthly: 10.0 一致）
     budget = 10.0
@@ -515,6 +532,7 @@ async def get_consumption_detail_stats(db: Database, period: str = "week") -> di
         "cost_per_million_tokens": round((period_cost["total"] or 0) / max(period_tokens["total"] if period_tokens else 1, 1) * 1e6, 2),
         "budget_progress": round((monthly_cost["total"] or 0) / budget, 3),
         "budget_remaining": round(budget - (monthly_cost["total"] or 0), 2),
+        "trend_window": trend_window,
         "trend": [{"label": r["label"], "cost": r["cost"], "articles": r["articles"]} for r in trend] if trend else [],
         "source_trend": [{"source": r["source"], "type": r["type"], "label": r["label"], "cost": r["cost"]} for r in source_trend] if source_trend else [],
         "provider_trend": [{"provider": r["provider"], "label": r["label"], "cost": r["cost"]} for r in provider_trend] if provider_trend else [],

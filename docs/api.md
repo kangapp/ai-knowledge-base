@@ -300,21 +300,28 @@
 
 ### GET /api/stats/consumption-detail
 
-资源消耗详细统计（新版）。`period` 表示日期窗口。
+资源消耗详细统计（新版）。`period` 表示 KPI 日期窗口，`trend_window` 单独控制趋势回看窗口。
 
 **参数:**
 
 | 参数 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
 | period | string | "week" | day/week/month |
+| trend_window | string | 跟随 period | 趋势回看窗口，格式为 `14d`、`12w`、`12m` |
 
 **period 口径:**
 
-| period | KPI/趋势窗口 | 趋势聚合粒度 |
-|--------|--------------|--------------|
-| day | 今天 | 按天 |
-| week | 近 7 个自然日（含今天） | 按周 |
-| month | 近 30 个自然日（含今天） | 按月 |
+| period | KPI 窗口 | 默认 trend_window | 趋势聚合粒度 |
+|--------|----------|--------------------|--------------|
+| day | 今天 | 14d | 按天 |
+| week | 近 7 个自然日（含今天） | 12w | 按周 |
+| month | 近 30 个自然日（含今天） | 12m | 按月 |
+
+**趋势口径:**
+
+- `period_cost`、`period_days`、`period_tokens`、`daily_avg` 使用 `period` 对应的 KPI 窗口。
+- `trend`、`source_trend`、`provider_trend` 使用 `trend_window` 对应的趋势窗口，三者窗口保持一致。
+- 前端默认传参：`day&trend_window=14d`、`week&trend_window=12w`、`month&trend_window=12m`。
 
 **来源费用口径:**
 
@@ -336,6 +343,7 @@
     "cost_per_million_tokens": 0.37,
     "budget_progress": 0.017,
     "budget_remaining": 9.83,
+    "trend_window": "12w",
     "trend": [...],
     "source_trend": [...],
     "provider_trend": [...]

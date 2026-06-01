@@ -60,7 +60,7 @@ async def test_consumption_detail_day_uses_today_window(tmp_path):
     try:
         await db.initialize()
         await _insert_cost(db, run_id="r1", agent="rss_analyzer", provider="deepseek", cost=0.2, days_ago=0)
-        await _insert_cost(db, run_id="r2", agent="reviewer", provider="deepseek", cost=9.0, days_ago=1)
+        await _insert_cost(db, run_id="r2", agent="reviewer", provider="deepseek", cost=0.3, days_ago=1)
         await _insert_cost(db, run_id="r3", agent="github_analyzer", provider="minimax", cost=9.0, days_ago=8)
         await db.commit()
 
@@ -69,9 +69,9 @@ async def test_consumption_detail_day_uses_today_window(tmp_path):
         assert data["period_cost"] == 0.2
         assert data["period_tokens"] == 200
         assert data["period_days"] == 1
-        assert len(data["trend"]) == 1
-        assert sum(row["cost"] for row in data["trend"]) == 0.2
-        assert {row["provider"] for row in data["provider_trend"]} == {"deepseek"}
+        assert len(data["trend"]) == 3
+        assert sum(row["cost"] for row in data["trend"]) == 9.5
+        assert {row["provider"] for row in data["provider_trend"]} == {"deepseek", "minimax"}
     finally:
         await db.close()
 
@@ -86,7 +86,7 @@ async def test_consumption_detail_week_uses_recent_7_day_window(tmp_path):
         await _insert_cost(db, run_id="r3", agent="github_analyzer", provider="minimax", cost=9.0, days_ago=7)
         await db.commit()
 
-        data = await get_consumption_detail_stats(db, "week")
+        data = await get_consumption_detail_stats(db, "week", trend_window="7d")
 
         assert data["period_cost"] == 0.5
         assert data["period_tokens"] == 400
@@ -94,6 +94,26 @@ async def test_consumption_detail_week_uses_recent_7_day_window(tmp_path):
         assert all("W" in row["label"] for row in data["trend"])
         assert sum(row["cost"] for row in data["trend"]) == 0.5
         assert {row["provider"] for row in data["provider_trend"]} == {"deepseek"}
+    finally:
+        await db.close()
+
+
+@pytest.mark.asyncio
+async def test_consumption_detail_day_accepts_custom_trend_window(tmp_path):
+    db = Database(tmp_path / "test.db", migrations_dir=_MIGRATIONS_DIR)
+    try:
+        await db.initialize()
+        await _insert_cost(db, run_id="r1", agent="rss_analyzer", provider="deepseek", cost=0.2, days_ago=0)
+        await _insert_cost(db, run_id="r2", agent="reviewer", provider="deepseek", cost=0.3, days_ago=1)
+        await _insert_cost(db, run_id="r3", agent="github_analyzer", provider="minimax", cost=9.0, days_ago=8)
+        await db.commit()
+
+        data = await get_consumption_detail_stats(db, "day", trend_window="2d")
+
+        assert data["period_cost"] == 0.2
+        assert len(data["trend"]) == 2
+        assert sum(row["cost"] for row in data["trend"]) == 0.5
+        assert data["trend_window"] == "2d"
     finally:
         await db.close()
 

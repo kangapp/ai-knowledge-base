@@ -45,6 +45,9 @@ async def get_stats_quality_detail(period: str = Query(default="week", pattern="
     return envelope(await operations.get_quality_detail_stats(db, period))
 
 @router.get("/consumption-detail")
-async def get_stats_consumption_detail(period: str = Query(default="week", pattern="^(day|week|month)$")):
+async def get_stats_consumption_detail(
+    period: str = Query(default="week", pattern="^(day|week|month)$"),
+    trend_window: str | None = Query(default=None, pattern=r"^\d+[dwm]$"),
+):
     db = get_db()
-    return envelope(await operations.get_consumption_detail_stats(db, period))
+    return envelope(await operations.get_consumption_detail_stats(db, period, trend_window))
