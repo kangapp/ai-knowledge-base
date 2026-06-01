@@ -79,6 +79,7 @@ async def analyze_items(
         )
 
         for attempt in range(2):
+            content = ""
             try:
                 kwargs = dict(
                     model=model_id,
@@ -105,11 +106,6 @@ async def analyze_items(
                 registry.budget.add_cost(provider, cost)
                 registry.health.record_success(provider, 0)
 
-                # 再 parse，parse 失败会抛出异常
-                analyzed = parse_and_validate(content, ref_url=item.url)
-
-                # parse 成功，记录 CostRecord 并 break
-                results.append(analyzed)
                 costs.append(CostRecord(
                     agent=agent_name,
                     provider=provider,
@@ -122,6 +118,12 @@ async def analyze_items(
                     source_detail=item.source_detail,
                     source_id=item.raw_metadata.get("source_id", item.source_detail or item.source),
                 ))
+
+                # 再 parse，parse 失败会抛出异常
+                analyzed = parse_and_validate(content, ref_url=item.url)
+
+                # parse 成功后记录分析结果并 break；费用已按真实 LLM 调用记录
+                results.append(analyzed)
                 logger.debug("analyzer.item", extra={
                     "agent": agent_name,
                     "url": item.url,

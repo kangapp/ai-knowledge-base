@@ -141,6 +141,27 @@ def _apply_github_velocity_filter(raw_items: list, source, trending_urls: set[st
     ]
 
 
+def _build_cost_source_map(items: list) -> dict[str, tuple[str, str, str]]:
+    source_map = {}
+    for item in items:
+        source_id = item.raw_metadata.get("source_id") or item.source_detail or item.source
+        source_map[item.url] = (item.source, item.source_detail, source_id)
+    return source_map
+
+
+def _summarize_item_costs(cost_records: list) -> dict[str, tuple[float, int]]:
+    summary: dict[str, tuple[float, int]] = {}
+    for record in cost_records:
+        if not record.ref_url:
+            continue
+        cost, tokens = summary.get(record.ref_url, (0.0, 0))
+        summary[record.ref_url] = (
+            round(cost + record.cost, 10),
+            tokens + record.tokens_in + record.tokens_out,
+        )
+    return summary
+
+
 async def run_pipeline(trigger: str = "cron", source_filter: str | list[str] | tuple[str, ...] | set[str] | None = None):
     """source_filter 为 None 时采集所有源；否则采集指定 source.id 或一组 source.id。"""
     global _registry, _db, _builder, _running, _graph
@@ -266,10 +287,8 @@ async def run_pipeline(trigger: str = "cron", source_filter: str | list[str] | t
         passed_count = 0
         retry_count = 0
         discarded_count = 0
-        cost_source_map = {}
-        for item in new_items:
-            source_id = item.raw_metadata.get("source_id") if item.source == "github" else item.source_detail
-            cost_source_map[item.url] = (item.source, item.source_detail, source_id or item.source)
+        cost_source_map = _build_cost_source_map(new_items)
+        item_costs = _summarize_item_costs(all_costs)
 
         for reviewed in all_reviewed:
             raw = next((r for r in new_items if r.url == reviewed.ref_url), None)
@@ -278,7 +297,8 @@ async def run_pipeline(trigger: str = "cron", source_filter: str | list[str] | t
                 continue
 
             if reviewed.verdict == "approved":
-                article_id = await save_article(_db, raw, analyzed, reviewed, 0, 0)
+                analysis_cost, analysis_tokens = item_costs.get(reviewed.ref_url, (0.0, 0))
+                article_id = await save_article(_db, raw, analyzed, reviewed, analysis_cost, analysis_tokens)
                 if article_id:
                     tags = list(analyzed.tags)
                     if raw.source == "github" and raw.raw_metadata.get("source_id"):
@@ -293,7 +313,8 @@ async def run_pipeline(trigger: str = "cron", source_filter: str | list[str] | t
                 if analyzed.retry_count >= 2:
                     discarded_count += 1
                 else:
-                    await save_article(_db, raw, analyzed, reviewed, 0, 0)
+                    analysis_cost, analysis_tokens = item_costs.get(reviewed.ref_url, (0.0, 0))
+                    await save_article(_db, raw, analyzed, reviewed, analysis_cost, analysis_tokens)
                     retry_count += 1
             else:  # discarded
                 discarded_count += 1

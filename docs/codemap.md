@@ -44,6 +44,7 @@
 - `src/db/operations.py`
   - 数据库操作集合：文章保存、标签保存、成本记录、统计查询、备份等。
   - 常见改动入口：文章查询、统计 SQL、pipeline run 记录、`cost_logs` 来源归因、GitHub repo 增速快照查询。
+  - 费用统计读取 `cost_logs`，资源消耗预算使用 `config/agents.yaml` 的 `budget.monthly`。
   - 目前仍包含较多统计 SQL；后续仪表盘重构时建议逐步拆到 service 层。
 
 - `src/core/database.py`
@@ -64,6 +65,7 @@
 
 - `src/main.py`
   - GitHub repo 快照在 DB 查重前写入，`trend_mode=true` 的源只过滤本源采集结果，不影响同批次其它 GitHub/RSS/arXiv 源。
+  - 图外入库前按 `ref_url` 汇总 Analyzer + Reviewer 成本，写入文章级 `analysis_cost/analysis_tokens`，并为 Reviewer 成本补齐来源快照。
 
 - `src/graph/pipeline.py`
   - LangGraph DAG 编排和 phase log 记录。

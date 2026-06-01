@@ -69,9 +69,27 @@ async def test_consumption_detail_day_uses_today_window(tmp_path):
         assert data["period_cost"] == 0.2
         assert data["period_tokens"] == 200
         assert data["period_days"] == 1
+        assert data["trend"][0]["llm_calls"] == data["trend"][0]["articles"]
         assert len(data["trend"]) == 3
         assert sum(row["cost"] for row in data["trend"]) == 9.5
         assert {row["provider"] for row in data["provider_trend"]} == {"deepseek", "minimax"}
+    finally:
+        await db.close()
+
+
+@pytest.mark.asyncio
+async def test_consumption_detail_accepts_monthly_budget(tmp_path):
+    db = Database(tmp_path / "test.db", migrations_dir=_MIGRATIONS_DIR)
+    try:
+        await db.initialize()
+        await _insert_cost(db, run_id="r1", agent="rss_analyzer", provider="deepseek", cost=0.2, days_ago=0)
+        await db.commit()
+
+        data = await get_consumption_detail_stats(db, "day", monthly_budget=1.0)
+
+        assert data["budget_progress"] == 0.2
+        assert data["budget_remaining"] == 0.8
+        assert data["monthly_budget"] == 1.0
     finally:
         await db.close()
 

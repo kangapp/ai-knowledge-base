@@ -135,6 +135,7 @@ async def reviewer_node(state: PipelineState, registry: LLMRegistry) -> dict:
         user_prompt = f"标题: {item.title}\n摘要: {item.summary}\n标签: {', '.join(item.tags)}\n来源: {item.ref_url}"
 
         for attempt in range(2):
+            content = ""
             try:
                 kwargs = dict(
                     model=model_id,
@@ -157,14 +158,15 @@ async def reviewer_node(state: PipelineState, registry: LLMRegistry) -> dict:
                 registry.budget.add_cost(provider, cost)
                 registry.health.record_success(provider, 0)
 
-                reviewed = parse_reviewer_output(content)
-                reviewed_items.append(reviewed)
-                reviewed.ref_url = item.ref_url
                 cost_records.append(CostRecord(
                     agent="reviewer", provider=provider, model=model_id,
                     tokens_in=tokens_in, tokens_out=tokens_out, cost=cost,
                     ref_url=item.ref_url
                 ))
+
+                reviewed = parse_reviewer_output(content)
+                reviewed_items.append(reviewed)
+                reviewed.ref_url = item.ref_url
                 logger.debug("reviewer.item", extra={
                     "url": item.ref_url,
                     "input_prompt": user_prompt,

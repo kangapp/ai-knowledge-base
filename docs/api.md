@@ -330,6 +330,8 @@
 - RSS 文章优先展示 `source_detail`（例如 `36氪`、`OpenAI Blog`）；`arxiv`、`github`、`feishu` 等非 RSS 来源展示 `source`。
 - 如果历史成本记录无法关联文章，则根据 `ref_url` 域名兜底识别常见来源（例如 `36kr.com → 36氪`、`github.com → github`、`arxiv.org → arxiv`），最后才回退到 `cost_logs.agent`。
 - `source_trend.type` 表示费用阶段：`analyze` 为 Analyzer 成本，`review` 为 Reviewer 成本；Reviewer 成本同样归到文章真实来源，不再把 `review` 当作来源。
+- `trend[].llm_calls` 表示该趋势粒度内的 LLM 调用次数；历史兼容字段 `trend[].articles` 暂时保留同值。
+- `budget_progress` 与 `budget_remaining` 使用 `config/agents.yaml` 中的 `budget.monthly`，不是硬编码值。
 
 **响应:**
 ```json
@@ -343,6 +345,7 @@
     "cost_per_million_tokens": 0.37,
     "budget_progress": 0.017,
     "budget_remaining": 9.83,
+    "monthly_budget": 10.0,
     "trend_window": "12w",
     "trend": [...],
     "source_trend": [...],

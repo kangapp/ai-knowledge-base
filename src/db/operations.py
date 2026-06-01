@@ -2,6 +2,7 @@
 import json
 from pathlib import Path
 from datetime import datetime, timezone, timedelta
+import yaml
 from ..core.database import Database
 from ..graph.state import AnalyzedItem, CostRecord, ReviewedItem, RawItem
 
@@ -22,6 +23,15 @@ def _trend_window_modifier(trend_window: str) -> str:
     if unit == "w":
         return date_window_modifier(amount * 7)
     return f"-{max(amount - 1, 0)} months"
+
+
+def _load_monthly_budget(default: float = 10.0) -> float:
+    config_path = Path(__file__).resolve().parents[2] / "config" / "agents.yaml"
+    try:
+        data = yaml.safe_load(config_path.read_text()) or {}
+        return float(data.get("budget", {}).get("monthly", default))
+    except (OSError, TypeError, ValueError):
+        return default
 
 
 async def save_article(db: Database, raw: RawItem, analyzed: AnalyzedItem, reviewed: ReviewedItem, cost: float, tokens: int) -> int | None:
@@ -382,7 +392,12 @@ async def get_consumption_stats(db: Database, days: int = 30) -> dict:
     }
 
 
-async def get_consumption_detail_stats(db: Database, period: str = "week", trend_window: str | None = None) -> dict:
+async def get_consumption_detail_stats(
+    db: Database,
+    period: str = "week",
+    trend_window: str | None = None,
+    monthly_budget: float | None = None,
+) -> dict:
     """
     资源消耗详细统计（Phase 2）
     period 表示日期窗口：
@@ -415,21 +430,21 @@ async def get_consumption_detail_stats(db: Database, period: str = "week", trend
     if period == "day":
         trend_sql = """
             SELECT date(created_at) as label,
-                   SUM(cost) as cost, COUNT(*) as articles
+                   SUM(cost) as cost, COUNT(*) as llm_calls
             FROM cost_logs WHERE created_at >= date('now', ?)
             GROUP BY date(created_at) ORDER BY label
         """
     elif period == "week":
         trend_sql = """
             SELECT strftime('%Y-W%W', created_at) as label,
-                   SUM(cost) as cost, COUNT(*) as articles
+                   SUM(cost) as cost, COUNT(*) as llm_calls
             FROM cost_logs WHERE created_at >= date('now', ?)
             GROUP BY label ORDER BY label
         """
     else:  # month
         trend_sql = """
             SELECT strftime('%Y-%m', created_at) as label,
-                   SUM(cost) as cost, COUNT(*) as articles
+                   SUM(cost) as cost, COUNT(*) as llm_calls
             FROM cost_logs WHERE created_at >= date('now', ?)
             GROUP BY label ORDER BY label
         """
@@ -517,8 +532,9 @@ async def get_consumption_detail_stats(db: Database, period: str = "week", trend
             GROUP BY provider, label ORDER BY label
         """, (trend_cutoff,))
 
-    # 6. 预算进度（硬编码月度预算 $10，与 config/agents.yaml budget.monthly: 10.0 一致）
-    budget = 10.0
+    # 6. 预算进度
+    budget = monthly_budget if monthly_budget is not None else _load_monthly_budget()
+    budget = max(float(budget), 0.01)
     monthly_cost = await db.fetch_one("""
         SELECT COALESCE(SUM(cost), 0) as total FROM cost_logs
         WHERE created_at >= date('now', '-29 days')
@@ -532,8 +548,17 @@ async def get_consumption_detail_stats(db: Database, period: str = "week", trend
         "cost_per_million_tokens": round((period_cost["total"] or 0) / max(period_tokens["total"] if period_tokens else 1, 1) * 1e6, 2),
         "budget_progress": round((monthly_cost["total"] or 0) / budget, 3),
         "budget_remaining": round(budget - (monthly_cost["total"] or 0), 2),
+        "monthly_budget": round(budget, 2),
         "trend_window": trend_window,
-        "trend": [{"label": r["label"], "cost": r["cost"], "articles": r["articles"]} for r in trend] if trend else [],
+        "trend": [
+            {
+                "label": r["label"],
+                "cost": r["cost"],
+                "llm_calls": r["llm_calls"],
+                "articles": r["llm_calls"],
+            }
+            for r in trend
+        ] if trend else [],
         "source_trend": [{"source": r["source"], "type": r["type"], "label": r["label"], "cost": r["cost"]} for r in source_trend] if source_trend else [],
         "provider_trend": [{"provider": r["provider"], "label": r["label"], "cost": r["cost"]} for r in provider_trend] if provider_trend else [],
     }

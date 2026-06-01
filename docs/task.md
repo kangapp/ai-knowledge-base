@@ -74,6 +74,11 @@
   - `total_score` 由代码按四维分重算，不再信任模型输出总分
   - `approved/retry/discarded` 由代码按阈值裁决，低 AI 相关度内容强制丢弃
   - 质量统计兼容历史 `information_density`，避免信息密度均值被算成 0
+- [x] 收紧费用统计账本口径
+  - Analyzer/Reviewer 只要 LLM 返回 usage，就记录 `CostRecord`，解析失败和重试调用不再漏记
+  - 文章入库时按 `ref_url` 汇总 Analyzer + Reviewer 成本，写入 `analysis_cost/analysis_tokens`
+  - Reviewer 成本来源映射统一使用 `RawItem.raw_metadata.source_id`，避免 RSS/arXiv 落到展示名
+  - 资源消耗预算读取 `config/agents.yaml budget.monthly`，趋势返回 `llm_calls` 并保留兼容字段 `articles`
 - [x] 统一 period 日期窗口口径
   - `/api/sources/stats` 使用真实日期窗口，不再取最近 N 条健康记录
   - `/api/stats/consumption-detail` 使用 day=今天、week=近 7 个自然日、month=近 30 个自然日
@@ -98,6 +103,7 @@
 - 已通过：`.venv/bin/python -m pytest tests/test_stats_consumption_detail.py -q`
 - 已通过：`.venv/bin/python -m pytest tests/test_collector.py tests/test_database.py tests/test_pipeline_github.py -q`
 - 已通过：`.venv/bin/python -m pytest tests/test_reviewer.py tests/test_stats_quality_detail.py tests/test_prompt_regression.py -q`
-- 已通过：`.venv/bin/python -m pytest -m "not integration and not e2e"`（86 passed）
+- 已通过：`.venv/bin/python -m pytest tests/test_analyzer.py tests/test_reviewer.py tests/test_cost_accounting.py tests/test_stats_consumption_detail.py -q`
+- 已通过：`.venv/bin/python -m pytest -m "not integration and not e2e"`（91 passed）
 
 说明：当前 shell 中 `uv` 不可用，使用项目 `.venv/bin/python` 执行测试。

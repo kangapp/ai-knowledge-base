@@ -154,6 +154,8 @@ FTS5 全文索引：`articles_fts` over (title, summary, description)
 - 新记录写入时应保存 `source/source_detail/source_id` 快照，统计接口优先使用这些字段，避免审核未通过、重复或未入库文章无法归因。
 - Analyzer 成本由 `RawItem` 直接填充来源字段。
 - Reviewer 成本在图外入库阶段按 `ref_url` 从本轮 `RawItem` 映射补齐来源字段。
+- 只要 LLM 返回 usage，即使 Analyzer/Reviewer JSON 解析失败，也应写入 `cost_logs`；一次重试对应一次真实 LLM 调用。
+- `articles.analysis_cost/analysis_tokens` 为同一 `ref_url` 的 Analyzer + Reviewer 调用成本汇总，不再固定为 0。
 - 历史记录缺少来源字段时，统计接口按 `articles` JOIN 和 URL 域名兜底归因。
 
 **审核评分口径：**
