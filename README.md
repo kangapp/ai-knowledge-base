@@ -325,7 +325,7 @@ agents:
       model: deepseek-chat
     fallback:
       - provider: minimax
-        model: MiniMax-M2.7
+        model: MiniMax-M3
     prompt: prompts/github.md
     budget_weight: 1.0
 ```
@@ -636,11 +636,11 @@ URL: {url}
 
 | Agent | Prompt 文件 | Primary Model | Fallback | temperature | max_tokens |
 |-------|------------|---------------|----------|-------------|------------|
-| `github_analyzer` | `prompts/github_analyzer.md` | MiniMax-M2.7 | deepseek-chat | 0.3 | 2048 |
-| `rss_analyzer` | `prompts/rss_analyzer.md` | MiniMax-M2.7 | — | 0.3 | 2048 |
-| `feishu_analyzer` | `prompts/feishu_analyzer.md` | MiniMax-M2.7 | — | 0.3 | 2048 |
-| `arxiv_analyzer` | `prompts/arxiv_analyzer.md` | MiniMax-M2.7 | deepseek-chat | 0.3 | 4096 |
-| `reviewer` | `prompts/reviewer.md` | MiniMax-M2.7 | — | 0.0 | 1024 |
+| `github_analyzer` | `prompts/github_analyzer.md` | MiniMax-M3 | deepseek-chat | 0.3 | 2048 |
+| `rss_analyzer` | `prompts/rss_analyzer.md` | MiniMax-M3 | — | 0.3 | 2048 |
+| `feishu_analyzer` | `prompts/feishu_analyzer.md` | MiniMax-M3 | — | 0.3 | 2048 |
+| `arxiv_analyzer` | `prompts/arxiv_analyzer.md` | MiniMax-M3 | deepseek-chat | 0.3 | 4096 |
+| `reviewer` | `prompts/reviewer.md` | MiniMax-M3 | — | 0.0 | 1024 |
 
 ### 完整数据流
 

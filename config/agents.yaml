@@ -1,7 +1,7 @@
 agents:
   github_analyzer:
     model:
-      primary: { provider: minimax, model: MiniMax-M2.7 }
+      primary: { provider: minimax, model: MiniMax-M3 }
       fallback: []
     params: { temperature: 0.3, max_tokens: 2048 }
     prompt: prompts/github_analyzer.md
@@ -9,7 +9,7 @@ agents:
 
   rss_analyzer:
     model:
-      primary: { provider: minimax, model: MiniMax-M2.7 }
+      primary: { provider: minimax, model: MiniMax-M3 }
       fallback: []
     params: { temperature: 0.3, max_tokens: 2048 }
     prompt: prompts/rss_analyzer.md
@@ -17,7 +17,7 @@ agents:
 
   feishu_analyzer:
     model:
-      primary: { provider: minimax, model: MiniMax-M2.7 }
+      primary: { provider: minimax, model: MiniMax-M3 }
       fallback: []
     params: { temperature: 0.3, max_tokens: 2048 }
     prompt: prompts/feishu_analyzer.md
@@ -25,7 +25,7 @@ agents:
 
   arxiv_analyzer:
     model:
-      primary: { provider: minimax, model: MiniMax-M2.7 }
+      primary: { provider: minimax, model: MiniMax-M3 }
       fallback: []
     params: { temperature: 0.3, max_tokens: 4096 }
     prompt: prompts/arxiv_analyzer.md
@@ -33,7 +33,7 @@ agents:
 
   reviewer:
     model:
-      primary: { provider: minimax, model: MiniMax-M2.7 }
+      primary: { provider: minimax, model: MiniMax-M3 }
       fallback: []
     params: { temperature: 0.0, max_tokens: 1024 }
     prompt: prompts/reviewer.md

@@ -645,7 +645,7 @@ _graph = build_pipeline(_registry)
 analyzer.parse_failed, agent=rss_analyzer, url=..., error="Error code: 500 - {'type': 'error', 'error': {'type': 'server_error', 'message': 'your current token plan not support model, abab6.5s-chat (2061)', 'http_code': '500'}}"
 ```
 
-**处理**: 将 `config/agents.yaml` 中所有 analyzer 和 reviewer 的 `abab6.5s-chat` 替换为 `MiniMax-M2.7`
+**处理**: 当时将 `config/agents.yaml` 中所有 analyzer 和 reviewer 的 `abab6.5s-chat` 替换为 MiniMax 上一代可用模型；2026-06-02 已统一升级为 `MiniMax-M3`。
 
 **相关文件**: `config/agents.yaml`
 
@@ -716,7 +716,7 @@ if m:
 **发现场景**: 本地代码中 `agents.yaml` 仍是 `abab6.5s-chat`，与 VPS 上的已修正版本不一致
 **根因**: VPS 上手动修改了 `/opt/ai-knowledge-base/config/agents.yaml`，但本地 git 仓库未同步更新
 
-**处理**: 将本地 `config/agents.yaml` 中 5 处 `abab6.5s-chat` 替换为 `MiniMax-M2.7`
+**处理**: 当时将本地 `config/agents.yaml` 中 5 处 `abab6.5s-chat` 替换为 MiniMax 上一代可用模型；2026-06-02 已统一升级为 `MiniMax-M3`。
 
 **相关文件**: `config/agents.yaml`
 

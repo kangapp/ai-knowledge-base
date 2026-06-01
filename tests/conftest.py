@@ -19,7 +19,7 @@ providers:
     api_key: sk-test-placeholder
     supports_json_mode: false
     models:
-      - id: MiniMax-M2.7
+      - id: MiniMax-M3
         price_per_1k_in: 0.0003
         price_per_1k_out: 0.0012
         max_tokens: 8192
@@ -52,7 +52,7 @@ def sample_agents_yaml(config_dir):
 agents:
   github_analyzer:
     model:
-      primary: {provider: minimax, model: MiniMax-M2.7}
+      primary: {provider: minimax, model: MiniMax-M3}
       fallback: []
     params: {temperature: 0.3, max_tokens: 2048}
     prompt: prompts/github_analyzer.md

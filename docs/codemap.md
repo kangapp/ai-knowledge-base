@@ -54,6 +54,7 @@
 - `src/core/config.py`
   - YAML 配置加载和 Pydantic 模型。
   - 新增配置字段时先改这里，再改对应 YAML 和文档。
+  - MiniMax 当前默认模型在 `config/llm.yaml` 注册为 `MiniMax-M3`，各 Agent 在 `config/agents.yaml` 绑定。
 
 ## Pipeline
 

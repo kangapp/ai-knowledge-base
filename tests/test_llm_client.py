@@ -11,7 +11,7 @@ def llm_cfg():
     return LLMConfig(providers={
         "minimax": ProviderConfig(
             base_url="https://api.minimax.chat/v1", api_key="sk-test",
-            models=[ModelInfo(id="MiniMax-M2.7", price_per_1k_in=0.0003, price_per_1k_out=0.0012, max_tokens=8192)]
+            models=[ModelInfo(id="MiniMax-M3", price_per_1k_in=0.0003, price_per_1k_out=0.0012, max_tokens=8192)]
         )
     })
 
@@ -21,7 +21,7 @@ def agents_cfg():
         agents={
             "github_analyzer": AgentConfig(
                 model=ModelBinding(
-                    primary=ModelRef(provider="minimax", model="MiniMax-M2.7"),
+                    primary=ModelRef(provider="minimax", model="MiniMax-M3"),
                     fallback=[]
                 ),
                 params={"temperature": 0.3, "max_tokens": 2048}
@@ -34,7 +34,7 @@ def test_get_client_primary(llm_cfg, agents_cfg):
     registry = LLMRegistry(llm_cfg, agents_cfg)
     client, provider, model_id, params = registry.get_client("github_analyzer")
     assert provider == "minimax"
-    assert model_id == "MiniMax-M2.7"
+    assert model_id == "MiniMax-M3"
     assert params["temperature"] == 0.3
 
 def test_fallback_on_unhealthy(llm_cfg, agents_cfg):
@@ -69,6 +69,6 @@ def test_all_unavailable_raises(llm_cfg, agents_cfg):
 
 def test_calc_cost(llm_cfg, agents_cfg):
     registry = LLMRegistry(llm_cfg, agents_cfg)
-    cost = registry.calc_cost("minimax", "MiniMax-M2.7", 1000, 500)
+    cost = registry.calc_cost("minimax", "MiniMax-M3", 1000, 500)
     # 1000/1000 * 0.0003 + 500/1000 * 0.0012 = 0.0003 + 0.0006 = 0.0009
     assert cost == pytest.approx(0.0009, rel=1e-6)

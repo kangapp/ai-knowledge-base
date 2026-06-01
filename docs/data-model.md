@@ -428,7 +428,7 @@ agents:
       temperature: 0.3
     fallback:
       - provider: minimax
-        model: abab6.5s-chat
+        model: MiniMax-M3
     prompt: prompts/github.md
     budget_weight: 1.0
 ```

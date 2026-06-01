@@ -101,13 +101,13 @@ async def test_reviewer_node_mocked():
     llm_cfg = LLMConfig(providers={
         "minimax": ProviderConfig(
             base_url="https://api.minimax.chat/v1", api_key="sk-test",
-            models=[ModelInfo(id="MiniMax-M2.7", price_per_1k_in=0.0003, price_per_1k_out=0.0012, max_tokens=8192)]
+            models=[ModelInfo(id="MiniMax-M3", price_per_1k_in=0.0003, price_per_1k_out=0.0012, max_tokens=8192)]
         )
     })
     agents_cfg = AgentsConfig(
         agents={
             "reviewer": AgentConfig(
-                model=ModelBinding(primary=ModelRef(provider="minimax", model="MiniMax-M2.7"), fallback=[]),
+                model=ModelBinding(primary=ModelRef(provider="minimax", model="MiniMax-M3"), fallback=[]),
                 params={"temperature": 0.0, "max_tokens": 1024}
             ),
         },
@@ -156,13 +156,13 @@ async def test_reviewer_node_records_cost_when_parse_fails():
         "minimax": ProviderConfig(
             base_url="https://api.minimax.chat/v1",
             api_key="sk-test",
-            models=[ModelInfo(id="MiniMax-M2.7", price_per_1k_in=0.0003, price_per_1k_out=0.0012, max_tokens=8192)],
+            models=[ModelInfo(id="MiniMax-M3", price_per_1k_in=0.0003, price_per_1k_out=0.0012, max_tokens=8192)],
         )
     })
     agents_cfg = AgentsConfig(
         agents={
             "reviewer": AgentConfig(
-                model=ModelBinding(primary=ModelRef(provider="minimax", model="MiniMax-M2.7"), fallback=[]),
+                model=ModelBinding(primary=ModelRef(provider="minimax", model="MiniMax-M3"), fallback=[]),
                 params={"temperature": 0.0, "max_tokens": 1024},
             )
         },

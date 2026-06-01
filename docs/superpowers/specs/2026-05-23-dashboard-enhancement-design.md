@@ -103,7 +103,7 @@ JOIN articles a ON a.url = cl.agent  -- 需要修正：cost_logs.agent 是字符
 ### 官方定价参考
 | Provider | Model | Input $/M | Output $/M |
 |----------|-------|-----------|------------|
-| MiniMax | MiniMax-M2.7 | $0.3 | $1.2 |
+| MiniMax | MiniMax-M3 | $0.3 | $1.2 |
 | DeepSeek | deepseek-chat | $0.14 | $0.28 |
 
 ## 数据模型变更

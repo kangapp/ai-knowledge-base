@@ -1,6 +1,6 @@
 # 当前任务拆解
 
-更新时间：2026-06-01
+更新时间：2026-06-02
 
 ## P0 已完成
 
@@ -93,6 +93,10 @@
   - `/api/stats/consumption-detail` 新增 `trend_window`，KPI 窗口继续由 `period` 控制
   - 默认趋势窗口：day=14d、week=12w、month=12m
   - `trend/source_trend/provider_trend` 使用同一个趋势窗口，避免选日时趋势只剩今天
+- [x] MiniMax 默认模型升级到 M3
+  - `config/llm.yaml` 注册模型改为 `MiniMax-M3`
+  - `config/agents.yaml` 中所有 analyzer/reviewer primary model 统一改为 `MiniMax-M3`
+  - 保持现有 provider、价格和 agent 输出 token 参数不变
 - [ ] 统计服务层继续收口
   - 将 `quality/runtime/consumption` SQL 从 `src/db/operations.py` 逐步迁到更聚焦的统计服务文件
   - 每迁一个接口补一个契约测试
@@ -112,5 +116,6 @@
 - 已通过：`.venv/bin/python -m pytest tests/test_reviewer.py tests/test_stats_quality_detail.py tests/test_prompt_regression.py -q`
 - 已通过：`.venv/bin/python -m pytest tests/test_analyzer.py tests/test_reviewer.py tests/test_cost_accounting.py tests/test_stats_consumption_detail.py -q`
 - 已通过：`.venv/bin/python -m pytest -m "not integration and not e2e"`（93 passed）
+- 已通过：`.venv/bin/pytest tests/test_config.py tests/test_llm_client.py tests/test_analyzer.py tests/test_reviewer.py tests/test_pipeline.py -q`（24 passed）
 
 说明：当前 shell 中 `uv` 不可用，使用项目 `.venv/bin/python` 执行测试。
