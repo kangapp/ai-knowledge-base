@@ -1,6 +1,7 @@
 # src/graph/collector.py
 import asyncio
 import logging
+import re
 import time
 from datetime import datetime, timedelta, timezone
 import httpx
@@ -13,17 +14,53 @@ from ..db.operations import record_source_health
 logger = logging.getLogger("pipeline")
 
 
-async def collect_github(source: SourceConfig) -> list[RawItem]:
-    cfg = source.config
-    topics = " OR ".join(cfg.get("topics", ["ai"]))
+def _quote_github_term(term: str) -> str:
+    term = term.strip()
+    if " " in term and not (term.startswith('"') and term.endswith('"')):
+        return f'"{term}"'
+    return term
+
+
+def _build_github_query(cfg: dict, now: datetime | None = None) -> str:
+    topics = [f"topic:{topic}" for topic in cfg.get("topics", ["ai"])]
+    keywords = [_quote_github_term(keyword) for keyword in cfg.get("keywords", [])]
+    include_terms = topics + keywords
+    query = f"({' OR '.join(include_terms)})"
+
     lookback_days = cfg.get("lookback_days", 7)
     lookback_type = cfg.get("lookback_type", "created")  # "created" 或 "pushed"
-    since = (datetime.now(timezone.utc) - timedelta(days=lookback_days)).strftime("%Y-%m-%d")
-    # 构建查询：pushed:> 查最近活跃仓库，created:> 查新建仓库
-    if lookback_type == "pushed":
-        q = f"{topics} pushed:>{since}"
-    else:
-        q = f"{topics} created:>{since}"
+    current_time = now or datetime.now(timezone.utc)
+    since = (current_time - timedelta(days=lookback_days)).strftime("%Y-%m-%d")
+    query = f"{query} {lookback_type}:>{since}"
+
+    exclude_terms = [_quote_github_term(term) for term in cfg.get("exclude_terms", [])]
+    if exclude_terms:
+        query = f"{query} " + " ".join(f"NOT {term}" for term in exclude_terms)
+    return query
+
+
+def _contains_ascii(term: str) -> bool:
+    return any(ch.isascii() and ch.isalpha() for ch in term)
+
+
+def _matches_rss_keywords(text: str, keywords: list[str]) -> bool:
+    for keyword in keywords:
+        term = keyword.strip()
+        if not term:
+            continue
+        if _contains_ascii(term):
+            pattern = rf"(?<![A-Za-z0-9_]){re.escape(term)}(?![A-Za-z0-9_])"
+            if re.search(pattern, text, flags=re.IGNORECASE):
+                return True
+            continue
+        if term in text:
+            return True
+    return False
+
+
+async def collect_github(source: SourceConfig) -> list[RawItem]:
+    cfg = source.config
+    q = _build_github_query(cfg)
     url = "https://api.github.com/search/repositories"
     params = {"q": q, "sort": "stars", "order": "desc", "per_page": source.max_items}
     headers = {"Accept": "application/vnd.github.v3+json"}
@@ -66,12 +103,14 @@ async def collect_rss(source: SourceConfig) -> list[RawItem]:
     items = []
     now = datetime.now(timezone.utc).isoformat()
     keywords = cfg.get("filter_keywords", [])
+    filter_scope = cfg.get("filter_scope", "title_summary")
 
     feed = feedparser.parse(cfg["url"])
     for entry in feed.entries[:source.max_items]:
         title = entry.get("title", "")
         summary = entry.get("summary", "")
-        if keywords and not any(kw.lower() in f"{title} {summary}".lower() for kw in keywords):
+        match_text = title if filter_scope == "title" else f"{title} {summary}"
+        if keywords and not _matches_rss_keywords(match_text, keywords):
             continue
         items.append(RawItem(
             url=entry.get("link", ""),

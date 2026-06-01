@@ -8,7 +8,9 @@ sources:
     cron: "0 */6 * * *"
     max_items: 10
     config:
-      topics: [ai, llm, agent, machine-learning, mcp, skill]
+      topics: [llm, artificial-intelligence, machine-learning, rag, mcp]
+      keywords: ["AI agent", "multi-agent", "LLM", "RAG", "MCP"]
+      exclude_terms: [wallpaper, porn, nsfw, account, registration, card]
       min_stars: 50
       min_forks: 10
       min_watchers: 20
@@ -22,7 +24,9 @@ sources:
     cron: "0 */6 * * *"
     max_items: 10
     config:
-      topics: [ai, llm, agent, machine-learning, mcp, skill]
+      topics: [llm, artificial-intelligence, machine-learning, rag, mcp]
+      keywords: ["AI agent", "multi-agent", "LLM", "RAG", "MCP"]
+      exclude_terms: [wallpaper, porn, nsfw, account, registration, card]
       lookback_type: pushed      # 用 pushed_at 而非 created：查询 90 天内有活跃 push 的仓库
       lookback_days: 90
       min_stars: 2000
@@ -38,7 +42,9 @@ sources:
     cron: "0 */6 * * *"
     max_items: 10
     config:
-      topics: [ai, llm, agent, machine-learning, mcp, skill]
+      topics: [llm, artificial-intelligence, machine-learning, rag, mcp]
+      keywords: ["AI agent", "multi-agent", "LLM", "RAG", "MCP"]
+      exclude_terms: [wallpaper, porn, nsfw, account, registration, card]
       min_stars: 10
       lookback_days: 30
       trend_mode: true
@@ -54,7 +60,8 @@ sources:
     max_items: 10
     config:
       url: "https://36kr.com/feed"
-      filter_keywords: [AI, LLM, 大模型, Agent, 人工智能, 机器人, ChatGPT, DeepSeek, 开源, 算法]
+      filter_keywords: [AI, AI4S, LLM, 大模型, Agent, 人工智能, 具身智能, ChatGPT, DeepSeek, OpenAI, Anthropic, 豆包, Kimi, 通义, 智谱]
+      filter_scope: title
 
   - id: rss_huxiu
     name: 虎嗅
@@ -65,7 +72,8 @@ sources:
     max_items: 10
     config:
       url: "https://www.huxiu.com/rss/feed"
-      filter_keywords: [AI, LLM, 大模型, 人工智能, ChatGPT, Agent, 创业, 技术]
+      filter_keywords: [AI, LLM, 大模型, 人工智能, ChatGPT, Agent, OpenAI, DeepSeek, 豆包, Kimi, 通义, 智谱]
+      filter_scope: title
 
   - id: rss_juejin
     name: 稀土掘金
@@ -76,7 +84,8 @@ sources:
     max_items: 10
     config:
       url: "https://api.juejin.cn/rss"
-      filter_keywords: [AI, 大模型, LLM, 机器学习, 前端, Python]
+      filter_keywords: [AI, 大模型, LLM, 机器学习, Agent, RAG, LangChain]
+      filter_scope: title
 
   - id: rss_ithome
     name: IT之家
@@ -87,7 +96,8 @@ sources:
     max_items: 10
     config:
       url: "https://www.ithome.com/rss/"
-      filter_keywords: [AI, LLM, 大模型, ChatGPT, 智能, 科技]
+      filter_keywords: [AI, LLM, 大模型, ChatGPT, OpenAI, DeepSeek, 人工智能]
+      filter_scope: title
 
   # ===== 国际 AI / 科技媒体 =====
   - id: rss_techcrunch
@@ -100,6 +110,7 @@ sources:
     config:
       url: "https://techcrunch.com/feed/"
       filter_keywords: [AI, artificial intelligence, machine learning, LLM, OpenAI, Anthropic]
+      filter_scope: title
 
   - id: rss_verge
     name: The Verge AI
@@ -111,6 +122,7 @@ sources:
     config:
       url: "https://www.theverge.com/rss/index.xml"
       filter_keywords: [AI, artificial intelligence, machine learning]
+      filter_scope: title
 
   - id: rss_arstechnica
     name: Ars Technica
@@ -121,7 +133,8 @@ sources:
     max_items: 10
     config:
       url: "https://feeds.arstechnica.com/arstechnica/index"
-      filter_keywords: [AI, artificial intelligence, machine learning, LLM]
+      filter_keywords: [AI, artificial intelligence, machine learning, LLM, OpenAI]
+      filter_scope: title
 
   - id: rss_reuters
     name: Reuters Science
@@ -132,7 +145,8 @@ sources:
     max_items: 10
     config:
       url: "https://feeds.reuters.com/reuters/scienceNews"
-      filter_keywords: [AI, artificial intelligence, technology]
+      filter_keywords: [AI, artificial intelligence, machine learning, OpenAI]
+      filter_scope: title
 
   - id: rss_producthunt
     name: Product Hunt
@@ -144,6 +158,7 @@ sources:
     config:
       url: "https://feeds.feedburner.com/producthunt"
       filter_keywords: [AI, artificial intelligence]
+      filter_scope: title
 
   - id: rss_arxiv
     name: arXiv AI/ML

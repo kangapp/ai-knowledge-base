@@ -1,7 +1,9 @@
 # tests/test_collector.py
 import pytest
 from unittest.mock import AsyncMock, patch
-from src.graph.collector import collect_github, collect_rss, collect_all
+from datetime import datetime, timezone
+
+from src.graph.collector import _build_github_query, _matches_rss_keywords, collect_github, collect_rss, collect_all
 from src.graph.state import RawItem
 from src.core.config import SourceConfig
 
@@ -10,6 +12,31 @@ def make_source(**kw):
     defaults = {"id": "test", "name": "Test", "type": "github", "enabled": True, "priority": 1, "cron": "0 9 * * *", "max_items": 10, "config": {}}
     defaults.update(kw)
     return SourceConfig(**defaults)
+
+
+def test_build_github_query_uses_topics_keywords_and_exclusions():
+    query = _build_github_query(
+        {
+            "topics": ["llm", "machine-learning"],
+            "keywords": ["AI agent", "RAG"],
+            "exclude_terms": ["wallpaper", "account"],
+            "lookback_type": "created",
+            "lookback_days": 7,
+        },
+        now=datetime(2026, 6, 1, tzinfo=timezone.utc),
+    )
+
+    assert query == (
+        '(topic:llm OR topic:machine-learning OR "AI agent" OR RAG) '
+        "created:>2026-05-25 NOT wallpaper NOT account"
+    )
+
+
+def test_matches_rss_keywords_does_not_match_ai_inside_words():
+    assert not _matches_rss_keywords("Rocket startup raises $24M", ["AI"])
+    assert _matches_rss_keywords("AI startup raises $24M", ["AI"])
+    assert _matches_rss_keywords("OpenAI releases a new model", ["OpenAI"])
+    assert _matches_rss_keywords("天津人工智能传感器产业园开园", ["人工智能"])
 
 
 @pytest.mark.asyncio
@@ -47,6 +74,56 @@ async def test_collect_rss_records_config_source_id():
     assert len(items) == 1
     assert items[0].source_detail == "36氪"
     assert items[0].raw_metadata["source_id"] == "rss_36kr"
+
+
+@pytest.mark.asyncio
+async def test_collect_rss_filters_ascii_acronym_by_word_boundary():
+    source = make_source(
+        id="rss_techcrunch",
+        name="TechCrunch",
+        type="rss",
+        config={"url": "https://techcrunch.com/feed", "filter_keywords": ["AI"]},
+    )
+    entries = [
+        {"title": "Rocket startup raises $24M", "summary": "", "link": "https://example.com/1"},
+        {"title": "AI startup raises $24M", "summary": "", "link": "https://example.com/2"},
+    ]
+
+    with patch("feedparser.parse", return_value=type("Feed", (), {"entries": entries})()):
+        items = await collect_rss(source)
+
+    assert [item.url for item in items] == ["https://example.com/2"]
+
+
+@pytest.mark.asyncio
+async def test_collect_rss_title_scope_ignores_summary_noise():
+    source = make_source(
+        id="rss_36kr",
+        name="36氪",
+        type="rss",
+        config={
+            "url": "https://36kr.com/feed",
+            "filter_keywords": ["AI", "豆包"],
+            "filter_scope": "title",
+        },
+    )
+    entries = [
+        {
+            "title": "今年盛夏，WAVES之夜会浪的一群年轻人",
+            "summary": "市集里也有 AI 硬件、咖啡和独立杂志。",
+            "link": "https://example.com/1",
+        },
+        {
+            "title": "豆包6月下旬正式付费",
+            "summary": "产品商业化更新。",
+            "link": "https://example.com/2",
+        },
+    ]
+
+    with patch("feedparser.parse", return_value=type("Feed", (), {"entries": entries})()):
+        items = await collect_rss(source)
+
+    assert [item.url for item in items] == ["https://example.com/2"]
 
 
 @pytest.mark.asyncio

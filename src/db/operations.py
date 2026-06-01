@@ -584,14 +584,30 @@ async def batch_save_github_snapshots(db: Database, items: list[RawItem]):
 
 
 async def get_trending_repo_urls(db: Database, min_velocity: float, days: int = 7) -> set[str]:
-    """计算 repos 在过去 N 天内的 star 增速，返回增速 >= min_velocity 的 repo_url 集合"""
+    """计算 repos 在过去 N 天内的 star 增速，返回增速 >= min_velocity 的 repo_url 集合。"""
     rows = await db.fetch_all("""
+        WITH latest AS (
+            SELECT repo_url, MAX(snapshot_date) AS latest_date
+            FROM github_repo_snapshots
+            GROUP BY repo_url
+        ),
+        baseline AS (
+            SELECT s.repo_url, MAX(s.snapshot_date) AS baseline_date
+            FROM github_repo_snapshots s
+            JOIN latest l ON l.repo_url = s.repo_url
+            WHERE s.snapshot_date <= date(l.latest_date, '-' || :days || ' days')
+            GROUP BY s.repo_url
+        )
         SELECT s1.repo_url,
                (s1.stars - s0.stars) / (:days * 1.0) AS velocity
-        FROM github_repo_snapshots s1
+        FROM latest l
+        JOIN baseline b ON b.repo_url = l.repo_url
+        JOIN github_repo_snapshots s1
+          ON s1.repo_url = l.repo_url
+         AND s1.snapshot_date = l.latest_date
         JOIN github_repo_snapshots s0
-          ON s0.repo_url = s1.repo_url
-         AND s0.snapshot_date = date(s1.snapshot_date, '-' || :days || ' days')
+          ON s0.repo_url = b.repo_url
+         AND s0.snapshot_date = b.baseline_date
         WHERE (s1.stars - s0.stars) / (:days * 1.0) >= :min_velocity
     """, {"days": days, "min_velocity": min_velocity})
     return {r["repo_url"] for r in rows}

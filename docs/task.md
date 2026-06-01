@@ -60,6 +60,15 @@
   - `run_pipeline(source_filter=...)` 支持多个 source id，组内由 Collector 并行采集
   - `pipeline.start/pipeline.skip` 日志补充 source filter 和 source 数量，便于排查
   - 修复每周数据源维护任务使用旧 DB 路径且未初始化连接的问题
+- [x] 收紧 GitHub 数据源采集口径
+  - GitHub Search 查询从宽泛全文词改为 `topic:` qualifier + 明确关键词 + 排除词
+  - 移除 `skill` 等易引入噪音的宽泛词，降低壁纸、账号、卡片、NSFW 等非技术仓库进入分析的概率
+  - `github_trending_velocity` 只过滤本源采集到的 repo，不再误过滤同批其它源
+  - GitHub 增速计算不再依赖精确 N 天前快照，改用目标窗口前最近一次基线快照
+- [x] 收紧 RSS 数据源采集口径
+  - 英文关键词按词边界匹配，避免 `AI` 命中 `raises`、`chair` 等普通单词片段
+  - 综合媒体 RSS 使用 `filter_scope: title`，避免长正文/推荐内容里偶然出现 AI 词导致误采集
+  - 移除 `技术/科技/智能/Python/前端/technology` 等泛词，补充 `豆包/Kimi/通义/智谱/AI4S` 等强信号词
 - [x] 统一 period 日期窗口口径
   - `/api/sources/stats` 使用真实日期窗口，不再取最近 N 条健康记录
   - `/api/stats/consumption-detail` 使用 day=今天、week=近 7 个自然日、month=近 30 个自然日
@@ -82,6 +91,7 @@
 
 - 已通过：`.venv/bin/python -m pytest tests/test_api_contracts.py -q`
 - 已通过：`.venv/bin/python -m pytest tests/test_stats_consumption_detail.py -q`
-- 已通过：`.venv/bin/python -m pytest -m "not integration and not e2e"`（77 passed）
+- 已通过：`.venv/bin/python -m pytest tests/test_collector.py tests/test_database.py tests/test_pipeline_github.py -q`
+- 已通过：`.venv/bin/python -m pytest -m "not integration and not e2e"`（83 passed）
 
 说明：当前 shell 中 `uv` 不可用，使用项目 `.venv/bin/python` 执行测试。

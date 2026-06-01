@@ -43,7 +43,7 @@
 
 - `src/db/operations.py`
   - 数据库操作集合：文章保存、标签保存、成本记录、统计查询、备份等。
-  - 常见改动入口：文章查询、统计 SQL、pipeline run 记录、`cost_logs` 来源归因。
+  - 常见改动入口：文章查询、统计 SQL、pipeline run 记录、`cost_logs` 来源归因、GitHub repo 增速快照查询。
   - 目前仍包含较多统计 SQL；后续仪表盘重构时建议逐步拆到 service 层。
 
 - `src/core/database.py`
@@ -58,7 +58,12 @@
 
 - `src/graph/collector.py`
   - 多源采集和 DB 查重。
+  - GitHub 采集使用 `topics` 生成 `topic:` qualifier，叠加 `keywords` 和 `exclude_terms` 构造 Search API 查询。
+  - RSS 采集使用 `_matches_rss_keywords()` 做关键词匹配；英文关键词按词边界匹配，综合媒体可用 `filter_scope: title` 避免长正文噪音。
   - `RawItem.raw_metadata.source_id` 保存配置 id，供 source health、成本归因等后续阶段使用。
+
+- `src/main.py`
+  - GitHub repo 快照在 DB 查重前写入，`trend_mode=true` 的源只过滤本源采集结果，不影响同批次其它 GitHub/RSS/arXiv 源。
 
 - `src/graph/pipeline.py`
   - LangGraph DAG 编排和 phase log 记录。

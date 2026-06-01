@@ -132,6 +132,15 @@ def _register_source_jobs(scheduler: AsyncIOScheduler, sources, run_pipeline_cb)
         })
 
 
+def _apply_github_velocity_filter(raw_items: list, source, trending_urls: set[str]) -> list:
+    return [
+        item for item in raw_items
+        if item.source != "github"
+        or item.raw_metadata.get("source_id") != source.id
+        or item.url in trending_urls
+    ]
+
+
 async def run_pipeline(trigger: str = "cron", source_filter: str | list[str] | tuple[str, ...] | set[str] | None = None):
     """source_filter 为 None 时采集所有源；否则采集指定 source.id 或一组 source.id。"""
     global _registry, _db, _builder, _running, _graph
@@ -180,8 +189,7 @@ async def run_pipeline(trigger: str = "cron", source_filter: str | list[str] | t
             if src.type == "github" and src.config.get("trend_mode"):
                 min_vel = src.config.get("trend_velocity_threshold", 5)
                 trending = await get_trending_repo_urls(_db, min_vel, days=7)
-                # 只保留 trending 中的 repo
-                raw_items = [i for i in raw_items if i.url in trending]
+                raw_items = _apply_github_velocity_filter(raw_items, src, trending)
 
         if not raw_items and error_log:
             summary = json.dumps({"collected": 0, "errors": error_log})

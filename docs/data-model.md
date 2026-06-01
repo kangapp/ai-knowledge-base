@@ -139,7 +139,7 @@ FTS5 全文索引：`articles_fts` over (title, summary, description)
 | ref_url | TEXT | LLM 调用关联的原始文章 URL |
 | source | TEXT | 成本记录时的来源快照：github / rss / feishu / arxiv |
 | source_detail | TEXT | 成本记录时的来源细分；RSS 存 feed 名称或展示名 |
-| source_id | TEXT | 成本记录时的源 ID；GitHub 用 source_id，RSS 用 feed URL |
+| source_id | TEXT | 成本记录时的源 ID；统一使用 `config/sources.yaml` 中的配置 id |
 | created_at | TEXT DEFAULT CURRENT_TIMESTAMP | |
 
 **样例数据：**
@@ -147,7 +147,7 @@ FTS5 全文索引：`articles_fts` over (title, summary, description)
 | id | run_id | agent | provider | model | tokens_in | tokens_out | cost | ref_url | source | source_detail | source_id | created_at |
 |----|--------|-------|----------|-------|----------|-----------|------|---------|--------|---------------|-----------|------------|
 | 1 | run_20260524_090000 | github_analyzer | deepseek | deepseek-chat | 1200 | 350 | 0.0021 | https://github.com/org/repo | github | | github_trending | 2026-05-24T09:01:00Z |
-| 2 | run_20260524_090000 | reviewer | deepseek | deepseek-chat | 2800 | 420 | 0.0048 | https://36kr.com/p/123 | rss | 36氪 | https://36kr.com/feed | 2026-05-24T09:03:00Z |
+| 2 | run_20260524_090000 | reviewer | deepseek | deepseek-chat | 2800 | 420 | 0.0048 | https://36kr.com/p/123 | rss | 36氪 | rss_36kr | 2026-05-24T09:03:00Z |
 
 **成本来源记录口径：**
 
@@ -229,6 +229,12 @@ UNIQUE(repo_url, snapshot_date)
 | id | repo_url | repo_name | stars | forks | watchers | snapshot_date | created_at |
 |----|----------|-----------|-------|-------|----------|---------------|------------|
 | 1 | https://github.com/meta-llama/llama4 | meta-llama/llama4 | 12400 | 1800 | 560 | 2026-05-24 | 2026-05-24T00:00:00Z |
+
+**趋势增速口径：**
+
+- 每次 GitHub 采集后写入当日 `repo_url + snapshot_date` 快照。
+- `github_trending_velocity` 使用最新快照与目标窗口前最近一次基线快照计算 star/day，不要求数据库里刚好存在精确 N 天前快照。
+- 增速筛选只作用于 `raw_metadata.source_id == github_trending_velocity` 的采集结果，不影响同一批次里的常规 GitHub、RSS 或 arXiv 数据。
 
 ### provider_health — Provider 健康状态
 
@@ -358,8 +364,13 @@ sources:
     cron: "0 */6 * * *"
     max_items: 10
     config:
-      languages: [python, typescript]
-      topics: [ai, llm, agent, machine-learning]
+      topics: [llm, artificial-intelligence, machine-learning, rag, mcp]
+      keywords: ["AI agent", "multi-agent", "LLM", "RAG", "MCP"]
+      exclude_terms: [wallpaper, porn, nsfw, account, registration, card]
+      min_stars: 50
+      min_forks: 10
+      min_watchers: 20
+      lookback_days: 7
 
   - id: rss_the_batch
     name: The Batch
@@ -370,6 +381,8 @@ sources:
     max_items: 5
     config:
       url: "https://www.deeplearning.ai/the-batch/feed/"
+      filter_keywords: [AI, LLM, Agent, RAG, machine learning]
+      filter_scope: title_summary
 
   - id: rss_hackernews_ai
     name: Hacker News AI
@@ -380,7 +393,15 @@ sources:
     max_items: 10
     config:
       url: "https://hnrss.org/frontpage?q=ai+llm+agent"
+      filter_keywords: [AI, LLM, Agent, RAG, OpenAI]
+      filter_scope: title
 ```
+
+RSS 过滤约定：
+
+- `filter_keywords` 为任一命中即保留；英文关键词按词边界匹配，`AI` 不会命中 `raises` 这类普通单词片段。
+- `filter_scope` 默认为 `title_summary`；综合媒体源建议配置为 `title`，避免整篇正文或推荐内容里偶然出现 AI 词导致误采集。
+- 配置中避免使用 `技术/科技/智能/technology/Python` 等泛词，优先使用 `大模型/Agent/OpenAI/DeepSeek/豆包/Kimi` 等强信号词。
 
 ### config/agents.yaml
 

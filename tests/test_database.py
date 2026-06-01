@@ -3,6 +3,7 @@ from pathlib import Path
 import aiosqlite
 import pytest
 from src.core.database import Database
+from src.db.operations import get_trending_repo_urls
 
 # 相对测试文件定位到项目根目录下的实际 migrations 目录
 _MIGRATIONS_DIR = Path(__file__).parent.parent / "src" / "db" / "migrations"
@@ -95,5 +96,36 @@ async def test_fts5_sync(tmp_path):
         await db.commit()
         rows = await db.fetch_all("SELECT * FROM articles_fts WHERE articles_fts MATCH ?", ("Agent",))
         assert len(rows) == 0
+    finally:
+        await db.close()
+
+
+@pytest.mark.asyncio
+async def test_get_trending_repo_urls_uses_nearest_baseline_snapshot(tmp_path):
+    db_path = tmp_path / "test.db"
+    db = Database(db_path, migrations_dir=_MIGRATIONS_DIR)
+    try:
+        await db.initialize()
+        await db.execute(
+            """
+            INSERT INTO github_repo_snapshots
+            (repo_url, repo_name, stars, forks, watchers, snapshot_date)
+            VALUES (?, ?, ?, ?, ?, ?)
+            """,
+            ("https://github.com/org/repo", "org/repo", 90, 10, 90, "2026-05-24"),
+        )
+        await db.execute(
+            """
+            INSERT INTO github_repo_snapshots
+            (repo_url, repo_name, stars, forks, watchers, snapshot_date)
+            VALUES (?, ?, ?, ?, ?, ?)
+            """,
+            ("https://github.com/org/repo", "org/repo", 170, 20, 170, "2026-06-01"),
+        )
+        await db.commit()
+
+        urls = await get_trending_repo_urls(db, min_velocity=10, days=7)
+
+        assert urls == {"https://github.com/org/repo"}
     finally:
         await db.close()
