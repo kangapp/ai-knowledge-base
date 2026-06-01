@@ -24,8 +24,10 @@ def _quote_github_term(term: str) -> str:
 def _build_github_query(cfg: dict, now: datetime | None = None) -> str:
     topics = [f"topic:{topic}" for topic in cfg.get("topics", ["ai"])]
     keywords = [_quote_github_term(keyword) for keyword in cfg.get("keywords", [])]
-    include_terms = topics + keywords
-    query = f"({' OR '.join(include_terms)})"
+    include_terms = (topics + keywords)[:5]
+    if not include_terms:
+        include_terms = ["topic:ai"]
+    query = include_terms[0] if len(include_terms) == 1 else f"({' OR '.join(include_terms)})"
 
     lookback_days = cfg.get("lookback_days", 7)
     lookback_type = cfg.get("lookback_type", "created")  # "created" 或 "pushed"
@@ -33,10 +35,15 @@ def _build_github_query(cfg: dict, now: datetime | None = None) -> str:
     since = (current_time - timedelta(days=lookback_days)).strftime("%Y-%m-%d")
     query = f"{query} {lookback_type}:>{since}"
 
-    exclude_terms = [_quote_github_term(term) for term in cfg.get("exclude_terms", [])]
-    if exclude_terms:
-        query = f"{query} " + " ".join(f"NOT {term}" for term in exclude_terms)
     return query
+
+
+def _matches_github_exclude(repo: dict, exclude_terms: list[str]) -> bool:
+    text = " ".join(
+        str(repo.get(field) or "")
+        for field in ("full_name", "name", "description")
+    ).lower()
+    return any(term.strip().lower() in text for term in exclude_terms if term.strip())
 
 
 def _contains_ascii(term: str) -> bool:
@@ -78,7 +85,10 @@ async def collect_github(source: SourceConfig) -> list[RawItem]:
     min_stars = cfg.get("min_stars", 0)
     min_forks = cfg.get("min_forks", 0)
     min_watchers = cfg.get("min_watchers", 0)
+    exclude_terms = cfg.get("exclude_terms", [])
     for repo in data.get("items", []):
+        if _matches_github_exclude(repo, exclude_terms):
+            continue
         if repo.get("stargazers_count", 0) < min_stars:
             continue
         if repo.get("forks_count", 0) < min_forks:

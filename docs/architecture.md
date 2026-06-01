@@ -86,7 +86,7 @@ APScheduler cron 分组触发 (同 cron 源合并为一个 pipeline run，skip_i
 - **Router 纯规则**：100% 按 `RawItem.source` 字段分流，无需 LLM
 - **Fan-out 并行**：4 个 SubAgent 各自专属 Prompt 和 model，共享通用 `analyze_items()`
 - **采集阶段去重**：Collector 后立即 DB 批量查重，已存在 url 不进入 LLM 分析
-- **GitHub 采集口径**：Search API 查询由 `topic:` qualifier、显式 `keywords` 和 `exclude_terms` 组成；增速源基于 `github_repo_snapshots` 的最新快照与窗口前最近基线快照计算 star/day。
+- **GitHub 采集口径**：Search API 查询由最多 5 个 `topic:` qualifier / 显式 `keywords` include 条件组成，避免触发 GitHub `AND/OR/NOT` 操作符上限；`exclude_terms` 在返回 repo 后本地过滤；增速源基于 `github_repo_snapshots` 的最新快照与窗口前最近基线快照计算 star/day。
 - **RSS 采集口径**：RSS feed 先由 `httpx.AsyncClient(timeout=30, follow_redirects=True)` 获取文本，再交给 `feedparser` 解析；英文关键词按词边界匹配，综合媒体源可用 `filter_scope: title` 只看标题强信号，避免长正文偶然提及 AI 造成误采集。
 - **Reviewer 裁决口径**：LLM 只给四维分和原因；代码统一维度 key、重算 `total_score`，并按阈值裁决 verdict，避免模型自由放行弱相关内容。
 - **成本记账口径**：只要 LLM 返回 usage 就记录 `cost_logs`；解析失败和 retry 都按真实调用次数计费，文章级成本由同一 `ref_url` 的 Analyzer + Reviewer 成本汇总得到。

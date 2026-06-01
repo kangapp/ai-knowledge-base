@@ -14,11 +14,11 @@ def make_source(**kw):
     return SourceConfig(**defaults)
 
 
-def test_build_github_query_uses_topics_keywords_and_exclusions():
+def test_build_github_query_stays_under_github_operator_limit():
     query = _build_github_query(
         {
-            "topics": ["llm", "machine-learning"],
-            "keywords": ["AI agent", "RAG"],
+            "topics": ["llm", "machine-learning", "rag"],
+            "keywords": ["AI agent", "RAG", "MCP"],
             "exclude_terms": ["wallpaper", "account"],
             "lookback_type": "created",
             "lookback_days": 7,
@@ -27,9 +27,11 @@ def test_build_github_query_uses_topics_keywords_and_exclusions():
     )
 
     assert query == (
-        '(topic:llm OR topic:machine-learning OR "AI agent" OR RAG) '
-        "created:>2026-05-25 NOT wallpaper NOT account"
+        '(topic:llm OR topic:machine-learning OR topic:rag OR "AI agent" OR RAG) '
+        "created:>2026-05-25"
     )
+    assert query.count(" OR ") <= 4
+    assert " NOT " not in query
 
 
 def test_matches_rss_keywords_does_not_match_ai_inside_words():
@@ -51,6 +53,30 @@ async def test_collect_github_mock():
     assert len(items) == 1
     assert items[0].source == "github"
     assert items[0].url == "https://github.com/test/x"
+
+
+@pytest.mark.asyncio
+async def test_collect_github_filters_excluded_terms_after_search():
+    source = make_source(
+        type="github",
+        config={
+            "topics": ["ai"],
+            "exclude_terms": ["wallpaper", "account"],
+            "min_stars": 1,
+            "lookback_days": 7,
+        },
+    )
+    repos = [
+        {"full_name": "a/wallpaper-ai", "name": "wallpaper-ai", "html_url": "https://github.com/a/wallpaper-ai", "description": "AI wallpaper", "stargazers_count": 100, "forks_count": 50, "watchers_count": 30, "language": "Python", "topics": ["ai"], "pushed_at": "2026-05-15T10:00:00Z"},
+        {"full_name": "b/useful-ai", "name": "useful-ai", "html_url": "https://github.com/b/useful-ai", "description": "Useful AI agent", "stargazers_count": 100, "forks_count": 50, "watchers_count": 30, "language": "Python", "topics": ["ai"], "pushed_at": "2026-05-15T10:00:00Z"},
+    ]
+    mock_resp = AsyncMock(status_code=200, json=lambda: {"items": repos})
+    mock_resp.raise_for_status = lambda: None
+
+    with patch("httpx.AsyncClient.get", return_value=mock_resp):
+        items = await collect_github(source)
+
+    assert [item.url for item in items] == ["https://github.com/b/useful-ai"]
 
 
 @pytest.mark.asyncio
