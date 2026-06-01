@@ -47,6 +47,12 @@ class CostRecord(BaseModel):
     source: str = ""
     source_detail: str = ""
     source_id: str = ""
+    status: str = "success"
+    error: str = ""
+    latency_ms: int | None = None
+    attempt_no: int = 1
+    prompt_name: str = ""
+    prompt_version: str = ""
 
 
 class PipelineState(BaseModel):

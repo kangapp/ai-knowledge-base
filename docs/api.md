@@ -265,9 +265,9 @@
     },
     "dimensions": {
       "ai_relevance": {"avg_score": 34.4, "high_rate": 1.0, "mid_rate": 0, "low_rate": 0},
-      "内容深度": {"avg_score": 0, "high_rate": 0, "mid_rate": 0, "low_rate": 0},
-      "信息密度": {"avg_score": 0, "high_rate": 0, "mid_rate": 0, "low_rate": 0},
-      "时效性": {"avg_score": 16.0, "high_rate": 0.008, "mid_rate": 0, "low_rate": 0}
+      "content_depth": {"avg_score": 24.0, "high_rate": 0.6, "mid_rate": 0.4, "low_rate": 0},
+      "info_density": {"avg_score": 12.0, "high_rate": 0.5, "mid_rate": 0.5, "low_rate": 0},
+      "timeliness": {"avg_score": 13.0, "high_rate": 0.8, "mid_rate": 0.2, "low_rate": 0}
     },
     "reason_keywords": [
       {"word": "核心", "count": 47},
@@ -425,8 +425,8 @@
 {
   "code": 0,
   "data": {
-    "run_id": "20260524-090000",
-    "run_id_bj": "run_20260524_173000",
+    "run_id": "run_20260524_090000",
+    "run_id_bj": "run_20260524_090000",
     "status": "completed",
     "current_phase": null,
     "phases": [...],
@@ -489,6 +489,7 @@
 - `avg_score` 为窗口内每日 `avg_score` 的简单平均。
 - `trend` 通过窗口前后半段 approved rate 对比得出：超过 10% 为 `rising`，低于 10% 为 `falling`，否则 `stable`。
 - `source_health` 按天合并：Collector 累加 `total_collected/failed`，Reviewer 累加 `approved/rejected`，`avg_score` 按 approved 数加权合并。
+- `new_items/dedup_skipped/analyzed/analysis_failed/retry/discarded/inserted/cost/tokens` 来自 `pipeline_source_runs`，表示窗口内每个 source 的 pipeline 漏斗和成本效率。
 
 **响应:**
 ```json
@@ -504,7 +505,16 @@
         "approved_rate": 0.75,
         "total_collected": 20,
         "avg_score": 82.5,
-        "trend": "rising"
+        "trend": "rising",
+        "new_items": 14,
+        "dedup_skipped": 6,
+        "analyzed": 13,
+        "analysis_failed": 1,
+        "retry": 1,
+        "discarded": 3,
+        "inserted": 10,
+        "cost": 0.12,
+        "tokens": 3200
       }
     ]
   },
@@ -567,6 +577,7 @@
 
 | 日期 | 变更内容 |
 |------|----------|
+| 2026-06-02 | `/api/sources/stats` 补充 source-run 漏斗、成本、token 字段；DAG 示例 run_id 改为北京时间真实 run_id |
 | 2026-05-31 | 统一 API 错误信封；新增 `/api/dashboard/summary`；修正 `/api/articles` total 和详情 tags；数据源接口复用注入 DB |
 | 2026-05-24 | 新增 `/api/stats/quality-detail` 端点 |
 | 2026-05-24 | 新增 `/api/stats/consumption-detail` 端点 |

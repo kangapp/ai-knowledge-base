@@ -45,6 +45,40 @@ async def _get_request_db() -> tuple[Database, bool]:
     return fallback_db, True
 
 
+async def _get_source_run_metrics(db: Database, start_date: str) -> dict[str, dict]:
+    rows = await db.fetch_all("""
+        SELECT
+            psr.source_id,
+            COALESCE(SUM(psr.new_items), 0) as new_items,
+            COALESCE(SUM(psr.dedup_skipped), 0) as dedup_skipped,
+            COALESCE(SUM(psr.analyzed), 0) as analyzed,
+            COALESCE(SUM(psr.analysis_failed), 0) as analysis_failed,
+            COALESCE(SUM(psr.retry), 0) as retry,
+            COALESCE(SUM(psr.discarded), 0) as discarded,
+            COALESCE(SUM(psr.inserted), 0) as inserted,
+            COALESCE(SUM(psr.cost), 0) as cost,
+            COALESCE(SUM(psr.tokens), 0) as tokens
+        FROM pipeline_source_runs psr
+        JOIN pipeline_runs pr ON pr.id = psr.run_id
+        WHERE date(pr.started_at) >= ?
+        GROUP BY psr.source_id
+    """, (start_date,))
+    return {
+        row["source_id"]: {
+            "new_items": row["new_items"],
+            "dedup_skipped": row["dedup_skipped"],
+            "analyzed": row["analyzed"],
+            "analysis_failed": row["analysis_failed"],
+            "retry": row["retry"],
+            "discarded": row["discarded"],
+            "inserted": row["inserted"],
+            "cost": round(row["cost"], 4),
+            "tokens": row["tokens"],
+        }
+        for row in rows
+    }
+
+
 @router.get("/")
 async def list_sources():
     """数据源列表（含状态）"""
@@ -77,6 +111,7 @@ async def get_source_stats(period: str = "week"):
 
         sources = SourceManager.load()
         source_map = {s.id: s for s in sources}
+        source_run_metrics = await _get_source_run_metrics(db, start_date)
 
         stats = []
         for h in health_data:
@@ -106,6 +141,7 @@ async def get_source_stats(period: str = "week"):
             else:
                 trend = "stable"
 
+            metrics = source_run_metrics.get(h["source_id"], {})
             stats.append({
                 "id": h["source_id"],
                 "name": source.name,
@@ -114,6 +150,15 @@ async def get_source_stats(period: str = "week"):
                 "total_collected": total,
                 "avg_score": h["avg_score"],
                 "trend": trend,
+                "new_items": metrics.get("new_items", 0),
+                "dedup_skipped": metrics.get("dedup_skipped", 0),
+                "analyzed": metrics.get("analyzed", 0),
+                "analysis_failed": metrics.get("analysis_failed", 0),
+                "retry": metrics.get("retry", 0),
+                "discarded": metrics.get("discarded", 0),
+                "inserted": metrics.get("inserted", 0),
+                "cost": metrics.get("cost", 0),
+                "tokens": metrics.get("tokens", 0),
             })
 
         return envelope({"period": period, "sources": stats})

@@ -1,4 +1,5 @@
 from pathlib import Path
+import shutil
 
 import pytest
 
@@ -44,10 +45,15 @@ async def test_record_source_health_merges_collection_and_review_stats(tmp_path)
 @pytest.mark.asyncio
 async def test_source_health_migration_merges_legacy_display_source_ids(tmp_path):
     db_path = tmp_path / "legacy.db"
-    db = Database(db_path, migrations_dir=_MIGRATIONS_DIR)
+    legacy_migrations = tmp_path / "migrations_v6"
+    legacy_migrations.mkdir()
+    for migration in sorted(_MIGRATIONS_DIR.glob("*.sql")):
+        if int(migration.name.split("_")[0]) <= 6:
+            shutil.copy2(migration, legacy_migrations / migration.name)
+
+    db = Database(db_path, migrations_dir=legacy_migrations)
     try:
         await db.initialize()
-        await db.execute("UPDATE schema_version SET version = 6")
         await db.execute("DELETE FROM source_health")
         await db.execute(
             """

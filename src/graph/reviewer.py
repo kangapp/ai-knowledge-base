@@ -2,6 +2,7 @@
 import json
 import re
 import logging
+import time
 from .state import PipelineState, AnalyzedItem, ReviewedItem, CostRecord
 from ..core.llm_client import LLMRegistry
 
@@ -136,6 +137,8 @@ async def reviewer_node(state: PipelineState, registry: LLMRegistry) -> dict:
 
         for attempt in range(2):
             content = ""
+            cost_record = None
+            started = time.perf_counter()
             try:
                 kwargs = dict(
                     model=model_id,
@@ -150,6 +153,7 @@ async def reviewer_node(state: PipelineState, registry: LLMRegistry) -> dict:
                     kwargs["response_format"] = {"type": "json_object"}
 
                 response = await client.chat.completions.create(**kwargs)
+                latency_ms = int((time.perf_counter() - started) * 1000)
                 content = response.choices[0].message.content or "{}"
 
                 tokens_in = response.usage.prompt_tokens if response.usage else 0
@@ -158,13 +162,26 @@ async def reviewer_node(state: PipelineState, registry: LLMRegistry) -> dict:
                 registry.budget.add_cost(provider, cost)
                 registry.health.record_success(provider, 0)
 
-                cost_records.append(CostRecord(
+                cost_record = CostRecord(
                     agent="reviewer", provider=provider, model=model_id,
                     tokens_in=tokens_in, tokens_out=tokens_out, cost=cost,
-                    ref_url=item.ref_url
-                ))
+                    ref_url=item.ref_url,
+                    status="success",
+                    latency_ms=latency_ms,
+                    attempt_no=attempt + 1,
+                    prompt_name="reviewer",
+                    prompt_version="current",
+                )
 
-                reviewed = parse_reviewer_output(content)
+                try:
+                    reviewed = parse_reviewer_output(content)
+                except Exception as parse_error:
+                    cost_record.status = "parse_failed"
+                    cost_record.error = str(parse_error)
+                    cost_records.append(cost_record)
+                    raise
+
+                cost_records.append(cost_record)
                 reviewed_items.append(reviewed)
                 reviewed.ref_url = item.ref_url
                 logger.debug("reviewer.item", extra={
@@ -175,6 +192,22 @@ async def reviewer_node(state: PipelineState, registry: LLMRegistry) -> dict:
                 break
 
             except Exception as e:
+                if cost_record is None:
+                    cost_records.append(CostRecord(
+                        agent="reviewer",
+                        provider=provider,
+                        model=model_id,
+                        tokens_in=0,
+                        tokens_out=0,
+                        cost=0.0,
+                        ref_url=item.ref_url,
+                        status="request_failed",
+                        error=str(e),
+                        latency_ms=int((time.perf_counter() - started) * 1000),
+                        attempt_no=attempt + 1,
+                        prompt_name="reviewer",
+                        prompt_version="current",
+                    ))
                 registry.health.record_failure(provider, str(e))
                 if attempt == 1:
                     logger.warning("reviewer.parse_failed", extra={

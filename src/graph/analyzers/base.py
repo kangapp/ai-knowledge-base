@@ -1,6 +1,7 @@
 import json
 import re
 import logging
+import time
 from pathlib import Path
 from ..state import RawItem, AnalyzedItem, CostRecord
 from ...core.llm_client import LLMRegistry
@@ -80,6 +81,8 @@ async def analyze_items(
 
         for attempt in range(2):
             content = ""
+            cost_record = None
+            started = time.perf_counter()
             try:
                 kwargs = dict(
                     model=model_id,
@@ -95,6 +98,7 @@ async def analyze_items(
                     kwargs["response_format"] = {"type": "json_object"}
 
                 response = await client.chat.completions.create(**kwargs)
+                latency_ms = int((time.perf_counter() - started) * 1000)
                 content = response.choices[0].message.content or "{}"
 
                 # 立即提取 tokens 并计算 cost，无论 parse 是否成功都记录
@@ -106,7 +110,7 @@ async def analyze_items(
                 registry.budget.add_cost(provider, cost)
                 registry.health.record_success(provider, 0)
 
-                costs.append(CostRecord(
+                cost_record = CostRecord(
                     agent=agent_name,
                     provider=provider,
                     model=model_id,
@@ -117,10 +121,23 @@ async def analyze_items(
                     source=item.source,
                     source_detail=item.source_detail,
                     source_id=item.raw_metadata.get("source_id", item.source_detail or item.source),
-                ))
+                    status="success",
+                    latency_ms=latency_ms,
+                    attempt_no=attempt + 1,
+                    prompt_name=agent_name,
+                    prompt_version="current",
+                )
 
                 # 再 parse，parse 失败会抛出异常
-                analyzed = parse_and_validate(content, ref_url=item.url)
+                try:
+                    analyzed = parse_and_validate(content, ref_url=item.url)
+                except Exception as parse_error:
+                    cost_record.status = "parse_failed"
+                    cost_record.error = str(parse_error)
+                    costs.append(cost_record)
+                    raise
+
+                costs.append(cost_record)
 
                 # parse 成功后记录分析结果并 break；费用已按真实 LLM 调用记录
                 results.append(analyzed)
@@ -133,6 +150,25 @@ async def analyze_items(
                 break
 
             except Exception as e:
+                if cost_record is None:
+                    costs.append(CostRecord(
+                        agent=agent_name,
+                        provider=provider,
+                        model=model_id,
+                        tokens_in=0,
+                        tokens_out=0,
+                        cost=0.0,
+                        ref_url=item.url,
+                        source=item.source,
+                        source_detail=item.source_detail,
+                        source_id=item.raw_metadata.get("source_id", item.source_detail or item.source),
+                        status="request_failed",
+                        error=str(e),
+                        latency_ms=int((time.perf_counter() - started) * 1000),
+                        attempt_no=attempt + 1,
+                        prompt_name=agent_name,
+                        prompt_version="current",
+                    ))
                 # parse 失败，仍需记录熔断统计（cost 已在上方 try 块记录）
                 registry.health.record_failure(provider, str(e))
                 if attempt == 1:

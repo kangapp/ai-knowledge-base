@@ -3,6 +3,7 @@ from pathlib import Path
 import aiosqlite
 import pytest
 from src.core.database import Database
+from src.db import operations
 from src.db.operations import get_trending_repo_urls
 
 # 相对测试文件定位到项目根目录下的实际 migrations 目录
@@ -29,11 +30,23 @@ async def test_initialize_and_migrate(tmp_path):
 
         # 验证迁移版本
         v = await db.fetch_one("SELECT version FROM schema_version")
-        assert v["version"] == 7
+        assert v["version"] == 8
 
         cost_log_columns = await db.fetch_all("PRAGMA table_info(cost_logs)")
         column_names = {row["name"] for row in cost_log_columns}
-        assert {"source", "source_detail", "source_id"}.issubset(column_names)
+        assert {
+            "source",
+            "source_detail",
+            "source_id",
+            "status",
+            "error",
+            "latency_ms",
+            "attempt_no",
+            "prompt_name",
+            "prompt_version",
+        }.issubset(column_names)
+        assert "collection_items" in names
+        assert "pipeline_source_runs" in names
     finally:
         await db.close()
 
@@ -127,5 +140,93 @@ async def test_get_trending_repo_urls_uses_nearest_baseline_snapshot(tmp_path):
         urls = await get_trending_repo_urls(db, min_velocity=10, days=7)
 
         assert urls == {"https://github.com/org/repo"}
+    finally:
+        await db.close()
+
+
+@pytest.mark.asyncio
+async def test_record_collection_item_upserts_status_by_run_and_url(tmp_path):
+    db = Database(tmp_path / "test.db", migrations_dir=_MIGRATIONS_DIR)
+    try:
+        await db.initialize()
+        await db.execute(
+            "INSERT INTO pipeline_runs (id, started_at, status, trigger) VALUES ('run_1', datetime('now', '+8 hours'), 'completed', 'test')"
+        )
+
+        await operations.record_collection_item(
+            db,
+            run_id="run_1",
+            url="https://example.com/a",
+            title="A",
+            source="rss",
+            source_id="rss_test",
+            source_detail="RSS Test",
+            status="collected",
+            reason="collector",
+            raw_metadata={"source_id": "rss_test"},
+        )
+        await operations.record_collection_item(
+            db,
+            run_id="run_1",
+            url="https://example.com/a",
+            title="A",
+            source="rss",
+            source_id="rss_test",
+            source_detail="RSS Test",
+            status="inserted",
+            reason="approved",
+            raw_metadata={"source_id": "rss_test"},
+        )
+
+        rows = await db.fetch_all("SELECT * FROM collection_items")
+
+        assert len(rows) == 1
+        assert rows[0]["status"] == "inserted"
+        assert rows[0]["reason"] == "approved"
+        assert rows[0]["source_id"] == "rss_test"
+    finally:
+        await db.close()
+
+
+@pytest.mark.asyncio
+async def test_upsert_pipeline_source_run_persists_funnel_metrics(tmp_path):
+    db = Database(tmp_path / "test.db", migrations_dir=_MIGRATIONS_DIR)
+    try:
+        await db.initialize()
+
+        await db.execute(
+            "INSERT INTO pipeline_runs (id, started_at, status, trigger) VALUES ('run_1', datetime('now', '+8 hours'), 'completed', 'test')"
+        )
+        await operations.upsert_pipeline_source_run(
+            db,
+            {
+                "run_id": "run_1",
+                "source_id": "rss_test",
+                "source": "rss",
+                "source_detail": "RSS Test",
+                "collected": 5,
+                "new_items": 3,
+                "dedup_skipped": 2,
+                "analyzed": 3,
+                "analysis_failed": 0,
+                "approved": 2,
+                "retry": 0,
+                "discarded": 1,
+                "inserted": 2,
+                "failed": 0,
+                "cost": 0.12,
+                "tokens": 3200,
+            },
+        )
+        await db.commit()
+
+        row = await db.fetch_one("SELECT * FROM pipeline_source_runs WHERE run_id='run_1' AND source_id='rss_test'")
+
+        assert row["collected"] == 5
+        assert row["new_items"] == 3
+        assert row["dedup_skipped"] == 2
+        assert row["approved"] == 2
+        assert row["cost"] == 0.12
+        assert row["tokens"] == 3200
     finally:
         await db.close()

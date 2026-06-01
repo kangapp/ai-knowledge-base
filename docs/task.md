@@ -103,6 +103,11 @@
   - 新增 `src/core/time.py` 作为 Python 业务时间唯一入口
   - 采集、pipeline run、phase log、cost log、source health、GitHub 快照、静态站构建时间统一写入北京时间
   - 所有 API/仪表盘 SQL 日期窗口使用北京时间自然日，避免 UTC 日界导致选日数据为 0
+- [x] 扩展数据模型可观测性
+  - 新增 `collection_items`，记录每次 pipeline 中每条原始 item 的采集、去重、审核和入库状态
+  - 新增 `pipeline_source_runs`，记录 run + source 级采集漏斗、成本、token 和失败数
+  - `cost_logs` 补充 `status/error/latency_ms/attempt_no/prompt_name/prompt_version` 审计字段
+  - `/api/sources/stats` 保留旧健康字段，同时返回 source-run 漏斗和成本字段，方便后续数据源健康 Tab 重构
 - [x] MiniMax 默认模型升级到 M3
   - `config/llm.yaml` 注册模型改为 `MiniMax-M3`
   - `config/agents.yaml` 中所有 analyzer/reviewer primary model 统一改为 `MiniMax-M3`
@@ -129,6 +134,7 @@
 - 已通过：`.venv/bin/python -m pytest -m "not integration and not e2e"`（93 passed）
 - 已通过：`.venv/bin/pytest tests/test_config.py tests/test_llm_client.py tests/test_analyzer.py tests/test_reviewer.py tests/test_pipeline.py -q`（24 passed）
 - 已通过：`.venv/bin/pytest tests/test_collector.py -q`（11 passed）
-- 已通过：`.venv/bin/python -m pytest -m "not integration and not e2e"`（95 passed）
+- 已通过：`.venv/bin/python -m pytest -m "not integration and not e2e"`（103 passed）
+- 已通过：`.venv/bin/python -m pytest tests/test_database.py tests/test_cost_accounting.py tests/test_pipeline_observability.py tests/test_api_contracts.py tests/test_analyzer.py tests/test_reviewer.py tests/test_pipeline.py -q`（34 passed）
 
 说明：当前 shell 中 `uv` 不可用，使用项目 `.venv/bin/python` 执行测试。

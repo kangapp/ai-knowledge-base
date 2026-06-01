@@ -25,7 +25,7 @@
 | retry_count | INTEGER DEFAULT 0 | |
 | collected_at | TEXT | 北京时间 ISO 字符串 |
 | published_at | TEXT | 上游原始发布时间 |
-| extra_data | TEXT | JSON: 四维评分 detail + reason_keywords + language |
+| extra_data | TEXT | JSON: 四维评分 detail + raw metadata + language |
 | analysis_cost | REAL | 该条分析总花费 ($) |
 | analysis_tokens | INTEGER | 该条分析 token 总量 |
 | created_at | TEXT DEFAULT (datetime('now', '+8 hours')) | 北京时间 |
@@ -49,7 +49,7 @@ FTS5 全文索引：`articles_fts` over (title, summary, description)
   "retry_count": 0,
   "collected_at": "2026-05-24T08:30:00",
   "published_at": "2026-05-23T14:00:00Z",
-  "extra_data": "{\"dimensions\":{\"ai_relevance\":{\"avg_score\":34.4,\"high_rate\":1.0,\"mid_rate\":0,\"low_rate\":0},\"内容深度\":{\"avg_score\":0,\"high_rate\":0,\"mid_rate\":0,\"low_rate\":0},\"信息密度\":{\"avg_score\":0,\"high_rate\":0,\"mid_rate\":0,\"low_rate\":0},\"时效性\":{\"avg_score\":16.0,\"high_rate\":0.008,\"mid_rate\":0,\"low_rate\":0}},\"reason_keywords\":[{\"word\":\"核心\",\"count\":47},{\"word\":\"属于\",\"count\":35}],\"language\":\"en\"}",
+  "extra_data": "{\"dimensions\":{\"ai_relevance\":{\"score\":35,\"reason\":\"核心内容围绕 LLM Agent 工具链\"},\"content_depth\":{\"score\":24,\"reason\":\"包含架构和实现细节\"},\"info_density\":{\"score\":12,\"reason\":\"有明确的新功能和技术信息\"},\"timeliness\":{\"score\":13,\"reason\":\"近期发布\"}},\"raw\":{\"source_id\":\"github_ai_devtools\"},\"language\":\"en\"}",
   "analysis_cost": 0.0032,
   "analysis_tokens": 1240,
   "created_at": "2026-05-24T08:30:05",
@@ -116,20 +116,19 @@ FTS5 全文索引：`articles_fts` over (title, summary, description)
 |----|------|------|
 | id | INTEGER PK | |
 | run_id | TEXT FK → pipeline_runs.id | |
-| phase | TEXT | collector / router / analyzer / reviewer |
-| source | TEXT | 源名称（analyzer 阶段按源记录） |
-| event | TEXT | started / completed / failed |
-| message | TEXT | 日志内容 |
-| created_at | TEXT | |
+| phase | TEXT | collect / route / analyze / aggregate / review |
+| status | TEXT | running / done / failed |
+| started_at | TEXT | 北京时间 |
+| ended_at | TEXT | 北京时间 |
+| duration_ms | INTEGER | 阶段耗时 |
+| details | TEXT | 阶段摘要 |
 
 **样例数据：**
 
-| id | run_id | phase | source | event | message | created_at |
-|----|--------|-------|--------|-------|---------|------------|
-| 1 | run_20260524_090000 | collector | - | started | 开始采集 | 2026-05-24T09:00:00 |
-| 2 | run_20260524_090000 | collector | - | completed | 采集完成 | 2026-05-24T09:00:45 |
-| 3 | run_20260524_090000 | analyzer | github_trending | started | 开始分析 | 2026-05-24T09:00:45 |
-| 4 | run_20260524_090000 | analyzer | github_trending | completed | 分析完成 | 2026-05-24T09:02:30 |
+| id | run_id | phase | status | started_at | ended_at | duration_ms | details |
+|----|--------|-------|--------|------------|----------|-------------|---------|
+| 1 | run_20260524_090000 | collect | done | 2026-05-24T09:00:00 | 2026-05-24T09:00:45 | 45000 | collected 20 items |
+| 2 | run_20260524_090000 | analyze | done | 2026-05-24T09:00:45 | 2026-05-24T09:02:30 | 105000 | total:20, succeeded:18, failed:2 |
 
 ### cost_logs — LLM 调用花费
 
@@ -147,14 +146,20 @@ FTS5 全文索引：`articles_fts` over (title, summary, description)
 | source | TEXT | 成本记录时的来源快照：github / rss / feishu / arxiv |
 | source_detail | TEXT | 成本记录时的来源细分；RSS 存 feed 名称或展示名 |
 | source_id | TEXT | 成本记录时的源 ID；统一使用 `config/sources.yaml` 中的配置 id |
+| status | TEXT DEFAULT 'success' | success / parse_failed / request_failed |
+| error | TEXT | 调用或解析错误 |
+| latency_ms | INTEGER | LLM 调用耗时 |
+| attempt_no | INTEGER DEFAULT 1 | 同一 item 的尝试序号 |
+| prompt_name | TEXT | prompt/agent 名称 |
+| prompt_version | TEXT | prompt 版本标识，当前为 `current` |
 | created_at | TEXT DEFAULT (datetime('now', '+8 hours')) | 北京时间 |
 
 **样例数据：**
 
-| id | run_id | agent | provider | model | tokens_in | tokens_out | cost | ref_url | source | source_detail | source_id | created_at |
-|----|--------|-------|----------|-------|----------|-----------|------|---------|--------|---------------|-----------|------------|
-| 1 | run_20260524_090000 | github_analyzer | deepseek | deepseek-chat | 1200 | 350 | 0.0021 | https://github.com/org/repo | github | | github_trending | 2026-05-24T09:01:00 |
-| 2 | run_20260524_090000 | reviewer | deepseek | deepseek-chat | 2800 | 420 | 0.0048 | https://36kr.com/p/123 | rss | 36氪 | rss_36kr | 2026-05-24T09:03:00 |
+| id | run_id | agent | provider | model | tokens_in | tokens_out | cost | ref_url | source | source_id | status | attempt_no | created_at |
+|----|--------|-------|----------|-------|----------|-----------|------|---------|--------|-----------|--------|------------|------------|
+| 1 | run_20260524_090000 | github_analyzer | deepseek | deepseek-chat | 1200 | 350 | 0.0021 | https://github.com/org/repo | github | github_trending | success | 1 | 2026-05-24T09:01:00 |
+| 2 | run_20260524_090000 | reviewer | deepseek | deepseek-chat | 2800 | 420 | 0.0048 | https://36kr.com/p/123 | rss | rss_36kr | parse_failed | 2 | 2026-05-24T09:03:00 |
 
 **成本来源记录口径：**
 
@@ -162,8 +167,59 @@ FTS5 全文索引：`articles_fts` over (title, summary, description)
 - Analyzer 成本由 `RawItem` 直接填充来源字段。
 - Reviewer 成本在图外入库阶段按 `ref_url` 从本轮 `RawItem` 映射补齐来源字段。
 - 只要 LLM 返回 usage，即使 Analyzer/Reviewer JSON 解析失败，也应写入 `cost_logs`；一次重试对应一次真实 LLM 调用。
+- `status/error/latency_ms/attempt_no/prompt_name/prompt_version` 用于追踪调用成功率、解析失败和 prompt/model 效果。
 - `articles.analysis_cost/analysis_tokens` 为同一 `ref_url` 的 Analyzer + Reviewer 调用成本汇总，不再固定为 0。
 - 历史记录缺少来源字段时，统计接口按 `articles` JOIN 和 URL 域名兜底归因。
+
+### collection_items — 采集 item 明细
+
+| 列 | 类型 | 说明 |
+|----|------|------|
+| id | INTEGER PK | |
+| run_id | TEXT FK → pipeline_runs.id | |
+| url | TEXT | 原始 URL |
+| title | TEXT | 原始标题 |
+| source | TEXT | github / rss / feishu / arxiv |
+| source_id | TEXT | 配置 id |
+| source_detail | TEXT | 来源细分 |
+| status | TEXT | collected / dedup_skipped / inserted / reviewed_retry / reviewed_discarded |
+| reason | TEXT | 状态原因 |
+| raw_metadata | TEXT | JSON 原始元数据 |
+| article_id | INTEGER FK → articles.id | 入库文章 id |
+| created_at | TEXT | 北京时间 |
+| updated_at | TEXT | 北京时间 |
+
+UNIQUE(run_id, url)
+
+该表保存每次 pipeline 中每条原始 item 的最终状态，用来回答“源有没有抓到、是否被去重、是否被审核丢弃、是否入库”。
+
+### pipeline_source_runs — 单次运行的数据源漏斗
+
+| 列 | 类型 | 说明 |
+|----|------|------|
+| id | INTEGER PK | |
+| run_id | TEXT FK → pipeline_runs.id | |
+| source_id | TEXT | 配置 id |
+| source | TEXT | 数据源类型 |
+| source_detail | TEXT | 来源细分 |
+| collected | INTEGER | 原始采集量 |
+| new_items | INTEGER | 查重后的新 item 数 |
+| dedup_skipped | INTEGER | URL 已存在跳过数 |
+| analyzed | INTEGER | Analyzer 成功产出数 |
+| analysis_failed | INTEGER | Analyzer 未产出数 |
+| approved | INTEGER | Reviewer 通过数 |
+| retry | INTEGER | Reviewer retry 数 |
+| discarded | INTEGER | Reviewer 丢弃数 |
+| inserted | INTEGER | 最终入库数 |
+| failed | INTEGER | 采集失败次数 |
+| cost | REAL | 本源本轮 LLM 成本 |
+| tokens | INTEGER | 本源本轮 token |
+| created_at | TEXT | 北京时间 |
+| updated_at | TEXT | 北京时间 |
+
+UNIQUE(run_id, source_id)
+
+该表是仪表盘数据源健康 Tab 的扩展事实表，适合展示 source 级采集漏斗、成本效率和失败定位。
 
 **审核评分口径：**
 
@@ -299,7 +355,7 @@ UNIQUE(repo_url, snapshot_date)
 
 | version |
 |---------|
-| 5 |
+| 8 |
 
 ## extra_data JSON 结构详解
 
@@ -309,34 +365,23 @@ UNIQUE(repo_url, snapshot_date)
 {
   "dimensions": {
     "ai_relevance": {
-      "avg_score": 34.4,
-      "high_rate": 1.0,
-      "mid_rate": 0,
-      "low_rate": 0
+      "score": 35,
+      "reason": "核心内容围绕 LLM Agent 工具链"
     },
-    "内容深度": {
-      "avg_score": 0,
-      "high_rate": 0,
-      "mid_rate": 0,
-      "low_rate": 0
+    "content_depth": {
+      "score": 24,
+      "reason": "包含架构和实现细节"
     },
-    "信息密度": {
-      "avg_score": 0,
-      "high_rate": 0,
-      "mid_rate": 0,
-      "low_rate": 0
+    "info_density": {
+      "score": 12,
+      "reason": "有明确的新功能和技术信息"
     },
-    "时效性": {
-      "avg_score": 16.0,
-      "high_rate": 0.008,
-      "mid_rate": 0,
-      "low_rate": 0
+    "timeliness": {
+      "score": 13,
+      "reason": "近期发布"
     }
   },
-  "reason_keywords": [
-    {"word": "核心", "count": 47},
-    {"word": "属于", "count": 35}
-  ],
+  "raw": {"source_id": "github_ai_devtools"},
   "language": "en"
 }
 ```
@@ -346,23 +391,19 @@ UNIQUE(repo_url, snapshot_date)
 | 字段 | 类型 | 说明 |
 |------|------|------|
 | dimensions | object | 四维评分对象 |
-| dimensions[].avg_score | float | 该维度平均分（0-100） |
-| dimensions[].high_rate | float | 高分率（≥ 高分阈值） |
-| dimensions[].mid_rate | float | 中分率（中等分数） |
-| dimensions[].low_rate | float | 低分率（< 低分阈值） |
-| reason_keywords | array | 审核理由关键词统计 |
-| reason_keywords[].word | string | 关键词 |
-| reason_keywords[].count | int | 出现次数 |
-| language | string | 文章语言（en/zh/multi） |
+| dimensions[].score | int | 单篇文章该维度得分 |
+| dimensions[].reason | string | 单篇文章该维度评分理由 |
+| raw | object | Collector 原始元数据快照 |
+| language | string | Analyzer 判断的文章语言（en/zh） |
 
 **四维评分说明：**
 
 | 维度 | 说明 | 高分标准 |
 |------|------|----------|
 | ai_relevance | AI 相关性 | 与 AI/LLM/Agent 领域相关程度 |
-| 内容深度 | 内容深度 | 有详细技术实现或分析 |
-| 信息密度 | 信息密度 | 内容充实、信息价值高 |
-| 时效性 | 时效性 | 近期发布的内容 |
+| content_depth | 内容深度 | 有详细技术实现或分析 |
+| info_density | 信息密度 | 内容充实、信息价值高 |
+| timeliness | 时效性 | 近期发布的内容 |
 
 ## 配置文件结构
 

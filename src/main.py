@@ -26,6 +26,7 @@ from .db.operations import (
     start_pipeline_run, end_pipeline_run, save_article, save_tags,
     save_cost_log, batch_check_existing_urls, backup_database,
     batch_save_github_snapshots, get_trending_repo_urls,
+    record_collection_item, upsert_pipeline_source_run,
 )
 from .site.builder import SiteBuilder, DebouncedBuilder
 
@@ -162,6 +163,157 @@ def _summarize_item_costs(cost_records: list) -> dict[str, tuple[float, int]]:
     return summary
 
 
+def _source_identity(item) -> tuple[str, str, str]:
+    source_id = item.raw_metadata.get("source_id") or item.source_detail or item.source
+    return source_id, item.source, item.source_detail
+
+
+def _build_pipeline_source_summaries(
+    *,
+    run_id: str,
+    raw_items: list,
+    new_items: list,
+    analyzed_items: list,
+    reviewed_items: list,
+    cost_records: list,
+    inserted_urls: set[str],
+    failed_counts: dict[str, int] | None = None,
+) -> list[dict]:
+    summaries: dict[str, dict] = {}
+
+    def ensure(source_id: str, source: str, source_detail: str) -> dict:
+        if source_id not in summaries:
+            summaries[source_id] = {
+                "run_id": run_id,
+                "source_id": source_id,
+                "source": source,
+                "source_detail": source_detail,
+                "collected": 0,
+                "new_items": 0,
+                "dedup_skipped": 0,
+                "analyzed": 0,
+                "analysis_failed": 0,
+                "approved": 0,
+                "retry": 0,
+                "discarded": 0,
+                "inserted": 0,
+                "failed": 0,
+                "cost": 0.0,
+                "tokens": 0,
+            }
+        return summaries[source_id]
+
+    url_to_source: dict[str, tuple[str, str, str]] = {}
+    for item in raw_items:
+        source_id, source, source_detail = _source_identity(item)
+        url_to_source[item.url] = (source_id, source, source_detail)
+        ensure(source_id, source, source_detail)["collected"] += 1
+
+    new_urls = {item.url for item in new_items}
+    for item in new_items:
+        source_id, source, source_detail = _source_identity(item)
+        ensure(source_id, source, source_detail)["new_items"] += 1
+
+    for item in raw_items:
+        if item.url not in new_urls:
+            source_id, source, source_detail = _source_identity(item)
+            ensure(source_id, source, source_detail)["dedup_skipped"] += 1
+
+    for item in analyzed_items:
+        mapping = url_to_source.get(item.ref_url)
+        if mapping:
+            ensure(*mapping)["analyzed"] += 1
+
+    for item in new_items:
+        if item.url not in {analyzed.ref_url for analyzed in analyzed_items}:
+            source_id, source, source_detail = _source_identity(item)
+            ensure(source_id, source, source_detail)["analysis_failed"] += 1
+
+    for reviewed in reviewed_items:
+        mapping = url_to_source.get(reviewed.ref_url)
+        if not mapping:
+            continue
+        summary = ensure(*mapping)
+        if reviewed.verdict == "approved":
+            summary["approved"] += 1
+        elif reviewed.verdict == "retry":
+            summary["retry"] += 1
+        else:
+            summary["discarded"] += 1
+
+    for url in inserted_urls:
+        mapping = url_to_source.get(url)
+        if mapping:
+            ensure(*mapping)["inserted"] += 1
+
+    for record in cost_records:
+        source_id = record.source_id
+        source = record.source
+        source_detail = record.source_detail
+        if not source_id and record.ref_url in url_to_source:
+            source_id, source, source_detail = url_to_source[record.ref_url]
+        if not source_id:
+            continue
+        summary = ensure(source_id, source or source_id, source_detail or "")
+        summary["cost"] = round(summary["cost"] + record.cost, 10)
+        summary["tokens"] += record.tokens_in + record.tokens_out
+
+    for source_id, count in (failed_counts or {}).items():
+        summary = ensure(source_id, source_id, "")
+        summary["failed"] += count
+
+    return list(summaries.values())
+
+
+async def _record_collected_items(db, run_id: str, items: list, status: str, reason: str):
+    for item in items:
+        source_id, source, source_detail = _source_identity(item)
+        await record_collection_item(
+            db,
+            run_id=run_id,
+            url=item.url,
+            title=item.title,
+            source=source,
+            source_id=source_id,
+            source_detail=source_detail,
+            status=status,
+            reason=reason,
+            raw_metadata=item.raw_metadata,
+        )
+
+
+async def _record_source_summaries(
+    db,
+    *,
+    run_id: str,
+    raw_items: list,
+    new_items: list,
+    analyzed_items: list,
+    reviewed_items: list,
+    cost_records: list,
+    inserted_urls: set[str],
+    error_log: list[dict],
+):
+    failed_counts: dict[str, int] = {}
+    for error in error_log:
+        source_id = error.get("source")
+        if source_id:
+            failed_counts[source_id] = failed_counts.get(source_id, 0) + 1
+    summaries = _build_pipeline_source_summaries(
+        run_id=run_id,
+        raw_items=raw_items,
+        new_items=new_items,
+        analyzed_items=analyzed_items,
+        reviewed_items=reviewed_items,
+        cost_records=cost_records,
+        inserted_urls=inserted_urls,
+        failed_counts=failed_counts,
+    )
+    for summary in summaries:
+        await upsert_pipeline_source_run(db, summary)
+    await db.commit()
+
+
 async def run_pipeline(trigger: str = "cron", source_filter: str | list[str] | tuple[str, ...] | set[str] | None = None):
     """source_filter 为 None 时采集所有源；否则采集指定 source.id 或一组 source.id。"""
     global _registry, _db, _builder, _running, _graph
@@ -197,6 +349,7 @@ async def run_pipeline(trigger: str = "cron", source_filter: str | list[str] | t
 
         # ====== 图外：Collector + DB 查重（需要 DB 连接） ======
         raw_items, error_log = await collect_all(_db, active_sources)
+        await _record_collected_items(_db, run_id, raw_items, "collected", "collector")
         await record_phase_end(_db, run_id, "collect", "done", f"collected {len(raw_items)} items")
         logger.info("collector.done", extra={"total": len(raw_items), "errors": len(error_log)})
 
@@ -213,6 +366,17 @@ async def run_pipeline(trigger: str = "cron", source_filter: str | list[str] | t
                 raw_items = _apply_github_velocity_filter(raw_items, src, trending)
 
         if not raw_items and error_log:
+            await _record_source_summaries(
+                _db,
+                run_id=run_id,
+                raw_items=[],
+                new_items=[],
+                analyzed_items=[],
+                reviewed_items=[],
+                cost_records=[],
+                inserted_urls=set(),
+                error_log=error_log,
+            )
             summary = json.dumps({"collected": 0, "errors": error_log})
             await end_pipeline_run(_db, run_id, "failed", summary)
             return
@@ -220,9 +384,22 @@ async def run_pipeline(trigger: str = "cron", source_filter: str | list[str] | t
         all_urls = [item.url for item in raw_items]
         existing = await batch_check_existing_urls(_db, all_urls)
         new_items = [item for item in raw_items if item.url not in existing]
+        skipped_items = [item for item in raw_items if item.url in existing]
+        await _record_collected_items(_db, run_id, skipped_items, "dedup_skipped", "url_exists")
         logger.info("collector.dedup", extra={"total": len(raw_items), "new": len(new_items), "skipped": len(raw_items) - len(new_items)})
 
         if not new_items:
+            await _record_source_summaries(
+                _db,
+                run_id=run_id,
+                raw_items=raw_items,
+                new_items=[],
+                analyzed_items=[],
+                reviewed_items=[],
+                cost_records=[],
+                inserted_urls=set(),
+                error_log=error_log,
+            )
             summary = json.dumps({"collected": {"total": len(raw_items), "new": 0}, "message": "all items already exist"})
             await end_pipeline_run(_db, run_id, "completed", summary)
             return
@@ -287,6 +464,7 @@ async def run_pipeline(trigger: str = "cron", source_filter: str | list[str] | t
         passed_count = 0
         retry_count = 0
         discarded_count = 0
+        inserted_urls: set[str] = set()
         cost_source_map = _build_cost_source_map(new_items)
         item_costs = _summarize_item_costs(all_costs)
 
@@ -300,6 +478,21 @@ async def run_pipeline(trigger: str = "cron", source_filter: str | list[str] | t
                 analysis_cost, analysis_tokens = item_costs.get(reviewed.ref_url, (0.0, 0))
                 article_id = await save_article(_db, raw, analyzed, reviewed, analysis_cost, analysis_tokens)
                 if article_id:
+                    inserted_urls.add(reviewed.ref_url)
+                    source_id, source, source_detail = _source_identity(raw)
+                    await record_collection_item(
+                        _db,
+                        run_id=run_id,
+                        url=raw.url,
+                        title=raw.title,
+                        source=source,
+                        source_id=source_id,
+                        source_detail=source_detail,
+                        status="inserted",
+                        reason="approved",
+                        raw_metadata=raw.raw_metadata,
+                        article_id=article_id,
+                    )
                     tags = list(analyzed.tags)
                     if raw.source == "github" and raw.raw_metadata.get("source_id"):
                         src_id = raw.raw_metadata["source_id"]
@@ -315,14 +508,52 @@ async def run_pipeline(trigger: str = "cron", source_filter: str | list[str] | t
                 else:
                     analysis_cost, analysis_tokens = item_costs.get(reviewed.ref_url, (0.0, 0))
                     await save_article(_db, raw, analyzed, reviewed, analysis_cost, analysis_tokens)
+                    source_id, source, source_detail = _source_identity(raw)
+                    await record_collection_item(
+                        _db,
+                        run_id=run_id,
+                        url=raw.url,
+                        title=raw.title,
+                        source=source,
+                        source_id=source_id,
+                        source_detail=source_detail,
+                        status="reviewed_retry",
+                        reason="retry",
+                        raw_metadata=raw.raw_metadata,
+                    )
                     retry_count += 1
             else:  # discarded
+                source_id, source, source_detail = _source_identity(raw)
+                await record_collection_item(
+                    _db,
+                    run_id=run_id,
+                    url=raw.url,
+                    title=raw.title,
+                    source=source,
+                    source_id=source_id,
+                    source_detail=source_detail,
+                    status="reviewed_discarded",
+                    reason="discarded",
+                    raw_metadata=raw.raw_metadata,
+                )
                 discarded_count += 1
 
         for record in all_costs:
             if not record.source and record.ref_url in cost_source_map:
                 record.source, record.source_detail, record.source_id = cost_source_map[record.ref_url]
             await save_cost_log(_db, run_id, record)
+
+        await _record_source_summaries(
+            _db,
+            run_id=run_id,
+            raw_items=raw_items,
+            new_items=new_items,
+            analyzed_items=all_analyzed,
+            reviewed_items=all_reviewed,
+            cost_records=all_costs,
+            inserted_urls=inserted_urls,
+            error_log=error_log,
+        )
 
         summary = json.dumps({
             "collected": {"total": len(raw_items), "new": len(new_items)},

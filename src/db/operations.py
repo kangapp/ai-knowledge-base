@@ -102,14 +102,104 @@ async def end_pipeline_run(db: Database, run_id: str, status: str, summary: str)
 async def save_cost_log(db: Database, run_id: str, record: CostRecord):
     await db.execute("""
         INSERT INTO cost_logs
-        (run_id, agent, provider, model, tokens_in, tokens_out, cost, ref_url, source, source_detail, source_id, created_at)
-        VALUES (?,?,?,?,?,?,?,?,?,?,?,?)
+        (run_id, agent, provider, model, tokens_in, tokens_out, cost, ref_url,
+         source, source_detail, source_id, status, error, latency_ms, attempt_no,
+         prompt_name, prompt_version, created_at)
+        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
     """, (
         run_id, record.agent, record.provider, record.model,
         record.tokens_in, record.tokens_out, record.cost, record.ref_url,
-        record.source, record.source_detail, record.source_id, now_bj_iso(),
+        record.source, record.source_detail, record.source_id,
+        record.status, record.error, record.latency_ms, record.attempt_no,
+        record.prompt_name, record.prompt_version, now_bj_iso(),
     ))
     await db.commit()
+
+
+async def record_collection_item(
+    db: Database,
+    *,
+    run_id: str,
+    url: str,
+    title: str,
+    source: str,
+    source_id: str,
+    source_detail: str = "",
+    status: str,
+    reason: str = "",
+    raw_metadata: dict | None = None,
+    article_id: int | None = None,
+):
+    metadata_json = json.dumps(raw_metadata or {}, ensure_ascii=False)
+    await db.execute("""
+        INSERT INTO collection_items
+        (run_id, url, title, source, source_id, source_detail, status, reason, raw_metadata, article_id)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(run_id, url) DO UPDATE SET
+            title=excluded.title,
+            source=excluded.source,
+            source_id=excluded.source_id,
+            source_detail=excluded.source_detail,
+            status=excluded.status,
+            reason=excluded.reason,
+            raw_metadata=excluded.raw_metadata,
+            article_id=COALESCE(excluded.article_id, collection_items.article_id),
+            updated_at=datetime('now', '+8 hours')
+    """, (
+        run_id,
+        url,
+        title,
+        source,
+        source_id,
+        source_detail,
+        status,
+        reason,
+        metadata_json,
+        article_id,
+    ))
+    await db.commit()
+
+
+async def upsert_pipeline_source_run(db: Database, stats: dict):
+    await db.execute("""
+        INSERT INTO pipeline_source_runs
+        (run_id, source_id, source, source_detail, collected, new_items, dedup_skipped,
+         analyzed, analysis_failed, approved, retry, discarded, inserted, failed, cost, tokens)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(run_id, source_id) DO UPDATE SET
+            source=excluded.source,
+            source_detail=excluded.source_detail,
+            collected=excluded.collected,
+            new_items=excluded.new_items,
+            dedup_skipped=excluded.dedup_skipped,
+            analyzed=excluded.analyzed,
+            analysis_failed=excluded.analysis_failed,
+            approved=excluded.approved,
+            retry=excluded.retry,
+            discarded=excluded.discarded,
+            inserted=excluded.inserted,
+            failed=excluded.failed,
+            cost=excluded.cost,
+            tokens=excluded.tokens,
+            updated_at=datetime('now', '+8 hours')
+    """, (
+        stats["run_id"],
+        stats["source_id"],
+        stats["source"],
+        stats.get("source_detail", ""),
+        stats.get("collected", 0),
+        stats.get("new_items", 0),
+        stats.get("dedup_skipped", 0),
+        stats.get("analyzed", 0),
+        stats.get("analysis_failed", 0),
+        stats.get("approved", 0),
+        stats.get("retry", 0),
+        stats.get("discarded", 0),
+        stats.get("inserted", 0),
+        stats.get("failed", 0),
+        stats.get("cost", 0.0),
+        stats.get("tokens", 0),
+    ))
 
 
 async def batch_check_existing_urls(db: Database, urls: list[str]) -> set[str]:

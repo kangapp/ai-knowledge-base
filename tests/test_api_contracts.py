@@ -176,6 +176,20 @@ async def test_source_stats_period_uses_calendar_window(api_client, api_db, monk
             """,
             row,
         )
+    await api_db.execute(
+        """
+        INSERT INTO pipeline_runs (id, started_at, status, trigger)
+        VALUES ('run_source_1', '2026-05-31T09:00:00', 'completed', 'test')
+        """
+    )
+    await api_db.execute(
+        """
+        INSERT INTO pipeline_source_runs
+        (run_id, source_id, source, source_detail, collected, new_items, dedup_skipped,
+         analyzed, analysis_failed, approved, retry, discarded, inserted, failed, cost, tokens)
+        VALUES ('run_source_1', 'rss_test', 'rss', 'RSS Test', 10, 6, 4, 5, 1, 4, 0, 1, 4, 0, 0.12, 3200)
+        """
+    )
     await api_db.commit()
     monkeypatch.setattr(
         "src.api.sources.SourceManager.load",
@@ -202,6 +216,14 @@ async def test_source_stats_period_uses_calendar_window(api_client, api_db, monk
     assert day["total_collected"] == 10
     assert day["approved_rate"] == 0.4
     assert day["avg_score"] == 80.0
+    assert day["new_items"] == 6
+    assert day["dedup_skipped"] == 4
+    assert day["analyzed"] == 5
+    assert day["analysis_failed"] == 1
+    assert day["discarded"] == 1
+    assert day["inserted"] == 4
+    assert day["cost"] == 0.12
+    assert day["tokens"] == 3200
     assert week["total_collected"] == 18
     assert week["approved_rate"] == 0.667
     assert week["avg_score"] == 85.0
