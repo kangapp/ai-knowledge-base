@@ -3,7 +3,7 @@
 ## LangGraph DAG 流程
 
 ```
-APScheduler cron 触发 (skip_if_running 防重叠)
+APScheduler cron 分组触发 (同 cron 源合并为一个 pipeline run，skip_if_running 防重叠)
        │
        ▼
   Collector ─── 按源并行采集 (httpx + asyncio.gather, 含飞书 token 惰性刷新)

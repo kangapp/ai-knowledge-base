@@ -3,6 +3,7 @@ import os, json, logging, sys, uuid
 from pathlib import Path
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
+from functools import partial
 
 from fastapi import FastAPI, HTTPException
 from fastapi.exceptions import RequestValidationError
@@ -75,12 +76,72 @@ _graph = None  # LangGraph 编译图
 _running = False
 
 
-async def run_pipeline(trigger: str = "cron", source_filter: str | None = None):
-    """source_filter 为 None 时采集所有源，否则只采集指定 source.id"""
+def _filter_sources(sources, source_filter: str | list[str] | tuple[str, ...] | set[str] | None):
+    if source_filter is None:
+        return sources
+    if isinstance(source_filter, str):
+        source_ids = {source_filter}
+    else:
+        source_ids = set(source_filter)
+    return [source for source in sources if source.id in source_ids]
+
+
+def _group_enabled_sources_by_cron(sources) -> dict[str, list[str]]:
+    groups: dict[str, list[str]] = {}
+    for source in sources:
+        if not source.enabled:
+            continue
+        groups.setdefault(source.cron, []).append(source.id)
+    return groups
+
+
+def _source_filter_label(source_filter) -> str:
+    if source_filter is None:
+        return "all"
+    if isinstance(source_filter, str):
+        return source_filter
+    return ",".join(source_filter)
+
+
+def _source_filter_count(source_filter) -> int | None:
+    if source_filter is None:
+        return None
+    if isinstance(source_filter, str):
+        return 1
+    return len(source_filter)
+
+
+def _register_source_jobs(scheduler: AsyncIOScheduler, sources, run_pipeline_cb):
+    for index, (cron, source_ids) in enumerate(_group_enabled_sources_by_cron(sources).items(), start=1):
+        parts = cron.strip().split()
+        scheduler.add_job(
+            partial(run_pipeline_cb, source_filter=source_ids),
+            "cron",
+            minute=parts[0],
+            hour=parts[1],
+            day=parts[2],
+            month=parts[3],
+            day_of_week=parts[4],
+            id=f"collect-group-{index}",
+        )
+        logger.info("scheduler.registered", extra={
+            "job": f"collect-group-{index}",
+            "cron": cron,
+            "source_count": len(source_ids),
+            "source_filter": ",".join(source_ids),
+        })
+
+
+async def run_pipeline(trigger: str = "cron", source_filter: str | list[str] | tuple[str, ...] | set[str] | None = None):
+    """source_filter 为 None 时采集所有源；否则采集指定 source.id 或一组 source.id。"""
     global _registry, _db, _builder, _running, _graph
 
     if _running:
-        logger.warning("pipeline.skip", extra={"reason": "previous run still in progress"})
+        logger.warning("pipeline.skip", extra={
+            "reason": "previous run still in progress",
+            "source_filter": _source_filter_label(source_filter),
+            "source_count": _source_filter_count(source_filter),
+        })
         return
     _running = True
 
@@ -95,8 +156,14 @@ async def run_pipeline(trigger: str = "cron", source_filter: str | None = None):
 
         sources_cfg = load_sources_config(CONFIG_DIR / "sources.yaml")
         active_sources = [s for s in sources_cfg.sources if s.enabled]
-        if source_filter:
-            active_sources = [s for s in active_sources if s.id == source_filter]
+        active_sources = _filter_sources(active_sources, source_filter)
+        logger.info("pipeline.start", extra={
+            "run_id": run_id,
+            "trigger": trigger,
+            "source_filter": _source_filter_label(source_filter),
+            "source_count": len(active_sources),
+            "sources": [source.id for source in active_sources],
+        })
 
         # ====== 图外：Collector + DB 查重（需要 DB 连接） ======
         raw_items, error_log = await collect_all(_db, active_sources)
@@ -285,18 +352,7 @@ async def lifespan(app: FastAPI):
     # APScheduler
     sources_cfg = load_sources_config(CONFIG_DIR / "sources.yaml")
     _scheduler = AsyncIOScheduler()
-    for source in sources_cfg.sources:
-        if not source.enabled:
-            continue
-        parts = source.cron.strip().split()
-        # 用 functools.partial 绑定 source_filter，每个 cron job 只采集自己的源
-        from functools import partial
-        _scheduler.add_job(
-            partial(run_pipeline, source_filter=source.id),
-            "cron",
-            minute=parts[0], hour=parts[1], day=parts[2], month=parts[3], day_of_week=parts[4],
-            id=f"collect-{source.id}",
-        )
+    _register_source_jobs(_scheduler, sources_cfg.sources, run_pipeline)
     _scheduler.start()
     setup_source_scheduler(_scheduler)
 

@@ -16,8 +16,9 @@ async def run_weekly_source_maintenance():
     1. 淘汰低质量数据源
     2. 发现新数据源并添加
     """
-    db = Database("data/knowledge.db")
+    db = Database("data/kb.db")
     try:
+        await db.initialize()
         # 1. 健康检查 + 淘汰
         tracker = SourceHealthTracker(db)
         sources = SourceManager.load()

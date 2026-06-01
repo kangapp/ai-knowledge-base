@@ -1,6 +1,6 @@
 # 当前任务拆解
 
-更新时间：2026-05-31
+更新时间：2026-06-01
 
 ## P0 已完成
 
@@ -55,6 +55,11 @@
   - Collector 累加 `total_collected/failed`
   - Reviewer 累加 `approved/rejected`，`avg_score` 按 approved 数加权合并
   - 新增 007 迁移合并历史 `36氪`、`cs.AI/cs.CL/cs.LG` 健康记录
+- [x] 修正多源定时采集竞争
+  - 启动时按 cron 表达式分组注册采集任务，同一时间只启动一个 pipeline run
+  - `run_pipeline(source_filter=...)` 支持多个 source id，组内由 Collector 并行采集
+  - `pipeline.start/pipeline.skip` 日志补充 source filter 和 source 数量，便于排查
+  - 修复每周数据源维护任务使用旧 DB 路径且未初始化连接的问题
 - [x] 统一 period 日期窗口口径
   - `/api/sources/stats` 使用真实日期窗口，不再取最近 N 条健康记录
   - `/api/stats/consumption-detail` 使用 day=今天、week=近 7 个自然日、month=近 30 个自然日
@@ -77,6 +82,6 @@
 
 - 已通过：`.venv/bin/python -m pytest tests/test_api_contracts.py -q`
 - 已通过：`.venv/bin/python -m pytest tests/test_stats_consumption_detail.py -q`
-- 已通过：`.venv/bin/python -m pytest -m "not integration and not e2e"`（73 passed）
+- 已通过：`.venv/bin/python -m pytest -m "not integration and not e2e"`（77 passed）
 
 说明：当前 shell 中 `uv` 不可用，使用项目 `.venv/bin/python` 执行测试。

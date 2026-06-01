@@ -1,11 +1,13 @@
 # 代码地图
 
-更新时间：2026-05-31
+更新时间：2026-06-01
 
 ## API 入口
 
 - `src/main.py`
   - FastAPI app 创建、lifespan 初始化、路由注册、异常 handler 注册。
+  - APScheduler 采集任务按 cron 分组注册，同一时间的一组源在单个 pipeline run 中串行入口、组内并行采集，避免多个源互抢 `_running` 锁。
+  - `run_pipeline(source_filter=...)` 支持 `None`、单个 source id、多个 source id。
   - 新增 API 路由后需要在 `create_app()` 中 `include_router()`。
 
 - `src/api/responses.py`
@@ -60,6 +62,10 @@
 
 - `src/graph/pipeline.py`
   - LangGraph DAG 编排和 phase log 记录。
+
+- `src/scheduler/source_scheduler.py`
+  - 每周数据源健康维护：低质量源淘汰、候选源发现。
+  - 使用 `data/kb.db` 并显式初始化数据库连接。
 
 - `src/graph/router.py`
   - 按 `RawItem.source` 做规则路由。

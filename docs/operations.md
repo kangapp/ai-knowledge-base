@@ -68,7 +68,7 @@ GitHub Actions (push main):
 - **LLM Provider 全挂**：`TrackedClient` 遍历 fallback[] 链，全失败则当天文章以 `pending_review` 状态入库
 - **单源 API 故障**：try/except 隔离，返回空列表 + 记录 error_log，其余源继续
 - **SQLite 损坏**：`cp data/backup/knowledge-YYYYMMDD.db data/knowledge.db` + restart pipeline
-- **调度重叠**：`skip_if_running` — 上一轮未完成时跳过本轮，下轮 cron 兜底
+- **调度重叠**：采集任务按 cron 分组注册，同一时间的一组源只启动一个 pipeline run；若上一轮仍未完成，`skip_if_running` 会跳过整组并在日志记录 `source_filter/source_count`
 
 ## 日志与排查
 
