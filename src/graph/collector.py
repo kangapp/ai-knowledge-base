@@ -105,7 +105,11 @@ async def collect_rss(source: SourceConfig) -> list[RawItem]:
     keywords = cfg.get("filter_keywords", [])
     filter_scope = cfg.get("filter_scope", "title_summary")
 
-    feed = feedparser.parse(cfg["url"])
+    async with httpx.AsyncClient(timeout=30, follow_redirects=True) as client:
+        resp = await client.get(cfg["url"])
+        resp.raise_for_status()
+
+    feed = feedparser.parse(resp.text)
     for entry in feed.entries[:source.max_items]:
         title = entry.get("title", "")
         summary = entry.get("summary", "")

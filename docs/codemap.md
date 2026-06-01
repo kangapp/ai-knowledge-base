@@ -60,7 +60,7 @@
 - `src/graph/collector.py`
   - 多源采集和 DB 查重。
   - GitHub 采集使用 `topics` 生成 `topic:` qualifier，叠加 `keywords` 和 `exclude_terms` 构造 Search API 查询。
-  - RSS 采集使用 `_matches_rss_keywords()` 做关键词匹配；英文关键词按词边界匹配，综合媒体可用 `filter_scope: title` 避免长正文噪音。
+  - RSS 采集先用 `httpx.AsyncClient(timeout=30)` 拉取 feed 文本，再交给 `feedparser` 解析；关键词过滤使用 `_matches_rss_keywords()`，英文关键词按词边界匹配，综合媒体可用 `filter_scope: title` 避免长正文噪音。
   - `RawItem.raw_metadata.source_id` 保存配置 id，供 source health、成本归因等后续阶段使用。
 
 - `src/main.py`

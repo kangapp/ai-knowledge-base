@@ -68,7 +68,12 @@ async def test_collect_rss_records_config_source_id():
         "published": "2026-05-31T10:00:00Z",
     }
 
-    with patch("feedparser.parse", return_value=type("Feed", (), {"entries": [entry]})()):
+    mock_resp = AsyncMock()
+    mock_resp.text = "<rss></rss>"
+    mock_resp.raise_for_status = lambda: None
+
+    with patch("httpx.AsyncClient.get", return_value=mock_resp), \
+         patch("feedparser.parse", return_value=type("Feed", (), {"entries": [entry]})()):
         items = await collect_rss(source)
 
     assert len(items) == 1
@@ -89,7 +94,12 @@ async def test_collect_rss_filters_ascii_acronym_by_word_boundary():
         {"title": "AI startup raises $24M", "summary": "", "link": "https://example.com/2"},
     ]
 
-    with patch("feedparser.parse", return_value=type("Feed", (), {"entries": entries})()):
+    mock_resp = AsyncMock()
+    mock_resp.text = "<rss></rss>"
+    mock_resp.raise_for_status = lambda: None
+
+    with patch("httpx.AsyncClient.get", return_value=mock_resp), \
+         patch("feedparser.parse", return_value=type("Feed", (), {"entries": entries})()):
         items = await collect_rss(source)
 
     assert [item.url for item in items] == ["https://example.com/2"]
@@ -120,10 +130,35 @@ async def test_collect_rss_title_scope_ignores_summary_noise():
         },
     ]
 
-    with patch("feedparser.parse", return_value=type("Feed", (), {"entries": entries})()):
+    mock_resp = AsyncMock()
+    mock_resp.text = "<rss></rss>"
+    mock_resp.raise_for_status = lambda: None
+
+    with patch("httpx.AsyncClient.get", return_value=mock_resp), \
+         patch("feedparser.parse", return_value=type("Feed", (), {"entries": entries})()):
         items = await collect_rss(source)
 
     assert [item.url for item in items] == ["https://example.com/2"]
+
+
+@pytest.mark.asyncio
+async def test_collect_rss_fetches_feed_with_http_client_before_parsing():
+    source = make_source(
+        id="rss_test",
+        name="RSS Test",
+        type="rss",
+        config={"url": "https://example.com/feed", "filter_keywords": []},
+    )
+    mock_resp = AsyncMock()
+    mock_resp.text = "<rss><channel /></rss>"
+    mock_resp.raise_for_status = lambda: None
+
+    with patch("httpx.AsyncClient.get", return_value=mock_resp) as mock_get, \
+         patch("feedparser.parse", return_value=type("Feed", (), {"entries": []})()) as mock_parse:
+        await collect_rss(source)
+
+    mock_get.assert_called_once_with("https://example.com/feed")
+    mock_parse.assert_called_once_with("<rss><channel /></rss>")
 
 
 @pytest.mark.asyncio
