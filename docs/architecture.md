@@ -88,6 +88,7 @@ APScheduler cron 分组触发 (同 cron 源合并为一个 pipeline run，skip_i
 - **采集阶段去重**：Collector 后立即 DB 批量查重，已存在 url 不进入 LLM 分析
 - **GitHub 采集口径**：Search API 查询由 `topic:` qualifier、显式 `keywords` 和 `exclude_terms` 组成；增速源基于 `github_repo_snapshots` 的最新快照与窗口前最近基线快照计算 star/day。
 - **RSS 采集口径**：英文关键词按词边界匹配，综合媒体源可用 `filter_scope: title` 只看标题强信号，避免长正文偶然提及 AI 造成误采集。
+- **Reviewer 裁决口径**：LLM 只给四维分和原因；代码统一维度 key、重算 `total_score`，并按阈值裁决 verdict，避免模型自由放行弱相关内容。
 - **Promp Schema 强制**：`response_format={"type": "json_object"}` + json.loads markdown 容错 + Pydantic 校验 + 两次重试
 - **标签自动生长**：Analyzer 自由建议标签，新标签自动插入 `tags` 表收录（不做强制从池选）
 - **原子站点切换**：渲染到 `output.tmp/` → rename 双目录切换，Linux rename 原子操作

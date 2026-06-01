@@ -46,6 +46,49 @@ def test_parse_reviewer_output_markdown_wrapped():
     result = parse_reviewer_output(raw)
     assert result.verdict == "discarded"
 
+
+def test_parse_reviewer_output_normalizes_dimension_alias_and_score():
+    raw = json.dumps({
+        "total_score": 99,
+        "dimensions": {
+            "ai_relevance": {"score": 34, "reason": "AI 基础设施"},
+            "content_depth": {"score": 20, "reason": "有细节"},
+            "information_density": {"score": 10, "reason": "有信息量"},
+            "timeliness": {"score": 9, "reason": "本月"},
+        },
+        "verdict": "approved",
+        "retry_feedback": None,
+    })
+
+    result = parse_reviewer_output(raw)
+
+    assert result.total_score == 73
+    assert set(result.dimensions) == {"ai_relevance", "content_depth", "info_density", "timeliness"}
+    assert result.dimensions["info_density"]["score"] == 10
+    assert result.verdict == "retry"
+    assert result.retry_feedback is not None
+
+
+def test_parse_reviewer_output_discards_low_ai_relevance_even_when_model_approves():
+    raw = json.dumps({
+        "total_score": 85,
+        "dimensions": {
+            "ai_relevance": {"score": 15, "reason": "只泛泛提到 AI"},
+            "content_depth": {"score": 25, "reason": "有行业细节"},
+            "info_density": {"score": 14, "reason": "信息密集"},
+            "timeliness": {"score": 15, "reason": "本周"},
+        },
+        "verdict": "approved",
+        "retry_feedback": None,
+    })
+
+    result = parse_reviewer_output(raw)
+
+    assert result.total_score == 69
+    assert result.verdict == "discarded"
+    assert result.retry_feedback is None
+
+
 @pytest.mark.asyncio
 async def test_reviewer_node_mocked():
     """Mock LLM 调用，验证 Reviewer 节点正确分类"""

@@ -69,6 +69,11 @@
   - 英文关键词按词边界匹配，避免 `AI` 命中 `raises`、`chair` 等普通单词片段
   - 综合媒体 RSS 使用 `filter_scope: title`，避免长正文/推荐内容里偶然出现 AI 词导致误采集
   - 移除 `技术/科技/智能/Python/前端/technology` 等泛词，补充 `豆包/Kimi/通义/智谱/AI4S` 等强信号词
+- [x] 稳定 Reviewer 四维评分裁决
+  - Reviewer 输出解析阶段统一维度 key，兼容历史 `information_density` 并写回 `info_density`
+  - `total_score` 由代码按四维分重算，不再信任模型输出总分
+  - `approved/retry/discarded` 由代码按阈值裁决，低 AI 相关度内容强制丢弃
+  - 质量统计兼容历史 `information_density`，避免信息密度均值被算成 0
 - [x] 统一 period 日期窗口口径
   - `/api/sources/stats` 使用真实日期窗口，不再取最近 N 条健康记录
   - `/api/stats/consumption-detail` 使用 day=今天、week=近 7 个自然日、month=近 30 个自然日
@@ -92,6 +97,7 @@
 - 已通过：`.venv/bin/python -m pytest tests/test_api_contracts.py -q`
 - 已通过：`.venv/bin/python -m pytest tests/test_stats_consumption_detail.py -q`
 - 已通过：`.venv/bin/python -m pytest tests/test_collector.py tests/test_database.py tests/test_pipeline_github.py -q`
-- 已通过：`.venv/bin/python -m pytest -m "not integration and not e2e"`（83 passed）
+- 已通过：`.venv/bin/python -m pytest tests/test_reviewer.py tests/test_stats_quality_detail.py tests/test_prompt_regression.py -q`
+- 已通过：`.venv/bin/python -m pytest -m "not integration and not e2e"`（86 passed）
 
 说明：当前 shell 中 `uv` 不可用，使用项目 `.venv/bin/python` 执行测试。

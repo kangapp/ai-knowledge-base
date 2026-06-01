@@ -705,12 +705,20 @@ async def get_quality_detail_stats(db: Database, period: str = "week") -> dict:
     for name, json_key, max_score in dimensions:
         high_threshold = max_score * 0.8
         mid_threshold = max_score * 0.5
+        score_expr = f"JSON_EXTRACT(extra_data, '$.dimensions.{json_key}.score')"
+        if name == "info_density":
+            score_expr = (
+                "COALESCE("
+                "JSON_EXTRACT(extra_data, '$.dimensions.info_density.score'), "
+                "JSON_EXTRACT(extra_data, '$.dimensions.information_density.score')"
+                ")"
+            )
         stats = await db.fetch_one(f"""
             SELECT
-                AVG(JSON_EXTRACT(extra_data, '$.dimensions.{json_key}.score')) as avg_score,
-                COUNT(CASE WHEN JSON_EXTRACT(extra_data, '$.dimensions.{json_key}.score') >= ? THEN 1 END) * 1.0 / NULLIF(COUNT(JSON_EXTRACT(extra_data, '$.dimensions.{json_key}.score')), 0) as high_rate,
-                COUNT(CASE WHEN JSON_EXTRACT(extra_data, '$.dimensions.{json_key}.score') >= ? AND JSON_EXTRACT(extra_data, '$.dimensions.{json_key}.score') < ? THEN 1 END) * 1.0 / NULLIF(COUNT(JSON_EXTRACT(extra_data, '$.dimensions.{json_key}.score')), 0) as mid_rate,
-                COUNT(CASE WHEN JSON_EXTRACT(extra_data, '$.dimensions.{json_key}.score') < ? THEN 1 END) * 1.0 / NULLIF(COUNT(JSON_EXTRACT(extra_data, '$.dimensions.{json_key}.score')), 0) as low_rate
+                AVG({score_expr}) as avg_score,
+                COUNT(CASE WHEN {score_expr} >= ? THEN 1 END) * 1.0 / NULLIF(COUNT({score_expr}), 0) as high_rate,
+                COUNT(CASE WHEN {score_expr} >= ? AND {score_expr} < ? THEN 1 END) * 1.0 / NULLIF(COUNT({score_expr}), 0) as mid_rate,
+                COUNT(CASE WHEN {score_expr} < ? THEN 1 END) * 1.0 / NULLIF(COUNT({score_expr}), 0) as low_rate
             FROM articles
             WHERE status='approved' AND extra_data IS NOT NULL AND collected_at >= date('now', ?)
         """, (high_threshold, mid_threshold, high_threshold, mid_threshold, cutoff))

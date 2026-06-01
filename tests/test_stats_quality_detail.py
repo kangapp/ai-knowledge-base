@@ -110,3 +110,35 @@ async def test_quality_detail_supports_dashboard_contract(tmp_path):
         assert data["dimensions"]["ai_relevance"]["low_rate"] == 0.0
     finally:
         await db.close()
+
+
+@pytest.mark.asyncio
+async def test_quality_detail_accepts_legacy_information_density_key(tmp_path):
+    db = Database(tmp_path / "test.db", migrations_dir=_MIGRATIONS_DIR)
+    try:
+        await db.initialize()
+
+        await _insert_article(
+            db,
+            title="legacy",
+            url="https://example.com/legacy",
+            source="github",
+            source_detail="org/repo",
+            score=80,
+            retry_count=0,
+            dimensions={
+                "ai_relevance": {"score": 35, "reason": "核心 AI"},
+                "content_depth": {"score": 20, "reason": "有细节"},
+                "information_density": {"score": 11, "reason": "历史 key"},
+                "timeliness": {"score": 14, "reason": "本周"},
+            },
+        )
+        await db.commit()
+
+        data = await get_quality_detail_stats(db, "week")
+
+        assert data["dimensions"]["info_density"]["avg_score"] == 11.0
+        assert data["dimensions"]["info_density"]["high_rate"] == 0.0
+        assert data["dimensions"]["info_density"]["mid_rate"] == 1.0
+    finally:
+        await db.close()

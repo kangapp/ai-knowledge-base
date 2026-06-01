@@ -156,6 +156,13 @@ FTS5 全文索引：`articles_fts` over (title, summary, description)
 - Reviewer 成本在图外入库阶段按 `ref_url` 从本轮 `RawItem` 映射补齐来源字段。
 - 历史记录缺少来源字段时，统计接口按 `articles` JOIN 和 URL 域名兜底归因。
 
+**审核评分口径：**
+
+- 新写入的 `extra_data.dimensions` 统一使用 `ai_relevance/content_depth/info_density/timeliness` 四个 key。
+- Reviewer 模型输出会在代码层规范化，`information_density` 历史别名会映射到 `info_density`，`currency` 历史别名会映射到 `timeliness`。
+- `relevance_score` 不信任模型输出的 `total_score`，由四维分相加得到。
+- `status` 不信任模型输出的 `verdict`，由代码按阈值裁决：低 AI 相关度直接丢弃，高总分且高 AI 相关度才通过。
+
 ### source_health — 数据源健康统计
 
 | 列 | 类型 | 说明 |

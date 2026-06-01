@@ -81,6 +81,7 @@
 
 - `src/graph/reviewer.py`
   - 四维评分审核。
+  - LLM 输出只作为四维打分草稿；解析阶段会统一维度 key、重算 `total_score`，并由代码按阈值裁决 `approved/retry/discarded`。
   - Reviewer 成本记录先保留 `ref_url`，图外入库前由 `src/main.py` 按本轮 `RawItem` 补齐来源字段。
   - Reviewer 节点结束后由 `src/graph/pipeline.py` 按配置 id 汇总 source health。
 
