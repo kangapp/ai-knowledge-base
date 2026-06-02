@@ -48,6 +48,23 @@ def test_parse_reviewer_output_markdown_wrapped():
     assert result.verdict == "discarded"
 
 
+def test_parse_reviewer_output_extracts_first_json_object_with_trailing_text():
+    raw = (
+        "<think>需要先评分</think>\n"
+        '{"total_score": 86, "dimensions": {"ai_relevance": {"score": 36, "reason": "核心"}, '
+        '"content_depth": {"score": 25, "reason": "深入"}, '
+        '"info_density": {"score": 12, "reason": "密集"}, '
+        '"timeliness": {"score": 13, "reason": "本周"}}, '
+        '"verdict": "approved", "retry_feedback": null}\n'
+        "```"
+    )
+
+    result = parse_reviewer_output(raw)
+
+    assert result.total_score == 86
+    assert result.verdict == "approved"
+
+
 def test_parse_reviewer_output_normalizes_dimension_alias_and_score():
     raw = json.dumps({
         "total_score": 99,

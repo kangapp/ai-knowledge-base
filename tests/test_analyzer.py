@@ -26,6 +26,21 @@ def test_invalid_output_raises():
         parse_and_validate('not json at all') 
 
 
+def test_parse_and_validate_extracts_first_json_object_with_trailing_text():
+    from src.graph.analyzers.base import parse_and_validate
+
+    raw = (
+        "<think>先分析一下</think>\n"
+        '{"title": "T", "summary": "S", "tags": ["AI"], "language": "zh"}\n'
+        "后续解释不要解析"
+    )
+
+    result = parse_and_validate(raw, ref_url="https://example.com/t")
+
+    assert result.title == "T"
+    assert result.tags == ["AI"]
+
+
 def test_parse_and_validate_propagates_source_context():
     from src.graph.analyzers.base import parse_and_validate
 

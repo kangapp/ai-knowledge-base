@@ -99,6 +99,66 @@ async def end_pipeline_run(db: Database, run_id: str, status: str, summary: str)
     await db.commit()
 
 
+async def record_pipeline_event(
+    db: Database,
+    *,
+    run_id: str,
+    phase: str,
+    event: str,
+    level: str = "info",
+    status: str = "",
+    source_id: str = "",
+    source: str = "",
+    source_detail: str = "",
+    ref_url: str = "",
+    title: str = "",
+    agent: str = "",
+    provider: str = "",
+    model: str = "",
+    attempt_no: int | None = None,
+    latency_ms: int | None = None,
+    cost: float | None = None,
+    tokens: int | None = None,
+    message: str = "",
+    payload: dict | None = None,
+) -> int:
+    payload_json = json.dumps(payload or {}, ensure_ascii=False, separators=(",", ":"))
+    await db.execute(
+        """
+        INSERT INTO pipeline_events
+        (run_id, ts, phase, event, level, status, source_id, source, source_detail,
+         ref_url, title, agent, provider, model, attempt_no, latency_ms, cost, tokens,
+         message, payload)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        (
+            run_id,
+            now_bj_iso(),
+            phase,
+            event,
+            level,
+            status,
+            source_id,
+            source,
+            source_detail,
+            ref_url,
+            title,
+            agent,
+            provider,
+            model,
+            attempt_no,
+            latency_ms,
+            cost,
+            tokens,
+            message,
+            payload_json,
+        ),
+    )
+    await db.commit()
+    row = await db.fetch_one("SELECT last_insert_rowid() as id")
+    return row["id"] if row else 0
+
+
 async def save_cost_log(db: Database, run_id: str, record: CostRecord):
     await db.execute("""
         INSERT INTO cost_logs

@@ -15,7 +15,7 @@ from .core.time import now_bj_iso, run_id_bj
 from .graph.pipeline import build_pipeline, record_phase_start, record_phase_end, set_pipeline_db, reset_analyzer_counter
 from .graph.state import PipelineState, ReviewedItem
 from .graph.collector import collect_all
-from .graph.router import router_node  # retry 循环中手动路由 retry items
+from .graph.reviewer import reviewer_node
 from .api.routes import router, set_db, set_run_pipeline, set_builder
 from .api.config import router as config_router
 from .api.stats import router as stats_router
@@ -27,6 +27,7 @@ from .db.operations import (
     save_cost_log, batch_check_existing_urls, backup_database,
     batch_save_github_snapshots, get_trending_repo_urls,
     record_collection_item, upsert_pipeline_source_run,
+    record_pipeline_event,
 )
 from .site.builder import SiteBuilder, DebouncedBuilder
 
@@ -200,6 +201,9 @@ def _build_pipeline_source_summaries(
                 "failed": 0,
                 "cost": 0.0,
                 "tokens": 0,
+                "filtered_items": 0,
+                "request_success_rate": 0,
+                "insert_rate": 0,
             }
         return summaries[source_id]
 
@@ -262,7 +266,30 @@ def _build_pipeline_source_summaries(
         summary = ensure(source_id, source_id, "")
         summary["failed"] += count
 
+    for summary in summaries.values():
+        summary["filtered_items"] = summary["retry"] + summary["discarded"]
+        attempts = summary["collected"] + summary["failed"]
+        summary["request_success_rate"] = round(summary["collected"] / attempts, 3) if attempts else 0
+        summary["insert_rate"] = round(summary["inserted"] / summary["new_items"], 3) if summary["new_items"] else 0
+
     return list(summaries.values())
+
+
+def _prepare_retry_review_items(
+    retry_reviewed: list[ReviewedItem],
+    analyzed_items: list,
+    raw_items: list,
+) -> list:
+    retry_items = []
+    raw_urls = {item.url for item in raw_items}
+    for reviewed in retry_reviewed:
+        if reviewed.ref_url not in raw_urls:
+            continue
+        matched = next((item for item in analyzed_items if item.ref_url == reviewed.ref_url), None)
+        if matched and matched.retry_count < 2:
+            matched.retry_count += 1
+            retry_items.append(matched)
+    return retry_items
 
 
 async def _record_collected_items(db, run_id: str, items: list, status: str, reason: str):
@@ -327,6 +354,8 @@ async def run_pipeline(trigger: str = "cron", source_filter: str | list[str] | t
         return
     _running = True
 
+    run_id: str | None = None
+
     try:
         if _registry is None or _db is None or _graph is None:
             logger.error("pipeline.not_initialized")
@@ -350,7 +379,29 @@ async def run_pipeline(trigger: str = "cron", source_filter: str | list[str] | t
         # ====== 图外：Collector + DB 查重（需要 DB 连接） ======
         raw_items, error_log = await collect_all(_db, active_sources)
         await _record_collected_items(_db, run_id, raw_items, "collected", "collector")
+        for error in error_log:
+            await record_pipeline_event(
+                _db,
+                run_id=run_id,
+                phase="collect",
+                event="collector.source_error",
+                level="error",
+                status="failed",
+                source_id=error.get("source", ""),
+                message=error.get("error", "source collect failed"),
+                payload=error,
+            )
         await record_phase_end(_db, run_id, "collect", "done", f"collected {len(raw_items)} items")
+        await record_pipeline_event(
+            _db,
+            run_id=run_id,
+            phase="collect",
+            event="collector.done",
+            level="success",
+            status="done",
+            message=f"采集完成：{len(raw_items)} 条",
+            payload={"total": len(raw_items), "errors": len(error_log)},
+        )
         logger.info("collector.done", extra={"total": len(raw_items), "errors": len(error_log)})
 
         # 记录 GitHub repo 快照
@@ -386,7 +437,33 @@ async def run_pipeline(trigger: str = "cron", source_filter: str | list[str] | t
         new_items = [item for item in raw_items if item.url not in existing]
         skipped_items = [item for item in raw_items if item.url in existing]
         await _record_collected_items(_db, run_id, skipped_items, "dedup_skipped", "url_exists")
+        for item in skipped_items:
+            source_id, source, source_detail = _source_identity(item)
+            await record_pipeline_event(
+                _db,
+                run_id=run_id,
+                phase="collect",
+                event="collector.item_dedup_skipped",
+                level="info",
+                status="skipped",
+                source_id=source_id,
+                source=source,
+                source_detail=source_detail,
+                ref_url=item.url,
+                title=item.title,
+                message="URL 已存在，跳过 LLM",
+            )
         logger.info("collector.dedup", extra={"total": len(raw_items), "new": len(new_items), "skipped": len(raw_items) - len(new_items)})
+        await record_pipeline_event(
+            _db,
+            run_id=run_id,
+            phase="collect",
+            event="collector.dedup_done",
+            level="success",
+            status="done",
+            message=f"去重完成：新 {len(new_items)}，跳过 {len(skipped_items)}",
+            payload={"new": len(new_items), "skipped": len(skipped_items)},
+        )
 
         if not new_items:
             await _record_source_summaries(
@@ -420,27 +497,64 @@ async def run_pipeline(trigger: str = "cron", source_filter: str | list[str] | t
             if not retry_reviewed:
                 break
 
-            # 找到对应的 analyzed items + raw items，递增 retry_count
-            retry_raw_items = []
-            retry_analyzed_items = []
-            for rr in retry_reviewed:
-                matched = next((a for a in all_analyzed if a.ref_url == rr.ref_url), None)
-                raw = next((r for r in new_items if r.url == rr.ref_url), None)
-                if matched and raw and matched.retry_count < 2:
-                    matched.retry_count += 1
-                    retry_raw_items.append(raw)
-                    retry_analyzed_items.append(matched)
-
-            if not retry_raw_items:
+            retry_analyzed_items = _prepare_retry_review_items(retry_reviewed, all_analyzed, new_items)
+            if not retry_analyzed_items:
                 break
 
-            logger.info("pipeline.retry", extra={"round": retry_round, "items": len(retry_raw_items)})
+            logger.info("pipeline.retry", extra={
+                "round": retry_round,
+                "items": len(retry_analyzed_items),
+                "mode": "review_only",
+            })
+            await record_pipeline_event(
+                _db,
+                run_id=run_id,
+                phase="review",
+                event="reviewer.round_start",
+                status="running",
+                message=f"开始第 {retry_round} 轮重审：{len(retry_analyzed_items)} 条",
+                payload={"round": retry_round, "items": len(retry_analyzed_items), "mode": "review_only"},
+            )
 
-            # 构建 retry state：直接跳过 Router，手动设置 routed_* 再跑图
-            retry_state = PipelineState(raw_items=retry_raw_items, run_id=run_id, trigger=trigger)
-            retry_state = retry_state.model_copy(update=await router_node(retry_state))
-            reset_analyzer_counter()
-            retry_result = await _graph.ainvoke(retry_state)
+            retry_state = PipelineState(
+                raw_items=[],
+                analyzed_items=retry_analyzed_items,
+                run_id=run_id,
+                trigger=trigger,
+            )
+            await record_phase_start(_db, run_id, "review")
+            retry_result = await reviewer_node(retry_state, _registry)
+            reviewed = retry_result.get("reviewed_items", [])
+            total_cost = sum(c.cost for c in retry_result.get("cost_records", []))
+            await record_phase_end(
+                _db,
+                run_id,
+                "review",
+                "done",
+                (
+                    f"approved:{sum(1 for r in reviewed if r.verdict == 'approved')}, "
+                    f"retry:{sum(1 for r in reviewed if r.verdict == 'retry')}, "
+                    f"discarded:{sum(1 for r in reviewed if r.verdict == 'discarded')}, "
+                    f"cost:${total_cost:.6f}, mode:review_only"
+                ),
+            )
+            await record_pipeline_event(
+                _db,
+                run_id=run_id,
+                phase="review",
+                event="reviewer.round_done",
+                level="success",
+                status="done",
+                cost=total_cost,
+                message=f"第 {retry_round} 轮重审完成",
+                payload={
+                    "round": retry_round,
+                    "approved": sum(1 for r in reviewed if r.verdict == "approved"),
+                    "retry": sum(1 for r in reviewed if r.verdict == "retry"),
+                    "discarded": sum(1 for r in reviewed if r.verdict == "discarded"),
+                    "mode": "review_only",
+                },
+            )
 
             # 合并结果（同一 ref_url 的 reviewed_item 用最新一轮的覆盖）
             existing_urls = {r.ref_url for r in all_reviewed}
@@ -501,9 +615,42 @@ async def run_pipeline(trigger: str = "cron", source_filter: str | list[str] | t
                         elif "velocity" in src_id or "trending_velocity" in src_id:
                             tags.append("趋势")
                     await save_tags(_db, article_id, tags)
+                    await record_pipeline_event(
+                        _db,
+                        run_id=run_id,
+                        phase="persist",
+                        event="pipeline.persist_inserted",
+                        level="success",
+                        status="inserted",
+                        source_id=source_id,
+                        source=source,
+                        source_detail=source_detail,
+                        ref_url=raw.url,
+                        title=analyzed.title,
+                        cost=analysis_cost,
+                        tokens=analysis_tokens,
+                        message="文章已入库",
+                        payload={"article_id": article_id, "score": reviewed.total_score},
+                    )
                 passed_count += 1
             elif reviewed.verdict == "retry":
                 if analyzed.retry_count >= 2:
+                    source_id, source, source_detail = _source_identity(raw)
+                    await record_pipeline_event(
+                        _db,
+                        run_id=run_id,
+                        phase="persist",
+                        event="pipeline.persist_discarded",
+                        level="warning",
+                        status="discarded",
+                        source_id=source_id,
+                        source=source,
+                        source_detail=source_detail,
+                        ref_url=raw.url,
+                        title=analyzed.title,
+                        message="达到最大重试次数后丢弃",
+                        payload={"score": reviewed.total_score, "retry_count": analyzed.retry_count},
+                    )
                     discarded_count += 1
                 else:
                     analysis_cost, analysis_tokens = item_costs.get(reviewed.ref_url, (0.0, 0))
@@ -521,6 +668,23 @@ async def run_pipeline(trigger: str = "cron", source_filter: str | list[str] | t
                         reason="retry",
                         raw_metadata=raw.raw_metadata,
                     )
+                    await record_pipeline_event(
+                        _db,
+                        run_id=run_id,
+                        phase="persist",
+                        event="pipeline.persist_retry",
+                        level="warning",
+                        status="retry",
+                        source_id=source_id,
+                        source=source,
+                        source_detail=source_detail,
+                        ref_url=raw.url,
+                        title=analyzed.title,
+                        cost=analysis_cost,
+                        tokens=analysis_tokens,
+                        message="文章保留为 retry",
+                        payload={"score": reviewed.total_score, "retry_count": analyzed.retry_count},
+                    )
                     retry_count += 1
             else:  # discarded
                 source_id, source, source_detail = _source_identity(raw)
@@ -535,6 +699,21 @@ async def run_pipeline(trigger: str = "cron", source_filter: str | list[str] | t
                     status="reviewed_discarded",
                     reason="discarded",
                     raw_metadata=raw.raw_metadata,
+                )
+                await record_pipeline_event(
+                    _db,
+                    run_id=run_id,
+                    phase="persist",
+                    event="pipeline.persist_discarded",
+                    level="warning",
+                    status="discarded",
+                    source_id=source_id,
+                    source=source,
+                    source_detail=source_detail,
+                    ref_url=raw.url,
+                    title=analyzed.title,
+                    message="审核未通过，丢弃",
+                    payload={"score": reviewed.total_score},
                 )
                 discarded_count += 1
 
@@ -564,6 +743,22 @@ async def run_pipeline(trigger: str = "cron", source_filter: str | list[str] | t
             "errors": error_log,
         })
         await end_pipeline_run(_db, run_id, "completed", summary)
+        await record_pipeline_event(
+            _db,
+            run_id=run_id,
+            phase="pipeline",
+            event="pipeline.done",
+            level="success",
+            status="completed",
+            cost=sum(c.cost for c in all_costs),
+            message="流水线完成",
+            payload={
+                "approved": passed_count,
+                "retry": retry_count,
+                "discarded": discarded_count,
+                "analyzed": len(all_analyzed),
+            },
+        )
         logger.info("pipeline.done", extra={
             "run_id": run_id,
             "passed": passed_count,
@@ -575,11 +770,29 @@ async def run_pipeline(trigger: str = "cron", source_filter: str | list[str] | t
         # ====== 图外：备份 + 站点构建 ======
         await backup_database(_db, str(BACKUP_DIR))
         if _builder:
+            await record_pipeline_event(
+                _db,
+                run_id=run_id,
+                phase="build",
+                event="site.build_queued",
+                status="queued",
+                message="静态站构建已排队",
+            )
             await _builder.schedule()
 
     except Exception as e:
         logger.error("pipeline.failed", extra={"error": str(e)})
-        await end_pipeline_run(_db, run_id, "failed", str(e)) if _db else None
+        if _db and run_id:
+            await record_pipeline_event(
+                _db,
+                run_id=run_id,
+                phase="pipeline",
+                event="pipeline.failed",
+                level="error",
+                status="failed",
+                message=str(e),
+            )
+            await end_pipeline_run(_db, run_id, "failed", str(e))
     finally:
         _running = False
 

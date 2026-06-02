@@ -12,6 +12,7 @@ from .analyzers.feishu import analyze_feishu
 from .analyzers.arxiv import analyze_arxiv
 from ..core.llm_client import LLMRegistry
 from ..core.time import now_bj, now_bj_iso, parse_bj_datetime
+from ..db.operations import record_pipeline_event
 
 logger = logging.getLogger("pipeline")
 
@@ -48,6 +49,14 @@ async def record_phase_start(db, run_id: str, phase: str):
         (run_id, phase, "running", started_at)
     )
     await db.commit()
+    await record_pipeline_event(
+        db,
+        run_id=run_id,
+        phase=phase,
+        event=f"{phase}.start",
+        status="running",
+        message=f"{phase} 开始",
+    )
     logger.info("phase.start", extra={"phase": phase, "run_id": run_id, "started_at": started_at})
 
 
@@ -66,6 +75,17 @@ async def record_phase_end(db, run_id: str, phase: str, status: str, details: st
         (status, ended_at, duration_ms, details, run_id, phase)
     )
     await db.commit()
+    await record_pipeline_event(
+        db,
+        run_id=run_id,
+        phase=phase,
+        event=f"{phase}.end",
+        level="success" if status == "done" else "error",
+        status=status,
+        latency_ms=duration_ms,
+        message=f"{phase} 完成" if status == "done" else f"{phase} {status}",
+        payload={"details": details} if details else {},
+    )
     logger.info("phase.end", extra={"phase": phase, "run_id": run_id, "status": status, "duration_ms": duration_ms, "details": details})
 
 
@@ -139,6 +159,50 @@ class _AnalyzerNode:
             await record_phase_start(db, state.run_id, "analyze")
 
         items, costs = await self._analyze(routed, self._registry)
+        source_map = {item.url: item for item in routed}
+        analyzed_urls = {item.ref_url for item in items}
+        for item in routed:
+            source_id = item.raw_metadata.get("source_id") or item.source_detail or item.source
+            await record_pipeline_event(
+                db,
+                run_id=state.run_id,
+                phase="analyze",
+                event="analyzer.item_done" if item.url in analyzed_urls else "analyzer.item_failed",
+                level="info" if item.url in analyzed_urls else "warning",
+                status="done" if item.url in analyzed_urls else "failed",
+                source_id=source_id,
+                source=item.source,
+                source_detail=item.source_detail,
+                ref_url=item.url,
+                title=item.title,
+                agent=self._routed_key.replace("routed_", "") + "_analyzer",
+                message="分析完成" if item.url in analyzed_urls else "分析失败",
+            )
+        for cost in costs:
+            if cost.status != "parse_failed":
+                continue
+            source_item = source_map.get(cost.ref_url)
+            await record_pipeline_event(
+                db,
+                run_id=state.run_id,
+                phase="analyze",
+                event="analyzer.parse_failed",
+                level="warning",
+                status="failed",
+                source_id=cost.source_id,
+                source=cost.source,
+                source_detail=cost.source_detail,
+                ref_url=cost.ref_url,
+                title=source_item.title if source_item else "",
+                agent=cost.agent,
+                provider=cost.provider,
+                model=cost.model,
+                attempt_no=cost.attempt_no,
+                latency_ms=cost.latency_ms,
+                cost=cost.cost,
+                tokens=cost.tokens_in + cost.tokens_out,
+                message=cost.error or "Analyzer JSON 解析失败",
+            )
         if _analyzer_count == 1:
             total_cost = sum(c.cost for c in costs) if costs else 0
             details = f"total:{len(routed)}, succeeded:{len(items)}, failed:{len(routed)-len(items)}, cost:${total_cost:.6f}"
@@ -177,6 +241,61 @@ class _ReviewerNode:
         approved = sum(1 for r in reviewed if r.verdict == "approved")
         retry = sum(1 for r in reviewed if r.verdict == "retry")
         discarded = sum(1 for r in reviewed if r.verdict == "discarded")
+        ref_source_map = {}
+        for key in ("routed_github", "routed_rss", "routed_feishu", "routed_arxiv"):
+            for item in getattr(state, key, []):
+                src_id = item.raw_metadata.get("source_id") or item.source_detail or item.source
+                ref_source_map[item.url] = (item.source, item.source_detail, src_id, item.title)
+        analyzed_map = {item.ref_url: item for item in state.analyzed_items}
+        for item in reviewed:
+            source, source_detail, src_id, title = ref_source_map.get(
+                item.ref_url,
+                (
+                    analyzed_map.get(item.ref_url).source if analyzed_map.get(item.ref_url) else "",
+                    analyzed_map.get(item.ref_url).source_detail if analyzed_map.get(item.ref_url) else "",
+                    analyzed_map.get(item.ref_url).source_id if analyzed_map.get(item.ref_url) else "",
+                    analyzed_map.get(item.ref_url).title if analyzed_map.get(item.ref_url) else "",
+                ),
+            )
+            await record_pipeline_event(
+                db,
+                run_id=state.run_id,
+                phase="review",
+                event="reviewer.item_done",
+                level="success" if item.verdict == "approved" else "warning",
+                status=item.verdict,
+                source_id=src_id,
+                source=source,
+                source_detail=source_detail,
+                ref_url=item.ref_url or "",
+                title=title,
+                agent="reviewer",
+                message=f"审核{item.verdict}",
+                payload={"score": item.total_score, "dimensions": item.dimensions},
+            )
+        for cost in result.get("cost_records", []):
+            if cost.status != "parse_failed":
+                continue
+            await record_pipeline_event(
+                db,
+                run_id=state.run_id,
+                phase="review",
+                event="reviewer.parse_failed",
+                level="warning",
+                status="failed",
+                source_id=cost.source_id,
+                source=cost.source,
+                source_detail=cost.source_detail,
+                ref_url=cost.ref_url,
+                agent="reviewer",
+                provider=cost.provider,
+                model=cost.model,
+                attempt_no=cost.attempt_no,
+                latency_ms=cost.latency_ms,
+                cost=cost.cost,
+                tokens=cost.tokens_in + cost.tokens_out,
+                message=cost.error or "Reviewer JSON 解析失败",
+            )
         details = f"approved:{approved}, retry:{retry}, discarded:{discarded}, cost:${total_cost:.6f}"
         await record_phase_end(db, state.run_id, "review", "done", details)
 

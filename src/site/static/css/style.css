@@ -86,6 +86,26 @@ main { max-width: 1200px; margin: 2rem auto; padding: 0 1rem; }
 .log-time { color: #999; min-width: 80px; }
 .log-entry.success .log-msg { color: #22c55e; }
 .log-entry.info .log-msg { color: #1a73e8; }
+.log-entry.warning .log-msg { color: #b45309; }
+.log-entry.error .log-msg { color: #ef4444; }
+.dag-progress { min-width: 220px; flex: 0 0 260px; }
+.dag-progress-meta { font-size: 0.75rem; color: #666; margin-bottom: 0.35rem; }
+.dag-progress-track { height: 8px; background: #eee; border-radius: 999px; overflow: hidden; }
+.dag-progress-fill { height: 100%; width: 0; background: #2563eb; transition: width 0.25s ease; }
+.dag-grid { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(280px, 0.7fr); gap: 1rem; margin-bottom: 1rem; }
+.dag-panel { background: #fff; border: 1px solid #e0e0e0; border-radius: 8px; padding: 1rem; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+.dag-panel h2 { font-size: 0.875rem; color: #666; margin-bottom: 0.75rem; text-transform: uppercase; }
+.source-funnels, .active-items { display: grid; gap: 0.75rem; }
+.source-funnel, .active-item { border: 1px solid #eee; border-radius: 6px; padding: 0.75rem; background: #fafafa; }
+.source-funnel-head { display: flex; justify-content: space-between; gap: 1rem; font-size: 0.875rem; margin-bottom: 0.5rem; }
+.source-funnel-head span, .muted { color: #777; font-size: 0.75rem; }
+.funnel-metrics { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.35rem; font-size: 0.75rem; color: #333; }
+.stage-detail { margin-top: 0.35rem; font-size: 0.65rem; color: #777; line-height: 1.3; word-break: break-word; }
+.empty-text { color: #999; font-size: 0.875rem; padding: 0.75rem 0; }
+.log-msg { min-width: 0; overflow-wrap: anywhere; }
+.log-msg b { margin-right: 0.5rem; color: #111; }
+.log-msg em { display: inline-block; margin-left: 0.5rem; color: #555; font-style: normal; }
+.log-msg small { display: block; color: #888; margin-top: 0.15rem; }
 
 /* ===== Enhanced Dashboard (Light Theme) ===== */
 .dashboard-page .page-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; }
@@ -180,6 +200,11 @@ main { max-width: 1200px; margin: 2rem auto; padding: 0 1rem; }
 .source-quality-table td { font-size: 0.85rem; }
 
 @media (max-width: 900px) {
+  .dag-status-bar { align-items: flex-start; flex-wrap: wrap; }
+  .dag-progress { flex: 1 1 100%; }
+  .dag-grid { grid-template-columns: 1fr; }
+  .pipeline-flow { overflow-x: auto; }
+  .pipeline-flow .stage { min-width: 110px; }
   .dashboard-hero { align-items: flex-start; flex-direction: column; gap: 1rem; }
   .dashboard-controls { align-items: stretch; width: 100%; }
   .dashboard-page .tabs { overflow-x: auto; }

@@ -222,6 +222,9 @@ async def test_source_stats_period_uses_calendar_window(api_client, api_db, monk
     assert day["analysis_failed"] == 1
     assert day["discarded"] == 1
     assert day["inserted"] == 4
+    assert day["filtered_items"] == 1
+    assert day["request_success_rate"] == 1
+    assert day["insert_rate"] == pytest.approx(0.667, abs=0.001)
     assert day["cost"] == 0.12
     assert day["tokens"] == 3200
     assert week["total_collected"] == 18
@@ -380,3 +383,58 @@ async def test_consumption_detail_api_passes_trend_window(api_client, api_db):
     assert body["data"]["period_cost"] == 0.25
     assert body["data"]["trend_window"] == "2d"
     assert sum(row["cost"] for row in body["data"]["trend"]) == 0.25
+
+
+@pytest.mark.asyncio
+async def test_pipeline_dag_returns_fine_grained_events_and_progress(api_client, api_db):
+    await api_db.execute(
+        """
+        INSERT INTO pipeline_runs (id, started_at, status, trigger)
+        VALUES ('run_dag', '2026-06-02T21:10:00', 'running', 'manual')
+        """
+    )
+    await api_db.execute(
+        """
+        INSERT INTO pipeline_phase_logs
+        (run_id, phase, status, started_at, ended_at, duration_ms, details)
+        VALUES
+        ('run_dag', 'collect', 'done', '2026-06-02T21:10:00', '2026-06-02T21:10:05', 5000, 'collected 2 items'),
+        ('run_dag', 'analyze', 'running', '2026-06-02T21:10:06', NULL, NULL, NULL)
+        """
+    )
+    await api_db.execute(
+        """
+        INSERT INTO pipeline_source_runs
+        (run_id, source_id, source, source_detail, collected, new_items, dedup_skipped,
+         analyzed, analysis_failed, approved, retry, discarded, inserted, failed, cost, tokens)
+        VALUES ('run_dag', 'github_ai_devtools', 'github', 'AI DevTools', 2, 2, 0, 1, 0, 0, 0, 0, 0, 0, 0.03, 3000)
+        """
+    )
+    await api_db.execute(
+        """
+        INSERT INTO pipeline_events
+        (run_id, ts, phase, event, level, status, source_id, source, source_detail,
+         ref_url, title, agent, provider, model, attempt_no, latency_ms, cost, tokens, message, payload)
+        VALUES
+        ('run_dag', '2026-06-02T21:10:01', 'collect', 'collector.source_done', 'info', 'done',
+         'github_ai_devtools', 'github', 'AI DevTools', '', '', '', '', '', NULL, NULL, NULL, NULL, 'GitHub 采集完成', '{"collected":2}'),
+        ('run_dag', '2026-06-02T21:10:07', 'analyze', 'analyzer.item_start', 'info', 'running',
+         'github_ai_devtools', 'github', 'AI DevTools', 'https://github.com/org/repo', 'repo',
+         'github_analyzer', 'minimax', 'MiniMax-M3', 1, NULL, NULL, NULL, '开始分析 repo', '{}')
+        """
+    )
+    await api_db.commit()
+
+    body = api_client.get("/api/pipeline/dag").json()
+
+    assert body["code"] == 0
+    data = body["data"]
+    assert data["run_id"] == "run_dag"
+    assert data["current_phase"] == "analyze"
+    assert data["progress"]["total_units"] == 2
+    assert data["progress"]["completed_units"] == 1
+    assert data["progress"]["percent"] == 50
+    assert data["source_funnels"][0]["source_id"] == "github_ai_devtools"
+    assert data["source_funnels"][0]["analyzed"] == 1
+    assert data["events"][-1]["event"] == "analyzer.item_start"
+    assert data["active_items"][0]["ref_url"] == "https://github.com/org/repo"

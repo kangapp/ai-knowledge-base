@@ -3,104 +3,193 @@
 {% block content %}
 <div class="dag-page">
     <header class="page-header">
-        <h1>📊 Pipeline DAG 状态</h1>
+        <h1>Pipeline DAG 状态</h1>
     </header>
 
-    <div class="dag-status-bar" id="status-bar">
+    <div class="dag-status-bar">
         <div class="status-dot" id="status-dot"></div>
         <div>
             <div class="status-text" id="status-text">加载中...</div>
             <div class="phase-text" id="phase-text"></div>
         </div>
+        <div class="dag-progress">
+            <div class="dag-progress-meta" id="progress-meta">-</div>
+            <div class="dag-progress-track"><div class="dag-progress-fill" id="progress-fill"></div></div>
+        </div>
         <div class="run-info" id="run-info"></div>
     </div>
 
-    <div class="pipeline-flow" id="pipeline-flow">
-        <div class="stage" data-phase="collect"><div class="stage-box"><div class="stage-icon">📥</div><div class="stage-name">采集</div><div class="stage-time" id="time-collect">-</div></div></div>
-        <div class="arrow">→</div>
-        <div class="stage" data-phase="route"><div class="stage-box"><div class="stage-icon">🔀</div><div class="stage-name">路由</div><div class="stage-time" id="time-route">-</div></div></div>
-        <div class="arrow">→</div>
-        <div class="stage" data-phase="analyze"><div class="stage-box"><div class="stage-icon">🧠</div><div class="stage-name">分析</div><div class="stage-time" id="time-analyze">-</div></div></div>
-        <div class="arrow">→</div>
-        <div class="stage" data-phase="aggregate"><div class="stage-box"><div class="stage-icon">📝</div><div class="stage-name">汇总</div><div class="stage-time" id="time-aggregate">-</div></div></div>
-        <div class="arrow">→</div>
-        <div class="stage" data-phase="review"><div class="stage-box"><div class="stage-icon">✅</div><div class="stage-name">审核</div><div class="stage-time" id="time-review">-</div></div></div>
+    <div class="pipeline-flow" id="pipeline-flow"></div>
+
+    <div class="dag-grid">
+        <section class="dag-panel">
+            <h2>数据源漏斗</h2>
+            <div class="source-funnels" id="source-funnels"></div>
+        </section>
+        <section class="dag-panel">
+            <h2>活跃任务</h2>
+            <div class="active-items" id="active-items"></div>
+        </section>
     </div>
 
-    <div class="dag-details">
-        <h3>📋 执行日志</h3>
+    <section class="dag-panel">
+        <h2>事件流</h2>
         <div class="logs" id="logs">
             <div class="log-entry"><span class="log-time">-</span><span class="log-msg">加载中...</span></div>
         </div>
-    </div>
+    </section>
 </div>
 
 <script>
-const PHASE_NAMES = {collect:'采集', route:'路由', analyze:'分析', aggregate:'汇总', review:'审核'};
+const PHASES = [
+    ['collect', '采集'],
+    ['route', '路由'],
+    ['analyze', '分析'],
+    ['aggregate', '汇总'],
+    ['review', '审核'],
+    ['persist', '入库'],
+    ['build', '构建']
+];
 
-function formatBJTime(isoStr) {
+function escapeHtml(value) {
+    return String(value || '').replace(/[&<>"']/g, ch => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+    }[ch]));
+}
+
+function formatTime(isoStr) {
     if (!isoStr) return '-';
-    try {
-        const dt = new Date(isoStr);
-        const bj = new Date(dt.getTime() + 8 * 3600000);
-        const pad = n => String(n).padStart(2, '0');
-        const month = pad(bj.getMonth() + 1);
-        const day = pad(bj.getDate());
-        const hours = pad(bj.getHours());
-        const mins = pad(bj.getMinutes());
-        const secs = pad(bj.getSeconds());
-        return `${month}-${day} ${hours}:${mins}:${secs}`;
-    } catch { return isoStr; }
+    const text = String(isoStr);
+    return text.length >= 19 ? text.slice(5, 19).replace('T', ' ') : text;
+}
+
+function formatDuration(ms) {
+    if (!ms) return '-';
+    return `${Math.round(ms / 1000)}s`;
 }
 
 async function fetchDag() {
     try {
-        const res = await fetch('/api/pipeline/dag');
+        const res = await fetch('/api/pipeline/dag?detail=full');
         const json = await res.json();
         if (json.code !== 0) throw new Error(json.message);
         updateDag(json.data);
-    } catch (e) {
-        console.error(e);
+    } catch (error) {
+        document.getElementById('status-text').textContent = '加载失败';
+        document.getElementById('phase-text').textContent = error.message || '';
     }
 }
 
 function updateDag(data) {
+    renderStatus(data);
+    renderFlow(data.phases || []);
+    renderSourceFunnels(data.source_funnels || []);
+    renderActiveItems(data.active_items || []);
+    renderEvents(data.events || []);
+}
+
+function renderStatus(data) {
     const statusDot = document.getElementById('status-dot');
     const statusText = document.getElementById('status-text');
     const phaseText = document.getElementById('phase-text');
     const runInfo = document.getElementById('run-info');
+    const progressMeta = document.getElementById('progress-meta');
+    const progressFill = document.getElementById('progress-fill');
 
-    statusDot.className = 'status-dot ' + data.status;
-    statusText.textContent = data.status === 'running' ? '运行中' : data.status === 'completed' ? '已完成' : data.status === 'failed' ? '失败' : '空闲';
-    phaseText.textContent = data.current_phase ? `阶段: ${PHASE_NAMES[data.current_phase] || data.current_phase}` : '';
-    runInfo.innerHTML = data.run_id ? `<div>${data.run_id_bj || data.run_id}</div><div class="run-time">${formatBJTime(data.phases[0]?.started_at)}</div>` : '';
+    statusDot.className = `status-dot ${data.status || 'idle'}`;
+    const statusMap = { running: '运行中', completed: '已完成', failed: '失败', idle: '空闲' };
+    statusText.textContent = statusMap[data.status] || data.status || '空闲';
+    phaseText.textContent = data.current_phase ? `当前阶段：${phaseName(data.current_phase)}` : '';
+    const progress = data.progress || { percent: 0, completed_units: 0, total_units: 0 };
+    progressMeta.textContent = `${progress.percent || 0}% · ${progress.completed_units || 0}/${progress.total_units || 0}`;
+    progressFill.style.width = `${progress.percent || 0}%`;
+    runInfo.innerHTML = data.run_id
+        ? `<div>${escapeHtml(data.run_id_bj || data.run_id)}</div><div class="run-time">${formatTime(data.phases?.[0]?.started_at)}</div>`
+        : '';
+}
 
-    const phases = data.phases || [];
+function renderFlow(phases) {
     const phaseMap = {};
-    phases.forEach(p => phaseMap[p.phase] = p);
+    phases.forEach(phase => { phaseMap[phase.phase] = phase; });
+    document.getElementById('pipeline-flow').innerHTML = PHASES.map(([key, label], index) => {
+        const phase = phaseMap[key];
+        const state = phase ? (phase.status === 'done' ? 'done' : phase.status === 'running' ? 'active' : 'waiting') : 'waiting';
+        const time = phase ? (phase.status === 'running' ? '进行中' : formatDuration(phase.duration_ms)) : '-';
+        const details = phase?.details ? `<div class="stage-detail">${escapeHtml(phase.details)}</div>` : '';
+        return `
+            <div class="stage ${state}" data-phase="${key}">
+                <div class="stage-box">
+                    <div class="stage-name">${label}</div>
+                    <div class="stage-time">${time}</div>
+                    ${details}
+                </div>
+            </div>
+            ${index < PHASES.length - 1 ? '<div class="arrow">→</div>' : ''}
+        `;
+    }).join('');
+}
 
-    ['collect', 'route', 'analyze', 'aggregate', 'review'].forEach(phase => {
-        const stage = document.querySelector(`.stage[data-phase="${phase}"]`);
-        const timeEl = document.getElementById(`time-${phase}`);
-        const p = phaseMap[phase];
-        stage.className = 'stage';
-        if (p) {
-            if (p.status === 'done') stage.classList.add('done');
-            else if (p.status === 'running') stage.classList.add('active');
-            else stage.classList.add('waiting');
-            if (p.duration_ms) timeEl.textContent = (p.duration_ms / 1000).toFixed(0) + 's';
-            else if (p.status === 'running') timeEl.textContent = '进行中';
-        } else {
-            stage.classList.add('waiting');
-        }
-    });
-
-    const logsEl = document.getElementById('logs');
-    if (data.logs && data.logs.length) {
-        logsEl.innerHTML = data.logs.map(l => `<div class="log-entry ${l.level}"><span class="log-time">${l.time}</span><span class="log-msg">${l.message}</span></div>`).join('');
-    } else {
-        logsEl.innerHTML = '<div class="log-entry"><span class="log-time">-</span><span class="log-msg">暂无日志</span></div>';
+function renderSourceFunnels(rows) {
+    const container = document.getElementById('source-funnels');
+    if (!rows.length) {
+        container.innerHTML = '<div class="empty-text">暂无数据源漏斗</div>';
+        return;
     }
+    container.innerHTML = rows.map(row => `
+        <div class="source-funnel">
+            <div class="source-funnel-head">
+                <strong>${escapeHtml(row.source_detail || row.source_id)}</strong>
+                <span>${escapeHtml(row.source_id)}</span>
+            </div>
+            <div class="funnel-metrics">
+                <span>采集 ${row.collected || 0}</span>
+                <span>新增 ${row.new_items || 0}</span>
+                <span>分析 ${row.analyzed || 0}</span>
+                <span>入库 ${row.inserted || 0}</span>
+                <span>过滤 ${(row.retry || 0) + (row.discarded || 0)}</span>
+                <span>失败 ${row.failed || 0}</span>
+            </div>
+        </div>
+    `).join('');
+}
+
+function renderActiveItems(items) {
+    const container = document.getElementById('active-items');
+    if (!items.length) {
+        container.innerHTML = '<div class="empty-text">暂无活跃任务</div>';
+        return;
+    }
+    container.innerHTML = items.map(item => `
+        <div class="active-item">
+            <div><strong>${escapeHtml(item.title || item.ref_url)}</strong></div>
+            <div class="muted">${escapeHtml(item.agent || item.phase)} · ${escapeHtml(item.source_id)} · ${formatTime(item.started_at)}</div>
+            <div class="muted">${escapeHtml(item.ref_url)}</div>
+        </div>
+    `).join('');
+}
+
+function renderEvents(events) {
+    const logsEl = document.getElementById('logs');
+    if (!events.length) {
+        logsEl.innerHTML = '<div class="log-entry"><span class="log-time">-</span><span class="log-msg">暂无事件</span></div>';
+        return;
+    }
+    logsEl.innerHTML = events.slice(-160).reverse().map(event => `
+        <div class="log-entry ${event.level || 'info'}">
+            <span class="log-time">${formatTime(event.ts)}</span>
+            <span class="log-msg">
+                <b>${escapeHtml(event.event)}</b>
+                ${escapeHtml(event.message || '')}
+                ${event.source_id ? `<em>${escapeHtml(event.source_id)}</em>` : ''}
+                ${event.ref_url ? `<small>${escapeHtml(event.ref_url)}</small>` : ''}
+            </span>
+        </div>
+    `).join('');
+}
+
+function phaseName(key) {
+    const found = PHASES.find(([id]) => id === key);
+    return found ? found[1] : key;
 }
 
 document.addEventListener('DOMContentLoaded', () => {

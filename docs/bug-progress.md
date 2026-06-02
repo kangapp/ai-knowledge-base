@@ -754,3 +754,35 @@ if m:
 **处理**: GitHub collector 将 `topics/keywords` 拆成最多 5 个单条件 Search 请求，分别请求后本地按 URL 合并去重、按 stars 排序，再应用 `exclude_terms` 和 stars/forks/watchers 阈值。
 
 **相关文件**: `src/graph/collector.py`, `tests/test_collector.py`
+
+---
+
+## Bug 37: MiniMax-M3 输出尾部解释导致 JSON 解析失败
+
+**发现时间**: 2026-06-02
+**发现场景**: VPS 流水线中 analyzer/reviewer 多次出现 `parse_failed`，日志显示 M3 会输出 `<think>`、markdown 包裹、合法 JSON 后追加解释或残留 ```。
+
+**根因**: Analyzer 和 Reviewer 各自维护 JSON 清洗逻辑，只能处理少数固定格式；当合法 JSON 后存在尾部文本时，`json.loads()` 报 `Extra data`。
+
+**处理**:
+1. 新增 `src/core/json_utils.py::extract_json_object()`，统一剥离 thinking tags、markdown 包裹，并用 `json.JSONDecoder.raw_decode()` 提取第一个完整 JSON 对象。
+2. `src/graph/analyzers/base.py` 和 `src/graph/reviewer.py` 复用同一个解析工具。
+3. 增加 analyzer/reviewer 尾部文本回归测试。
+
+**相关文件**: `src/core/json_utils.py`, `src/graph/analyzers/base.py`, `src/graph/reviewer.py`, `tests/test_analyzer.py`, `tests/test_reviewer.py`
+
+---
+
+## Bug 38: retry 轮重复跑 Analyzer 导致流水线耗时和成本放大
+
+**发现时间**: 2026-06-02
+**发现场景**: VPS 手动流水线第一轮 review 后有 10 条 retry，后续又进入 route/analyze/aggregate/review；由于 Analyzer prompt 未消费 `retry_feedback`，重跑分析没有带来确定收益。
+
+**根因**: retry 循环复用整张 LangGraph DAG，导致 retry item 重新走 Router 和 Analyzer。
+
+**处理**:
+1. 新增 `_prepare_retry_review_items()`，从已有 `AnalyzedItem` 中挑选 retry item 并递增 `retry_count`。
+2. retry 轮直接调用 `reviewer_node()`，保留 review phase log，避免重复 Analyzer 调用。
+3. 增加 retry 复用已有分析结果的回归测试。
+
+**相关文件**: `src/main.py`, `tests/test_pipeline_observability.py`

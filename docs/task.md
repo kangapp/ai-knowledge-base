@@ -14,6 +14,23 @@
   - 单次 LLM 请求使用 `asyncio.wait_for` 按 `timeout_seconds` 超时，默认 60 秒
   - 输出按原始 analyzed item 顺序合并，避免并发导致后续入库顺序不稳定
   - 增加 item 级 `reviewer.item_start/item_done` 日志，慢请求或超时更容易定位
+- [x] 稳定 M3 结构化输出解析
+  - 新增通用 JSON 提取器，Analyzer/Reviewer 共用
+  - 兼容 `<think>`、markdown 包裹、合法 JSON 后追加解释等常见 M3 输出
+  - parse_failed 场景仍按真实 LLM 调用写入 `cost_logs`
+- [x] 优化 retry 轮执行路径
+  - retry 轮复用已有 `AnalyzedItem`，不再重复跑 Analyzer
+  - retry 阶段直接重审 reviewer，保留 review phase log 和 cost 记录
+  - 减少重复分析带来的耗时和成本放大
+- [x] 数据源健康指标分层
+  - `/api/sources/stats` 增加 `failed/filtered_items/request_success_rate/insert_rate`
+  - 区分上游请求失败、内容被质量过滤、最终入库效率
+  - 避免将 RSS 低通过率误判为采集不可用
+- [x] DAG 模块细粒度重构
+  - 新增 `pipeline_events` 事件表，记录 source、item、agent、LLM 调用、入库和构建事件
+  - `/api/pipeline/dag` 返回 `progress/events/source_funnels/active_items`，保留旧 `phases/logs`
+  - DAG 页面改为分层运行观察台：总进度、阶段流、数据源漏斗、活跃任务、事件流
+  - Pipeline collect/analyze/review/retry/persist/build 关键点写入结构化事件
 - [x] 统一 API 成功/失败响应入口
   - 成功响应走 `src/api/responses.py::envelope()`
   - `HTTPException` 按项目错误码映射返回
