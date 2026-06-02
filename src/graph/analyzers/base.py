@@ -16,7 +16,7 @@ def load_prompt(agent_name: str, registry: LLMRegistry) -> str:
     return path.read_text(encoding="utf-8")
 
 
-def parse_and_validate(raw: str, ref_url: str = "") -> AnalyzedItem:
+def parse_and_validate(raw: str, ref_url: str = "", source_item: RawItem | None = None) -> AnalyzedItem:
     # 0. 容错：剥离所有 thinking tags（包括不完整的）
     # 先剥离所有 ```json ... ``` 包裹（markdown 格式）
     m = re.search(r'```(?:json)?\s*(.*?)\s*```', raw, re.DOTALL)
@@ -48,6 +48,11 @@ def parse_and_validate(raw: str, ref_url: str = "") -> AnalyzedItem:
 
     # ref_url 由调用方赋值
     data["ref_url"] = ref_url
+    if source_item is not None:
+        data["source"] = source_item.source
+        data["source_detail"] = source_item.source_detail
+        data["source_id"] = source_item.raw_metadata.get("source_id", source_item.source_detail or source_item.source)
+        data["metadata"] = source_item.raw_metadata
 
     # 容错：tags 超过 3 个时裁剪
     if "tags" in data and isinstance(data["tags"], list) and len(data["tags"]) > 3:
@@ -130,7 +135,7 @@ async def analyze_items(
 
                 # 再 parse，parse 失败会抛出异常
                 try:
-                    analyzed = parse_and_validate(content, ref_url=item.url)
+                    analyzed = parse_and_validate(content, ref_url=item.url, source_item=item)
                 except Exception as parse_error:
                     cost_record.status = "parse_failed"
                     cost_record.error = str(parse_error)

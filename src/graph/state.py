@@ -24,6 +24,10 @@ class AnalyzedItem(BaseModel):
     tags: list[str] = Field(default_factory=list, max_length=3)
     language: Literal["zh", "en"] = "zh"
     retry_count: int = Field(default=0, ge=0)
+    source: str = ""
+    source_detail: str = ""
+    source_id: str = ""
+    metadata: dict = Field(default_factory=dict)
 
 
 class ReviewedItem(BaseModel):

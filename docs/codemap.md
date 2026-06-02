@@ -90,10 +90,13 @@
 - `src/graph/analyzers/`
   - 各源 Analyzer 薄层；通用实现位于 `base.py`。
   - Analyzer 成本记录在 `base.py` 写入 `CostRecord`，来源字段来自 `RawItem`。
+  - `AnalyzedItem` 会透传 `source/source_id/source_detail/metadata`，供 Reviewer 做 source-aware 审核。
 
 - `src/graph/reviewer.py`
   - 四维评分审核。
   - LLM 输出只作为四维打分草稿；解析阶段会统一维度 key、重算 `total_score`，并由代码按阈值裁决 `approved/retry/discarded`。
+  - 普通文章/arXiv 使用 `prompts/reviewer.md` 和文章型四维评分；GitHub repo 使用 `prompts/github_reviewer.md` 和 repo-aware 四维评分，避免 AI 开源工具被文章深度标准误伤。
+  - Reviewer 使用 `config/agents.yaml` 中 `reviewer.params.concurrency` 控制有限并发，`timeout_seconds` 控制单次 LLM 请求超时；默认建议为并发 3、超时 60 秒。
   - Reviewer 成本记录先保留 `ref_url`，图外入库前由 `src/main.py` 按本轮 `RawItem` 补齐来源字段。
   - Reviewer 节点结束后由 `src/graph/pipeline.py` 按配置 id 汇总 source health。
 

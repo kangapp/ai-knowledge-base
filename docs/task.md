@@ -4,6 +4,16 @@
 
 ## P0 已完成
 
+- [x] GitHub repo 审核策略分流
+  - 为 `AnalyzedItem` 增加 `source/source_id/source_detail/metadata` 上下文
+  - 新增 `prompts/github_reviewer.md`，GitHub repo 按 AI 相关性、开发者实用性、项目信号、内容清晰度评分
+  - 普通文章继续使用文章型阈值；GitHub repo 使用 repo-aware 系统裁决，避免 Understand-Anything 类 AI 开源工具被文章深度标准误伤
+  - 增加 `Understand-Anything` 类 repo 回归测试和 GitHub prompt 上下文测试
+- [x] Reviewer 有限并发和请求超时
+  - `reviewer_node` 使用 `asyncio.Semaphore` 按 `reviewer.params.concurrency` 控制并发，默认 3
+  - 单次 LLM 请求使用 `asyncio.wait_for` 按 `timeout_seconds` 超时，默认 60 秒
+  - 输出按原始 analyzed item 顺序合并，避免并发导致后续入库顺序不稳定
+  - 增加 item 级 `reviewer.item_start/item_done` 日志，慢请求或超时更容易定位
 - [x] 统一 API 成功/失败响应入口
   - 成功响应走 `src/api/responses.py::envelope()`
   - `HTTPException` 按项目错误码映射返回
