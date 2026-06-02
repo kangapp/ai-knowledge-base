@@ -56,6 +56,26 @@ def test_pipeline_structure(registry):
     assert "aggregator" in names
     assert "reviewer" in names
 
+
+def test_github_review_prompt_uses_source_context_from_analyzed_item():
+    from src.graph.reviewer import build_reviewer_user_prompt
+
+    analyzed = AnalyzedItem(
+        ref_url="https://github.com/Lum1104/Understand-Anything",
+        title="Understand-Anything",
+        summary="代码知识图谱工具",
+        tags=["AI", "RAG", "Tool"],
+        source="github",
+        source_detail="Lum1104/Understand-Anything",
+        source_id="github_ai_devtools",
+        metadata={"stars": 49166, "topics": ["knowledge-graph", "codex"]},
+    )
+
+    prompt = build_reviewer_user_prompt(analyzed)
+
+    assert "内容类型: github_repo" in prompt
+    assert "source_id: github_ai_devtools" in prompt
+
 @pytest.mark.asyncio
 async def test_pipeline_e2e_mocked(registry):
     """全链路 mock 测试：router → fan-out → aggregator → reviewer"""

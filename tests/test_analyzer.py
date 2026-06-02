@@ -26,6 +26,30 @@ def test_invalid_output_raises():
         parse_and_validate('not json at all') 
 
 
+def test_parse_and_validate_propagates_source_context():
+    from src.graph.analyzers.base import parse_and_validate
+
+    raw_item = RawItem(
+        url="https://github.com/Lum1104/Understand-Anything",
+        title="Understand-Anything",
+        source="github",
+        source_detail="Lum1104/Understand-Anything",
+        raw_metadata={
+            "source_id": "github_ai_devtools",
+            "stars": 49166,
+            "topics": ["knowledge-graph", "codex"],
+        },
+    )
+    raw = json.dumps({"title": "T", "summary": "S", "tags": ["AI"], "language": "zh"})
+
+    result = parse_and_validate(raw, ref_url=raw_item.url, source_item=raw_item)
+
+    assert result.source == "github"
+    assert result.source_detail == "Lum1104/Understand-Anything"
+    assert result.source_id == "github_ai_devtools"
+    assert result.metadata["stars"] == 49166
+
+
 @pytest.mark.asyncio
 async def test_analyze_items_records_cost_when_parse_fails():
     from src.core.config import (

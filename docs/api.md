@@ -490,6 +490,7 @@
 - `trend` 通过窗口前后半段 approved rate 对比得出：超过 10% 为 `rising`，低于 10% 为 `falling`，否则 `stable`。
 - `source_health` 按天合并：Collector 累加 `total_collected/failed`，Reviewer 累加 `approved/rejected`，`avg_score` 按 approved 数加权合并。
 - `new_items/dedup_skipped/analyzed/analysis_failed/retry/discarded/inserted/cost/tokens` 来自 `pipeline_source_runs`，表示窗口内每个 source 的 pipeline 漏斗和成本效率。
+- GitHub repo 的审核策略与普通文章不同：系统会按 repo-aware 维度裁决，因此 `approved/retry/discarded` 不能直接与 RSS 新闻按同一内容深度标准比较。
 
 **响应:**
 ```json
