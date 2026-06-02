@@ -16,7 +16,8 @@
 
 - `src/api/routes.py`
   - 基础 API：文章列表/详情、搜索、基础统计、健康检查、成本 summary、pipeline 手动触发、pipeline DAG。
-  - 常见改动入口：文章接口字段、分页参数、pipeline 状态展示。
+  - `/api/pipeline/dag` 聚合 `pipeline_runs`、`pipeline_phase_logs`、`pipeline_events`、`pipeline_source_runs`，用于 DAG 页面展示阶段、source 漏斗、活跃 item 和事件流。
+  - 常见改动入口：文章接口字段、分页参数、pipeline DAG 状态展示。
 
 - `src/api/stats.py`
   - 统计 API：`/api/stats/enhanced`、质量、运行、消耗、detail 统计。
@@ -44,7 +45,7 @@
 
 - `src/db/operations.py`
   - 数据库操作集合：文章保存、标签保存、成本记录、统计查询、备份等。
-  - 常见改动入口：文章查询、统计 SQL、pipeline run 记录、`collection_items` 明细、`pipeline_source_runs` 漏斗、`cost_logs` 来源归因、GitHub repo 增速快照查询。
+  - 常见改动入口：文章查询、统计 SQL、pipeline run 记录、`collection_items` 明细、`pipeline_events` 事件流、`pipeline_source_runs` 漏斗、`cost_logs` 来源归因、GitHub repo 增速快照查询。
   - 费用统计读取 `cost_logs`，资源消耗预算使用 `config/agents.yaml` 的 `budget.monthly`。
   - 所有 `days=N` 查询窗口按北京时间“含今天的 N 个自然日”计算。
   - 目前仍包含较多统计 SQL；后续仪表盘重构时建议逐步拆到 service 层。
@@ -75,10 +76,11 @@
 - `src/main.py`
   - GitHub repo 快照在 DB 查重前写入，`trend_mode=true` 的源只过滤本源采集结果，不影响同批次其它 GitHub/RSS/arXiv 源。
   - 图外入库前按 `ref_url` 汇总 Analyzer + Reviewer 成本，写入文章级 `analysis_cost/analysis_tokens`，并为 Reviewer 成本补齐来源快照。
-  - Pipeline 会写入 `collection_items` 和 `pipeline_source_runs`，用于追踪采集、去重、分析、审核、入库的 source 级漏斗。
+  - Pipeline 会写入 `collection_items`、`pipeline_source_runs` 和 `pipeline_events`，用于追踪采集、去重、分析、审核、入库的 source 级漏斗和 item 级事件。
+  - Retry 轮复用已有 `AnalyzedItem` 直接重审 Reviewer，不再重新进入 Analyzer；入口为 `_prepare_retry_review_items()`。
 
 - `src/graph/pipeline.py`
-  - LangGraph DAG 编排和 phase log 记录。
+  - LangGraph DAG 编排、phase log 记录、Analyzer/Reviewer item 级事件记录。
 
 - `src/scheduler/source_scheduler.py`
   - 每周数据源健康维护：低质量源淘汰、候选源发现。
@@ -91,6 +93,7 @@
   - 各源 Analyzer 薄层；通用实现位于 `base.py`。
   - Analyzer 成本记录在 `base.py` 写入 `CostRecord`，来源字段来自 `RawItem`。
   - `AnalyzedItem` 会透传 `source/source_id/source_detail/metadata`，供 Reviewer 做 source-aware 审核。
+  - Analyzer 输出 JSON 解析复用 `src/core/json_utils.py::extract_json_object()`。
 
 - `src/graph/reviewer.py`
   - 四维评分审核。
@@ -99,6 +102,11 @@
   - Reviewer 使用 `config/agents.yaml` 中 `reviewer.params.concurrency` 控制有限并发，`timeout_seconds` 控制单次 LLM 请求超时；默认建议为并发 3、超时 60 秒。
   - Reviewer 成本记录先保留 `ref_url`，图外入库前由 `src/main.py` 按本轮 `RawItem` 补齐来源字段。
   - Reviewer 节点结束后由 `src/graph/pipeline.py` 按配置 id 汇总 source health。
+  - Reviewer 输出 JSON 解析复用 `src/core/json_utils.py::extract_json_object()`，兼容 M3 thinking tags、markdown 包裹和尾部解释。
+
+- `src/core/json_utils.py`
+  - LLM JSON 输出容错工具。
+  - 常见改动入口：新增 provider 特殊输出格式、调整 JSON 提取策略。
 
 ## 静态站与仪表盘前端
 
@@ -108,6 +116,10 @@
 - `src/site/templates/dashboard.html`
   - 仪表盘 DOM 结构。
   - 后续重构时保持模板只描述结构，不塞复杂逻辑。
+
+- `src/site/templates/dag.html`
+  - Pipeline DAG 运行页。
+  - 常见改动入口：阶段布局、source 漏斗、活跃 item、事件流日志展示。
 
 - `src/site/static/js/app.js`
   - 首页文章列表筛选、来源/标签/日期过滤。
@@ -129,18 +141,18 @@
   - 仪表盘初始化、Tab 切换、周期切换和数据调度。
 
 - `src/site/static/css/style.css`
-  - 全站样式和 dashboard 样式。
+  - 全站样式、dashboard 样式和 DAG 运行页样式。
 
 ## 测试入口
 
 - `tests/test_api_contracts.py`
-  - API 契约测试：响应信封、错误码、分页、tags、sources DB 注入、dashboard summary。
+  - API 契约测试：响应信封、错误码、分页、tags、sources DB 注入、dashboard summary、pipeline DAG 细粒度响应。
 
 - `tests/test_stats_quality_detail.py`
   - 仪表盘质量详情统计契约测试。
 
 - `tests/test_database.py`
-  - SQLite migration、唯一约束、FTS5 同步。
+  - SQLite migration、唯一约束、FTS5 同步、pipeline event 持久化。
 
 ## 文档入口
 

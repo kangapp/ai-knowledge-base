@@ -418,7 +418,14 @@
 
 ### GET /api/pipeline/dag
 
-查看 DAG 状态。
+查看 DAG 状态。默认返回最近一次 run；可传 `run_id` 查看历史 run。接口同时保留旧的 `phases/logs` 字段，并返回细粒度事件流和 source 漏斗。
+
+**参数:**
+
+| 参数 | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| run_id | string | "" | 为空时返回最新 run |
+| detail | string | "summary" | summary 返回最近 100 条事件；full 返回最近 500 条事件 |
 
 **响应:**
 ```json
@@ -429,7 +436,40 @@
     "run_id_bj": "run_20260524_090000",
     "status": "completed",
     "current_phase": null,
+    "progress": {
+      "total_units": 40,
+      "completed_units": 40,
+      "percent": 100
+    },
     "phases": [...],
+    "events": [
+      {
+        "id": 12,
+        "ts": "2026-06-02T21:10:07",
+        "phase": "review",
+        "event": "reviewer.item_done",
+        "level": "success",
+        "status": "approved",
+        "source_id": "github_ai_devtools",
+        "ref_url": "https://github.com/Lum1104/Understand-Anything",
+        "agent": "reviewer",
+        "message": "审核approved",
+        "payload": {"score": 93}
+      }
+    ],
+    "source_funnels": [
+      {
+        "source_id": "github_ai_devtools",
+        "source": "github",
+        "source_detail": "AI DevTools",
+        "collected": 8,
+        "new_items": 7,
+        "analyzed": 7,
+        "inserted": 7,
+        "failed": 0
+      }
+    ],
+    "active_items": [],
     "logs": [...]
   },
   "message": "ok"
@@ -489,7 +529,10 @@
 - `avg_score` 为窗口内每日 `avg_score` 的简单平均。
 - `trend` 通过窗口前后半段 approved rate 对比得出：超过 10% 为 `rising`，低于 10% 为 `falling`，否则 `stable`。
 - `source_health` 按天合并：Collector 累加 `total_collected/failed`，Reviewer 累加 `approved/rejected`，`avg_score` 按 approved 数加权合并。
-- `new_items/dedup_skipped/analyzed/analysis_failed/retry/discarded/inserted/cost/tokens` 来自 `pipeline_source_runs`，表示窗口内每个 source 的 pipeline 漏斗和成本效率。
+- `new_items/dedup_skipped/analyzed/analysis_failed/retry/discarded/inserted/failed/cost/tokens` 来自 `pipeline_source_runs`，表示窗口内每个 source 的 pipeline 漏斗和成本效率。
+- `filtered_items = retry + discarded`，表示采集后被质量门槛拦下或仍需重审的数量；它不是采集失败。
+- `request_success_rate = collected / (collected + failed)`，用于区分上游源不可用和内容被正常过滤。
+- `insert_rate = inserted / new_items`，用于衡量新采集内容最终入库效率。
 - GitHub repo 的审核策略与普通文章不同：系统会按 repo-aware 维度裁决，因此 `approved/retry/discarded` 不能直接与 RSS 新闻按同一内容深度标准比较。
 
 **响应:**
@@ -514,6 +557,10 @@
         "retry": 1,
         "discarded": 3,
         "inserted": 10,
+        "failed": 0,
+        "filtered_items": 4,
+        "request_success_rate": 1,
+        "insert_rate": 0.714,
         "cost": 0.12,
         "tokens": 3200
       }
@@ -578,6 +625,7 @@
 
 | 日期 | 变更内容 |
 |------|----------|
+| 2026-06-02 | `/api/pipeline/dag` 支持 `run_id/detail` 参数，返回 `progress/events/source_funnels/active_items` 细粒度运行数据 |
 | 2026-06-02 | `/api/sources/stats` 补充 source-run 漏斗、成本、token 字段；DAG 示例 run_id 改为北京时间真实 run_id |
 | 2026-05-31 | 统一 API 错误信封；新增 `/api/dashboard/summary`；修正 `/api/articles` total 和详情 tags；数据源接口复用注入 DB |
 | 2026-05-24 | 新增 `/api/stats/quality-detail` 端点 |

@@ -34,7 +34,7 @@ APScheduler cron 分组触发 (同 cron 源合并为一个 pipeline run，skip_i
   Site Builder ─── 去抖触发 (5min 计时器) → output.tmp/ 渲染 → 原子 rename → 上线
                     └── 手动 POST /api/pipeline/build 可调 build_now() 跳过去抖
 
-横切: TrackedClient wrapper (每次 LLM 调用自动记账 + 熔断检查 + fallback)
+横切: pipeline_phase_logs 记录阶段耗时；pipeline_events 记录 source/item/LLM 调用/入库/构建细粒度事件；TrackedClient wrapper 负责每次 LLM 调用记账 + 熔断检查 + fallback
 ```
 
 ## 数据流与阶段模型
@@ -59,8 +59,8 @@ APScheduler cron 分组触发 (同 cron 源合并为一个 pipeline run，skip_i
 | 时效性 | 0-15 | 12-15: 本周内；7-11: 本月；0-6: 较早 |
 
 - temperature=0, 每维度强制 `score` + `reason`（隐式 CoT）
-- verdict=retry 时附带 `retry_feedback.suggestions`，Analyzer 针对性修改
-- 同一维度连续两次低分且 reason 一致 → 不再 retry，标记 exhausted 入库
+- verdict=retry 时附带 `retry_feedback.suggestions`，系统最多再重审 2 轮
+- retry 轮复用已有 `AnalyzedItem`，不再重新跑 Analyzer；当前 Analyzer prompt 不消费 reviewer feedback，重复分析只增加耗时和成本
 
 ## LLM 模型管理
 
@@ -79,6 +79,7 @@ APScheduler cron 分组触发 (同 cron 源合并为一个 pipeline run，skip_i
 | 首页 | Jinja2 构建时预渲染 30 天首屏 HTML + JS 后台加载 `data.json` 无缝扩展全量；筛选（来源/标签/日期/评分）纯客户端过滤 | `data.json`（列表字段，不含 summary） |
 | 详情页 | `article.html` + JS 读 URL param → `fetch /api/articles/{id}` 渲染完整 summary | `/api/articles/{id}` 实时 SQL |
 | 仪表盘 | Jinja2 内联 `stats.json` 渲染 KPI 卡片 + Chart.js 画来源饼图 + 每日花费折线 | `stats.json`（KPI+分布+趋势，<10KB） |
+| DAG 运行页 | 5 秒轮询 `/api/pipeline/dag?detail=full`，展示阶段、source 漏斗、活跃 item、事件流 | `pipeline_runs` + `pipeline_phase_logs` + `pipeline_events` + `pipeline_source_runs` |
 | 搜索 | 300ms 去抖 → `/api/search?q=xxx` FTS5 全文检索 | `/api/search` FTS5 |
 
 ## 关键设计决策
@@ -90,6 +91,6 @@ APScheduler cron 分组触发 (同 cron 源合并为一个 pipeline run，skip_i
 - **RSS 采集口径**：RSS feed 先由 `httpx.AsyncClient(timeout=30, follow_redirects=True)` 获取文本，再交给 `feedparser` 解析；英文关键词按词边界匹配，综合媒体源可用 `filter_scope: title` 只看标题强信号，避免长正文偶然提及 AI 造成误采集。
 - **Reviewer 裁决口径**：LLM 只给四维分和原因；代码统一维度 key、重算 `total_score`，并按阈值裁决 verdict，避免模型自由放行弱相关内容。
 - **成本记账口径**：只要 LLM 返回 usage 就记录 `cost_logs`；解析失败和 retry 都按真实调用次数计费，文章级成本由同一 `ref_url` 的 Analyzer + Reviewer 成本汇总得到。
-- **Promp Schema 强制**：`response_format={"type": "json_object"}` + json.loads markdown 容错 + Pydantic 校验 + 两次重试
+- **Prompt Schema 强制**：`response_format={"type": "json_object"}` + 首个完整 JSON 对象提取（兼容 `<think>`、markdown、尾部解释）+ Pydantic 校验 + 两次重试
 - **标签自动生长**：Analyzer 自由建议标签，新标签自动插入 `tags` 表收录（不做强制从池选）
 - **原子站点切换**：渲染到 `output.tmp/` → rename 双目录切换，Linux rename 原子操作

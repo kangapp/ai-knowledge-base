@@ -1,4 +1,5 @@
 # tests/test_database.py
+import json
 from pathlib import Path
 import aiosqlite
 import pytest
@@ -30,7 +31,7 @@ async def test_initialize_and_migrate(tmp_path):
 
         # 验证迁移版本
         v = await db.fetch_one("SELECT version FROM schema_version")
-        assert v["version"] == 8
+        assert v["version"] == 9
 
         cost_log_columns = await db.fetch_all("PRAGMA table_info(cost_logs)")
         column_names = {row["name"] for row in cost_log_columns}
@@ -47,6 +48,51 @@ async def test_initialize_and_migrate(tmp_path):
         }.issubset(column_names)
         assert "collection_items" in names
         assert "pipeline_source_runs" in names
+        assert "pipeline_events" in names
+    finally:
+        await db.close()
+
+
+@pytest.mark.asyncio
+async def test_record_pipeline_event_persists_structured_payload(tmp_path):
+    db = Database(tmp_path / "test.db", migrations_dir=_MIGRATIONS_DIR)
+    try:
+        await db.initialize()
+        await db.execute(
+            "INSERT INTO pipeline_runs (id, started_at, status, trigger) VALUES ('run_1', datetime('now', '+8 hours'), 'running', 'test')"
+        )
+
+        event_id = await operations.record_pipeline_event(
+            db,
+            run_id="run_1",
+            phase="analyze",
+            event="analyzer.item_done",
+            level="info",
+            status="done",
+            source_id="github_ai_devtools",
+            source="github",
+            source_detail="org/repo",
+            ref_url="https://github.com/org/repo",
+            title="repo",
+            agent="github_analyzer",
+            provider="minimax",
+            model="MiniMax-M3",
+            attempt_no=1,
+            latency_ms=1200,
+            cost=0.001,
+            tokens=300,
+            message="分析完成",
+            payload={"score": 88},
+        )
+
+        row = await db.fetch_one("SELECT * FROM pipeline_events WHERE id = ?", (event_id,))
+
+        assert row["run_id"] == "run_1"
+        assert row["phase"] == "analyze"
+        assert row["event"] == "analyzer.item_done"
+        assert row["source_id"] == "github_ai_devtools"
+        assert row["ref_url"] == "https://github.com/org/repo"
+        assert json.loads(row["payload"]) == {"score": 88}
     finally:
         await db.close()
 

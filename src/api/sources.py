@@ -49,6 +49,7 @@ async def _get_source_run_metrics(db: Database, start_date: str) -> dict[str, di
     rows = await db.fetch_all("""
         SELECT
             psr.source_id,
+            COALESCE(SUM(psr.collected), 0) as collected,
             COALESCE(SUM(psr.new_items), 0) as new_items,
             COALESCE(SUM(psr.dedup_skipped), 0) as dedup_skipped,
             COALESCE(SUM(psr.analyzed), 0) as analyzed,
@@ -56,6 +57,7 @@ async def _get_source_run_metrics(db: Database, start_date: str) -> dict[str, di
             COALESCE(SUM(psr.retry), 0) as retry,
             COALESCE(SUM(psr.discarded), 0) as discarded,
             COALESCE(SUM(psr.inserted), 0) as inserted,
+            COALESCE(SUM(psr.failed), 0) as failed,
             COALESCE(SUM(psr.cost), 0) as cost,
             COALESCE(SUM(psr.tokens), 0) as tokens
         FROM pipeline_source_runs psr
@@ -65,6 +67,7 @@ async def _get_source_run_metrics(db: Database, start_date: str) -> dict[str, di
     """, (start_date,))
     return {
         row["source_id"]: {
+            "collected": row["collected"],
             "new_items": row["new_items"],
             "dedup_skipped": row["dedup_skipped"],
             "analyzed": row["analyzed"],
@@ -72,6 +75,13 @@ async def _get_source_run_metrics(db: Database, start_date: str) -> dict[str, di
             "retry": row["retry"],
             "discarded": row["discarded"],
             "inserted": row["inserted"],
+            "failed": row["failed"],
+            "filtered_items": row["retry"] + row["discarded"],
+            "request_success_rate": round(
+                row["collected"] / (row["collected"] + row["failed"]),
+                3,
+            ) if row["collected"] + row["failed"] else 0,
+            "insert_rate": round(row["inserted"] / row["new_items"], 3) if row["new_items"] else 0,
             "cost": round(row["cost"], 4),
             "tokens": row["tokens"],
         }
@@ -157,6 +167,10 @@ async def get_source_stats(period: str = "week"):
                 "retry": metrics.get("retry", 0),
                 "discarded": metrics.get("discarded", 0),
                 "inserted": metrics.get("inserted", 0),
+                "failed": metrics.get("failed", 0),
+                "filtered_items": metrics.get("filtered_items", 0),
+                "request_success_rate": metrics.get("request_success_rate", 0),
+                "insert_rate": metrics.get("insert_rate", 0),
                 "cost": metrics.get("cost", 0),
                 "tokens": metrics.get("tokens", 0),
             })

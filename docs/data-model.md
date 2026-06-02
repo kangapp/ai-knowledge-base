@@ -130,6 +130,39 @@ FTS5 全文索引：`articles_fts` over (title, summary, description)
 | 1 | run_20260524_090000 | collect | done | 2026-05-24T09:00:00 | 2026-05-24T09:00:45 | 45000 | collected 20 items |
 | 2 | run_20260524_090000 | analyze | done | 2026-05-24T09:00:45 | 2026-05-24T09:02:30 | 105000 | total:20, succeeded:18, failed:2 |
 
+### pipeline_events — 流水线细粒度事件
+
+| 列 | 类型 | 说明 |
+|----|------|------|
+| id | INTEGER PK | 递增事件 id，可用于前端增量轮询 |
+| run_id | TEXT FK → pipeline_runs.id | |
+| ts | TEXT | 北京时间 |
+| phase | TEXT | collect / route / analyze / aggregate / review / persist / build / pipeline |
+| event | TEXT | 事件名，如 `analyzer.item_done`、`reviewer.parse_failed` |
+| level | TEXT | info / success / warning / error |
+| status | TEXT | running / done / failed / approved / discarded / retry / inserted 等 |
+| source_id | TEXT | 配置源 id |
+| source | TEXT | github / rss / feishu / arxiv |
+| source_detail | TEXT | 展示来源或 repo 名 |
+| ref_url | TEXT | item URL |
+| title | TEXT | item 标题 |
+| agent | TEXT | analyzer/reviewer 名 |
+| provider | TEXT | LLM provider |
+| model | TEXT | LLM model |
+| attempt_no | INTEGER | LLM 调用尝试次数 |
+| latency_ms | INTEGER | 单次调用或阶段耗时 |
+| cost | REAL | 单次事件关联成本 |
+| tokens | INTEGER | tokens_in + tokens_out |
+| message | TEXT | 人类可读短消息 |
+| payload | TEXT | JSON 扩展字段 |
+
+**样例数据：**
+
+| run_id | phase | event | status | source_id | ref_url | message |
+|--------|-------|-------|--------|-----------|---------|---------|
+| run_20260602_211007 | analyze | analyzer.item_done | done | github_ai_devtools | https://github.com/Lum1104/Understand-Anything | 分析完成 |
+| run_20260602_211007 | review | reviewer.item_done | approved | github_ai_devtools | https://github.com/Lum1104/Understand-Anything | 审核approved |
+
 ### cost_logs — LLM 调用花费
 
 | 列 | 类型 | 说明 |
