@@ -35,6 +35,23 @@ def _load_monthly_budget(default: float = 10.0) -> float:
         return default
 
 
+def _decode_json_field(value: str, fallback):
+    if not value:
+        return fallback
+    try:
+        return json.loads(value)
+    except json.JSONDecodeError:
+        return fallback
+
+
+def _deep_report_row(row) -> dict:
+    item = dict(row)
+    item["report_json"] = _decode_json_field(item.get("report_json", ""), {})
+    item["evidence_json"] = _decode_json_field(item.get("evidence_json", ""), [])
+    item["tech_stack_json"] = _decode_json_field(item.get("tech_stack_json", ""), {})
+    return item
+
+
 async def save_article(db: Database, raw: RawItem, analyzed: AnalyzedItem, reviewed: ReviewedItem, cost: float, tokens: int) -> int | None:
     """保存文章，返回 article id（新插入或已存在行的 id）"""
     now = now_bj_iso()
@@ -218,6 +235,105 @@ async def record_collection_item(
         article_id,
     ))
     await db.commit()
+
+
+async def save_deep_report(
+    db: Database,
+    *,
+    repo_url: str,
+    repo_name: str,
+    article_id: int | None,
+    run_id: str,
+    commit_sha: str,
+    status: str,
+    candidate_score: int,
+    trigger_reason: str,
+    report_json: dict,
+    report_markdown: str,
+    evidence_json: list,
+    tech_stack_json: dict,
+    file_tree_summary: str,
+    analysis_cost: float,
+    analysis_tokens: int,
+    error: str,
+) -> int:
+    now = now_bj_iso()
+    cursor = await db.execute("""
+        INSERT INTO deep_reports
+        (repo_url, repo_name, article_id, run_id, commit_sha, status, candidate_score,
+         trigger_reason, report_json, report_markdown, evidence_json, tech_stack_json,
+         file_tree_summary, analysis_cost, analysis_tokens, error, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(repo_url, commit_sha) DO UPDATE SET
+            repo_name=excluded.repo_name,
+            article_id=excluded.article_id,
+            run_id=excluded.run_id,
+            status=excluded.status,
+            candidate_score=excluded.candidate_score,
+            trigger_reason=excluded.trigger_reason,
+            report_json=excluded.report_json,
+            report_markdown=excluded.report_markdown,
+            evidence_json=excluded.evidence_json,
+            tech_stack_json=excluded.tech_stack_json,
+            file_tree_summary=excluded.file_tree_summary,
+            analysis_cost=excluded.analysis_cost,
+            analysis_tokens=excluded.analysis_tokens,
+            error=excluded.error,
+            updated_at=excluded.updated_at
+        RETURNING id
+    """, (
+        repo_url,
+        repo_name,
+        article_id,
+        run_id,
+        commit_sha,
+        status,
+        candidate_score,
+        trigger_reason,
+        json.dumps(report_json, ensure_ascii=False),
+        report_markdown,
+        json.dumps(evidence_json, ensure_ascii=False),
+        json.dumps(tech_stack_json, ensure_ascii=False),
+        file_tree_summary,
+        analysis_cost,
+        analysis_tokens,
+        error,
+        now,
+        now,
+    ))
+    row = await cursor.fetchone()
+    await db.commit()
+    return row["id"] if row else 0
+
+
+async def get_deep_report(db: Database, report_id: int) -> dict | None:
+    row = await db.fetch_one("SELECT * FROM deep_reports WHERE id = ?", (report_id,))
+    return _deep_report_row(row) if row else None
+
+
+async def get_latest_deep_report(db: Database) -> dict | None:
+    row = await db.fetch_one(
+        "SELECT * FROM deep_reports WHERE status = 'completed' ORDER BY updated_at DESC, id DESC LIMIT 1"
+    )
+    return _deep_report_row(row) if row else None
+
+
+async def list_deep_reports(db: Database, page: int = 1, page_size: int = 20) -> dict:
+    page = max(page, 1)
+    page_size = max(page_size, 1)
+    offset = (page - 1) * page_size
+
+    total = await db.fetch_one("SELECT COUNT(*) as c FROM deep_reports")
+    rows = await db.fetch_all(
+        "SELECT * FROM deep_reports ORDER BY created_at DESC, id DESC LIMIT ? OFFSET ?",
+        (page_size, offset),
+    )
+    return {
+        "items": [_deep_report_row(row) for row in rows],
+        "total": total["c"] if total else 0,
+        "page": page,
+        "page_size": page_size,
+    }
 
 
 async def upsert_pipeline_source_run(db: Database, stats: dict):
