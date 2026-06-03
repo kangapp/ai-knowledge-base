@@ -21,6 +21,7 @@ from .api.config import router as config_router
 from .api.stats import router as stats_router
 from .api.sources import router as sources_router
 from .api.dashboard import router as dashboard_router
+from .api.deep_reports import router as deep_reports_router, set_db as set_deep_reports_db
 from .scheduler.source_scheduler import setup_source_scheduler
 from .db.operations import (
     start_pipeline_run, end_pipeline_run, save_article, save_tags,
@@ -821,6 +822,7 @@ async def lifespan(app: FastAPI):
     _graph = build_pipeline(_registry)
 
     set_db(_db)
+    set_deep_reports_db(_db)
     set_pipeline_db(_db)
     set_run_pipeline(run_pipeline)
     template_dir = BASE_DIR / "src" / "site" / "templates"
@@ -856,6 +858,7 @@ def create_app() -> FastAPI:
     app.include_router(stats_router)
     app.include_router(sources_router)
     app.include_router(dashboard_router)
+    app.include_router(deep_reports_router, prefix="/api")
     app.add_exception_handler(HTTPException, http_exception_handler)
     app.add_exception_handler(RequestValidationError, validation_exception_handler)
     app.add_exception_handler(Exception, general_exception_handler)
