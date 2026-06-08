@@ -89,7 +89,7 @@ Modify:
   Add restrained styles for deep report list/detail.
 
 - `config/agents.yaml`  
-  Add `deep_reporter` agent configuration.
+  Add `deep_report` agent configuration.
 
 - `docs/api.md`  
   Document new API endpoints.
@@ -1170,269 +1170,24 @@ git commit -m "Add deep report candidate selector"
 - Modify: `config/agents.yaml`
 - Test: `tests/test_deep_reports_analyzer.py`
 
-- [ ] **Step 1: Write failing analyzer parsing test**
+- 实现说明（最终落地）：
+  - 使用 `DeepReportOutput` 作为深度报告结构化输出，字段收敛为 `title`、`summary`、`tech_stack`、`architecture`、`data_flow`、`use_cases`、`strengths`、`limitations`、`actionable_takeaways`、`source_evidence`，避免过度复杂。
+  - `src/deep_reports/analyzer.py` 提供：
+    - `load_deep_report_prompt(registry)`
+    - `parse_deep_report_output(raw)`
+    - `analyze_deep_report(candidate, source_package, registry)`
+  - `analyze_deep_report()` 复用现有 `LLMRegistry.get_client()` / `supports_json_mode()` / `calc_cost()` 模式，最多尝试 2 次。
+  - 成功调用后无论 parse 是否成功都先记录 token 与 cost；返回所有 attempt 的 `CostRecord` 列表，失败时最后一条状态分别为 `parse_failed` / `request_failed`。
+  - agent 配置名称统一使用 `deep_report`。
+  - prompt 模板占位符使用 `{repo_name}`、`{repo_url}`、`{candidate_context}`、`{source_package}`、`{schema}`，并强约束“只输出 JSON、必须中文、不得编造 evidence 中不存在的文件或能力”。
 
-Create `tests/test_deep_reports_analyzer.py`:
-
-```python
-from src.deep_reports.analyzer import parse_deep_report_response
-
-
-def test_parse_deep_report_response_extracts_json_with_markdown_wrapper():
-    raw = """
-    <think>analysis</think>
-    ```json
-    {
-      "project_overview": "A repo analyzer",
-      "practical_value": "Useful for code understanding",
-      "tech_stack": {"languages": ["Python"]},
-      "architecture": "CLI plus API",
-      "core_modules": [{"name": "scanner", "responsibility": "scan files"}],
-      "data_model": "Document and graph nodes",
-      "data_flow": "repo -> scan -> graph -> answer",
-      "use_cases": ["codebase onboarding"],
-      "setup_path": "pip install",
-      "extension_points": ["custom parser"],
-      "risks": ["large repos"],
-      "recommendation": {"score": 88, "verdict": "recommended"},
-      "evidence": [{"path": "src/main.py", "claim": "entry"}]
-    }
-    ```
-    """
-
-    report = parse_deep_report_response(raw)
-
-    assert report.project_overview == "A repo analyzer"
-    assert report.recommendation["score"] == 88
-    assert report.evidence[0]["path"] == "src/main.py"
-```
-
-- [ ] **Step 2: Run test to verify failure**
+- 验收要点（更新后）：
+  - `tests/test_deep_reports_analyzer.py` 覆盖 fenced/noisy JSON 解析、缺字段失败、prompt 渲染、JSON mode 条件传参、success / parse_failed / request_failed 路径。
+  - 验证命令以实际存在的测试文件为准：
 
 ```bash
-.venv/bin/python -m pytest tests/test_deep_reports_analyzer.py -q
-```
-
-Expected: FAIL because analyzer does not exist.
-
-- [ ] **Step 3: Add report model**
-
-Add to `src/deep_reports/models.py`:
-
-```python
-class DeepReportOutput(BaseModel):
-    project_overview: str
-    practical_value: str
-    tech_stack: dict = Field(default_factory=dict)
-    architecture: str
-    core_modules: list[dict] = Field(default_factory=list)
-    data_model: str
-    data_flow: str
-    use_cases: list[str] = Field(default_factory=list)
-    setup_path: str
-    extension_points: list[str] = Field(default_factory=list)
-    risks: list[str] = Field(default_factory=list)
-    recommendation: dict = Field(default_factory=dict)
-    evidence: list[dict] = Field(default_factory=list)
-```
-
-- [ ] **Step 4: Add analyzer parser and renderer**
-
-Create `src/deep_reports/analyzer.py`:
-
-```python
-import json
-
-from src.core.json_utils import extract_json_object
-
-from .models import DeepReportOutput, SourcePackage
-
-
-def parse_deep_report_response(raw: str) -> DeepReportOutput:
-    parsed = json.loads(extract_json_object(raw))
-    return DeepReportOutput.model_validate(parsed)
-
-
-def render_report_markdown(report: DeepReportOutput, package: SourcePackage) -> str:
-    evidence_lines = "\n".join(
-        f"- `{item.get('path', '')}`: {item.get('claim') or item.get('reason', '')}"
-        for item in report.evidence
-    )
-    modules = "\n".join(
-        f"- **{item.get('name', '模块')}**: {item.get('responsibility', '')}"
-        for item in report.core_modules
-    )
-    use_cases = "\n".join(f"- {item}" for item in report.use_cases)
-    risks = "\n".join(f"- {item}" for item in report.risks)
-    return f"""# {package.repo_name} 深度分析
-
-## 项目概述
-{report.project_overview}
-
-## 实用性判断
-{report.practical_value}
-
-## 技术栈
-```json
-{json.dumps(report.tech_stack, ensure_ascii=False, indent=2)}
-```
-
-## 架构与核心模块
-{report.architecture}
-
-{modules}
-
-## 数据模型
-{report.data_model}
-
-## 数据流
-{report.data_flow}
-
-## 应用场景
-{use_cases}
-
-## 上手路径
-{report.setup_path}
-
-## 二次开发切入点
-{chr(10).join(f"- {item}" for item in report.extension_points)}
-
-## 风险与不确定性
-{risks}
-
-## 证据
-{evidence_lines}
-"""
-```
-
-- [ ] **Step 5: Add LLM call function**
-
-Append to `src/deep_reports/analyzer.py`:
-
-```python
-from src.core.config import AgentConfig
-from src.core.llm_client import LLMRegistry
-from src.graph.analyzers.base import load_prompt
-from src.graph.state import CostRecord
-
-
-async def analyze_source_package(
-    package: SourcePackage,
-    registry: LLMRegistry,
-    agent_config: AgentConfig,
-    run_id: str,
-) -> tuple[DeepReportOutput, CostRecord]:
-    prompt = load_prompt(agent_config.prompt).format(
-        repo_name=package.repo_name,
-        repo_url=package.repo_url,
-        readme=package.readme_excerpt,
-        tech_stack=json.dumps(package.tech_stack, ensure_ascii=False),
-        file_tree=package.file_tree_summary,
-        entry_files=json.dumps(package.entry_files, ensure_ascii=False),
-        key_files=json.dumps([item.model_dump() for item in package.key_files], ensure_ascii=False),
-        evidence=json.dumps(package.evidence, ensure_ascii=False),
-    )
-    client = registry.get_client(agent_config.model.provider)
-    response = await client.chat(
-        agent="deep_reporter",
-        model=agent_config.model.model,
-        messages=[{"role": "user", "content": prompt}],
-        temperature=agent_config.model.temperature,
-        max_tokens=agent_config.model.max_tokens,
-        response_format={"type": "json_object"},
-        run_id=run_id,
-        ref_url=package.repo_url,
-        source="github",
-        source_detail=package.repo_name,
-        source_id="deep_report",
-    )
-    report = parse_deep_report_response(response.content)
-    return report, response.cost_record
-```
-
-If `TrackedClient.chat()` signature differs, match the existing Analyzer call pattern in `src/graph/analyzers/base.py`.
-
-- [ ] **Step 6: Add prompt**
-
-Create `prompts/deep_report.md`:
-
-```markdown
-你是源码级 GitHub 项目研究员。请基于给定 README、技术栈、目录树、入口文件和关键源码片段，生成一份证据驱动的深度分析报告。
-
-要求：
-- 不要编造没有证据的能力。
-- 每个关键架构判断尽量引用 evidence 或文件路径。
-- 如果源码证据不足，必须在 risks 中说明。
-- 输出必须是合法 JSON，不要输出 Markdown 包裹。
-
-Repo: {repo_name}
-URL: {repo_url}
-
-README:
-{readme}
-
-技术栈候选:
-{tech_stack}
-
-目录树:
-{file_tree}
-
-入口文件:
-{entry_files}
-
-关键源码文件:
-{key_files}
-
-证据候选:
-{evidence}
-
-输出 JSON schema:
-{{
-  "project_overview": "string",
-  "practical_value": "string",
-  "tech_stack": {{"languages": [], "frameworks": [], "dependencies": []}},
-  "architecture": "string",
-  "core_modules": [{{"name": "string", "responsibility": "string", "evidence": "path"}}],
-  "data_model": "string",
-  "data_flow": "string",
-  "use_cases": ["string"],
-  "setup_path": "string",
-  "extension_points": ["string"],
-  "risks": ["string"],
-  "recommendation": {{"score": 0, "verdict": "recommended|watch|skip", "reason": "string"}},
-  "evidence": [{{"path": "string", "claim": "string"}}]
-}}
-```
-
-- [ ] **Step 7: Add agent config**
-
-Modify `config/agents.yaml`:
-
-```yaml
-  deep_reporter:
-    model:
-      provider: minimax
-      model: MiniMax-M3
-      temperature: 0.2
-      max_tokens: 4096
-    prompt: prompts/deep_report.md
-```
-
-Place this under the existing `agents:` map and preserve local YAML style.
-
-- [ ] **Step 8: Run tests**
-
-```bash
-.venv/bin/python -m pytest tests/test_deep_reports_analyzer.py tests/test_config.py -q
-```
-
-Expected: PASS.
-
-- [ ] **Step 9: Commit**
-
-```bash
-git add prompts/deep_report.md src/deep_reports/analyzer.py src/deep_reports/models.py config/agents.yaml tests/test_deep_reports_analyzer.py
-git commit -m "Add deep report analyzer"
+.venv/bin/python -m pytest tests/test_deep_reports_analyzer.py
+.venv/bin/python -m pytest tests/test_repo_inspector.py tests/test_deep_reports_selector.py tests/test_deep_reports_analyzer.py
 ```
 
 ---
@@ -1614,7 +1369,7 @@ async def run_deep_report_stage(
             message=f"源码扫描完成：{len(package.key_files)} 个关键文件",
         )
         if registry is None or agent_config is None or analyze_fn is None:
-            raise RuntimeError("deep reporter is not configured")
+            raise RuntimeError("deep_report is not configured")
 
         await record_pipeline_event(
             db,
@@ -1725,7 +1480,7 @@ from .deep_reports.service import run_deep_report_stage
 After `_record_source_summaries(...)` and before `end_pipeline_run(...)`, add:
 
 ```python
-deep_agent = agents_cfg.agents.get("deep_reporter")
+deep_agent = agents_cfg.agents.get("deep_report")
 await run_deep_report_stage(
     db=_db,
     registry=_registry,

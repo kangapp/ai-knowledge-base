@@ -39,6 +39,14 @@ agents:
     prompt: prompts/reviewer.md
     budget_weight: 0.5
 
+  deep_report:
+    model:
+      primary: { provider: minimax, model: MiniMax-M3 }
+      fallback: []
+    params: { temperature: 0.2, max_tokens: 4096 }
+    prompt: prompts/deep_report.md
+    budget_weight: 1.0
+
 budget:
   monthly: 10.0
   soft_limit: 0.8

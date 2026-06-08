@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class RepoFile(BaseModel):
@@ -44,3 +44,32 @@ class DeepReportCandidate(BaseModel):
     candidate_score: int = 0
     trigger_reason: str = ""
     metadata: dict = Field(default_factory=dict)
+
+
+class DeepReportArchitecture(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    pattern: str
+    components: list[str]
+
+
+class DeepReportEvidence(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    path: str
+    reason: str
+
+
+class DeepReportOutput(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    title: str
+    summary: str
+    tech_stack: list[str]
+    architecture: DeepReportArchitecture
+    data_flow: list[str]
+    use_cases: list[str]
+    strengths: list[str]
+    limitations: list[str]
+    actionable_takeaways: list[str]
+    source_evidence: list[DeepReportEvidence]
