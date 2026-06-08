@@ -139,6 +139,12 @@
   - `config/llm.yaml` 注册模型改为 `MiniMax-M3`
   - `config/agents.yaml` 中所有 analyzer/reviewer primary model 统一改为 `MiniMax-M3`
   - 保持现有 provider、价格和 agent 输出 token 参数不变
+- [x] Deep report service + 主 pipeline 图外接入（Task 7）
+  - 新增 `run_deep_report_stage()` 图外后置阶段：候选选择、`asyncio.to_thread` clone、源码包构建、LLM 深度报告、deep_reports 入库
+  - stage 全阶段 best-effort：selector_start/select/select_skipped/clone/analyze/persist/failed 任一点异常都返回 `DeepReportStageResult(status='failed')`，不影响主 pipeline 完成
+  - completed 报告先落库，`deep.persist_done` 观测事件失败只记日志，不得降级或覆盖已完成报告
+  - 同一 `repo_url + commit_sha` 的历史 completed 报告，不会被后续失败尝试 upsert 降级为 failed
+  - main 再保留最终兜底；deep report cost 独立入 `cost_logs`，不混入 source funnel `all_costs`；approved/retry 已持久化文章都会回填 `article_ids`
 - [ ] 统计服务层继续收口
   - 将 `quality/runtime/consumption` SQL 从 `src/db/operations.py` 逐步迁到更聚焦的统计服务文件
   - 每迁一个接口补一个契约测试
@@ -163,5 +169,7 @@
 - 已通过：`.venv/bin/pytest tests/test_collector.py -q`（11 passed）
 - 已通过：`.venv/bin/python -m pytest -m "not integration and not e2e"`（103 passed）
 - 已通过：`.venv/bin/python -m pytest tests/test_database.py tests/test_cost_accounting.py tests/test_pipeline_observability.py tests/test_api_contracts.py tests/test_analyzer.py tests/test_reviewer.py tests/test_pipeline.py -q`（34 passed）
+- 已通过：`.venv/bin/python -m pytest tests/test_deep_reports_pipeline.py`
+- 已通过：`.venv/bin/python -m pytest tests/test_deep_reports_pipeline.py tests/test_deep_reports_analyzer.py tests/test_deep_reports_selector.py tests/test_repo_inspector.py tests/test_pipeline.py tests/test_pipeline_observability.py`
 
 说明：当前 shell 中 `uv` 不可用，使用项目 `.venv/bin/python` 执行测试。

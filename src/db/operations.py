@@ -280,6 +280,7 @@ async def save_deep_report(
             analysis_tokens=excluded.analysis_tokens,
             error=excluded.error,
             updated_at=excluded.updated_at
+        WHERE NOT (deep_reports.status = 'completed' AND excluded.status = 'failed')
         RETURNING id
     """, (
         repo_url,
@@ -303,7 +304,13 @@ async def save_deep_report(
     ))
     row = await cursor.fetchone()
     await db.commit()
-    return row["id"] if row else 0
+    if row:
+        return row["id"]
+    existing = await db.fetch_one(
+        "SELECT id FROM deep_reports WHERE repo_url = ? AND commit_sha = ?",
+        (repo_url, commit_sha),
+    )
+    return existing["id"] if existing else 0
 
 
 async def get_deep_report(db: Database, report_id: int) -> dict | None:

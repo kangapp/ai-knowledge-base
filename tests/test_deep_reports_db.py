@@ -173,6 +173,67 @@ async def test_save_deep_report_upsert_returns_same_id_and_updates_fields(tmp_pa
 
 
 @pytest.mark.asyncio
+async def test_save_deep_report_failed_cannot_downgrade_existing_completed(tmp_path):
+    db = await _init_db(tmp_path)
+    try:
+        completed_id = await save_deep_report(
+            db,
+            repo_url="https://github.com/org/tool",
+            repo_name="org/tool",
+            article_id=12,
+            run_id="run_1",
+            commit_sha="abc123",
+            status="completed",
+            candidate_score=88,
+            trigger_reason="首次成功",
+            report_json={"project_overview": "completed body"},
+            report_markdown="# completed",
+            evidence_json=[{"path": "src/main.py", "reason": "entry"}],
+            tech_stack_json={"languages": ["Python"]},
+            file_tree_summary="src/main.py",
+            analysis_cost=0.012,
+            analysis_tokens=2048,
+            error="",
+        )
+
+        returned_id = await save_deep_report(
+            db,
+            repo_url="https://github.com/org/tool",
+            repo_name="org/tool",
+            article_id=None,
+            run_id="run_1",
+            commit_sha="abc123",
+            status="failed",
+            candidate_score=20,
+            trigger_reason="后续失败",
+            report_json={},
+            report_markdown="",
+            evidence_json=[],
+            tech_stack_json={},
+            file_tree_summary="",
+            analysis_cost=0.001,
+            analysis_tokens=100,
+            error="timeout",
+        )
+
+        detail = await get_deep_report(db, completed_id)
+
+        assert returned_id == completed_id
+        assert detail["status"] == "completed"
+        assert detail["article_id"] == 12
+        assert detail["run_id"] == "run_1"
+        assert detail["report_json"]["project_overview"] == "completed body"
+        assert detail["report_markdown"] == "# completed"
+        assert detail["evidence_json"] == [{"path": "src/main.py", "reason": "entry"}]
+        assert detail["tech_stack_json"] == {"languages": ["Python"]}
+        assert detail["analysis_cost"] == 0.012
+        assert detail["analysis_tokens"] == 2048
+        assert detail["error"] == ""
+    finally:
+        await db.close()
+
+
+@pytest.mark.asyncio
 async def test_latest_deep_report_uses_updated_at_for_completed_reports(tmp_path):
     db = await _init_db(tmp_path)
     try:

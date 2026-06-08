@@ -1224,7 +1224,7 @@ async def test_deep_report_stage_skips_when_no_candidate(tmp_path):
         raw_items=[],
         analyzed_items=[],
         reviewed_items=[],
-        agent_config=None,
+        article_ids=None,
         clone_and_inspect_fn=None,
         analyze_fn=None,
     )
@@ -1259,7 +1259,7 @@ async def test_deep_report_stage_failure_does_not_raise(tmp_path):
         raw_items=[raw],
         analyzed_items=[analyzed],
         reviewed_items=[reviewed],
-        agent_config=None,
+        article_ids=None,
         clone_and_inspect_fn=failing_clone,
         analyze_fn=None,
     )
@@ -1314,14 +1314,16 @@ async def run_deep_report_stage(
     raw_items: list[RawItem],
     analyzed_items: list[AnalyzedItem],
     reviewed_items: list[ReviewedItem],
-    agent_config,
+    article_ids: dict[str, int] | None = None,
     clone_and_inspect_fn=clone_and_inspect,
-    analyze_fn=analyze_source_package,
+    analyze_fn=analyze_deep_report,
 ) -> DeepReportStageResult:
+    # 整个 stage（selector_start/select/select_skipped/clone/analyze/persist/failed）
+    # 都在总兜底内，任何异常都返回 failed，不向 main 冒泡。
     await record_pipeline_event(
         db,
         run_id=run_id,
-        phase="deep",
+        phase="deep_report",
         event="deep.selector_start",
         status="running",
         message="开始选择深度分析候选",
@@ -1331,7 +1333,7 @@ async def run_deep_report_stage(
         await record_pipeline_event(
             db,
             run_id=run_id,
-            phase="deep",
+            phase="deep_report",
             event="deep.selector_skipped",
             status="skipped",
             message="没有满足条件的深度分析候选",
@@ -1342,7 +1344,7 @@ async def run_deep_report_stage(
         await record_pipeline_event(
             db,
             run_id=run_id,
-            phase="deep",
+            phase="deep_report",
             event="deep.clone_start",
             status="running",
             source_id=candidate.source_id,
@@ -1352,12 +1354,12 @@ async def run_deep_report_stage(
             title=candidate.title,
             message="开始 clone repo",
         )
-        inspection = clone_and_inspect_fn(candidate.repo_url, candidate.repo_name)
+        inspection = await asyncio.to_thread(clone_and_inspect_fn, candidate.repo_url, candidate.repo_name)
         package = build_source_package(inspection)
         await record_pipeline_event(
             db,
             run_id=run_id,
-            phase="deep",
+            phase="deep_report",
             event="deep.scan_done",
             level="success",
             status="done",
@@ -1368,13 +1370,13 @@ async def run_deep_report_stage(
             title=candidate.title,
             message=f"源码扫描完成：{len(package.key_files)} 个关键文件",
         )
-        if registry is None or agent_config is None or analyze_fn is None:
+        if registry is None or analyze_fn is None:
             raise RuntimeError("deep_report is not configured")
 
         await record_pipeline_event(
             db,
             run_id=run_id,
-            phase="deep",
+            phase="deep_report",
             event="deep.analyze_start",
             status="running",
             source_id=candidate.source_id,
@@ -1384,8 +1386,9 @@ async def run_deep_report_stage(
             title=candidate.title,
             message="开始源码级深度分析",
         )
-        report, cost_record = await analyze_fn(package, registry, agent_config, run_id)
-        await save_cost_log(db, run_id, cost_record)
+        report, cost_records = await analyze_fn(candidate, package, registry)
+        for cost_record in cost_records:
+            await save_cost_log(db, run_id, cost_record)
         markdown = render_report_markdown(report, package)
         report_id = await save_deep_report(
             db,
@@ -1399,66 +1402,35 @@ async def run_deep_report_stage(
             trigger_reason=candidate.trigger_reason,
             report_json=report.model_dump(),
             report_markdown=markdown,
-            evidence_json=report.evidence,
-            tech_stack_json=report.tech_stack,
+            evidence_json=[item.model_dump(mode="json") for item in report.source_evidence],
+            tech_stack_json=package.tech_stack,
             file_tree_summary=package.file_tree_summary,
-            analysis_cost=cost_record.cost,
-            analysis_tokens=cost_record.tokens_in + cost_record.tokens_out,
+            analysis_cost=sum(item.cost for item in cost_records),
+            analysis_tokens=sum(item.tokens_in + item.tokens_out for item in cost_records),
             error="",
         )
         await record_pipeline_event(
             db,
             run_id=run_id,
-            phase="deep",
+            phase="deep_report",
             event="deep.persist_done",
             level="success",
-            status="done",
+            status="completed",
             source_id=candidate.source_id,
             source="github",
             source_detail=candidate.repo_name,
             ref_url=candidate.repo_url,
             title=candidate.title,
-            cost=cost_record.cost,
-            tokens=cost_record.tokens_in + cost_record.tokens_out,
+            cost=sum(item.cost for item in cost_records),
+            tokens=sum(item.tokens_in + item.tokens_out for item in cost_records),
             message="深度分析报告已保存",
             payload={"report_id": report_id, "candidate_score": candidate.candidate_score},
         )
         return DeepReportStageResult(status="completed", report_id=report_id, repo_url=candidate.repo_url)
     except Exception as exc:
-        await record_pipeline_event(
-            db,
-            run_id=run_id,
-            phase="deep",
-            event="deep.failed",
-            level="error",
-            status="failed",
-            source_id=candidate.source_id,
-            source="github",
-            source_detail=candidate.repo_name,
-            ref_url=candidate.repo_url,
-            title=candidate.title,
-            message=str(exc),
-        )
-        await save_deep_report(
-            db,
-            repo_url=candidate.repo_url,
-            repo_name=candidate.repo_name,
-            article_id=candidate.article_id,
-            run_id=run_id,
-            commit_sha="",
-            status="failed",
-            candidate_score=candidate.candidate_score,
-            trigger_reason=candidate.trigger_reason,
-            report_json={},
-            report_markdown="",
-            evidence_json=[],
-            tech_stack_json={},
-            file_tree_summary="",
-            analysis_cost=0,
-            analysis_tokens=0,
-            error=str(exc),
-        )
-        return DeepReportStageResult(status="failed", repo_url=candidate.repo_url, message=str(exc))
+        # failed path 也是 best-effort：保存 failed report 或写 deep.failed event 再失败，
+        # 都只 logger.exception，最终仍返回 failed。
+        ...
 ```
 
 - [ ] **Step 5: Run service tests**
@@ -1480,7 +1452,6 @@ from .deep_reports.service import run_deep_report_stage
 After `_record_source_summaries(...)` and before `end_pipeline_run(...)`, add:
 
 ```python
-deep_agent = agents_cfg.agents.get("deep_report")
 await run_deep_report_stage(
     db=_db,
     registry=_registry,
@@ -1488,17 +1459,21 @@ await run_deep_report_stage(
     raw_items=new_items,
     analyzed_items=all_analyzed,
     reviewed_items=all_reviewed,
-    agent_config=deep_agent,
+    article_ids=article_ids,
 )
 ```
 
-If `agents_cfg` is not currently available in `run_pipeline`, load it near the other configs:
+Main 再保留最后一道小兜底：
 
 ```python
-agents_cfg = load_agents_config(CONFIG_DIR / "agents.yaml")
+try:
+    deep_report_result = await run_deep_report_stage(...)
+except Exception as exc:
+    logger.exception("deep_report.stage_unexpected_failure", extra={"run_id": run_id})
+    deep_report_result = DeepReportStageResult(status="failed", message=str(exc))
 ```
 
-Do not let exceptions from deep report stage escape; `run_deep_report_stage()` already catches per-candidate failures.
+这样即使 future regression 让 service 重新抛错，主 pipeline 仍保持 `completed`。另外，completed 报告先保存，再以 best-effort 写 `deep.persist_done` 事件；事件失败只记日志，不能回退成 failed 覆盖已完成报告。DB upsert 还需要保证同一 `repo_url + commit_sha` 的历史 completed 报告不会被后续 failed 尝试降级。Deep report cost records stay inside the stage and are not merged back into the source funnel `all_costs`。approved/retry 已持久化文章都需要回填到 `article_ids`，供 selector 关联当前 run 文章。
 
 - [ ] **Step 7: Run pipeline tests**
 

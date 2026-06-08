@@ -73,3 +73,10 @@ class DeepReportOutput(BaseModel):
     limitations: list[str]
     actionable_takeaways: list[str]
     source_evidence: list[DeepReportEvidence]
+
+
+class DeepReportStageResult(BaseModel):
+    status: str
+    report_id: int | None = None
+    repo_url: str = ""
+    message: str = ""
