@@ -867,6 +867,16 @@ git commit -m "Add source package summarizer"
 - Modify: `src/deep_reports/models.py`
 - Test: `tests/test_deep_reports_selector.py`
 
+**Final selector rules:**
+- Only GitHub repository root URLs are eligible: `https://github.com/{owner}/{repo}` with optional trailing `/` and optional repo suffix `.git`; reject issue/tree/pull/query/fragment URLs.
+- Normalize every accepted candidate to `repo_url="https://github.com/{owner}/{repo}"` and `repo_name="{owner}/{repo}"`; use this normalized `repo_url` for candidate output and recent-report lookup.
+- Skip only recent `status='completed'` reports in the last 7 Beijing-time days: `datetime(updated_at) >= datetime('now', '+8 hours', '-7 days')`.
+- Recent `pending`, `report`, and `failed` rows do not suppress retry.
+- Build the candidate first, then apply `candidate_score >= 70`; do not pre-filter by reviewer `total_score`.
+- Source priority uses both `source_id` and `source_detail`: `github_ai_devtools > github_trending_velocity > github_trending_hot > github_trending > others`. `source_detail` terms such as `ai`, `devtools`, `agent`, `rag`, and `code` should be treated as GitHub AI-tool source signals when `source_id` is absent.
+- Effective `source_detail` is `analyzed.source_detail` first, then `raw.source_detail`; use the same effective value for source priority, source-detail score bonus, and `DeepReportCandidate.source_detail`.
+- `raw.raw_metadata["topics"]` and `AnalyzedItem.tags` may be absent or malformed; only list/tuple/set values contribute to practical hits. Integers and strings are treated as empty collections.
+
 - [ ] **Step 1: Write failing selector tests**
 
 Create `tests/test_deep_reports_selector.py`:
@@ -989,6 +999,9 @@ class DeepReportCandidate(BaseModel):
 Create `src/deep_reports/selector.py`:
 
 ```python
+import re
+from urllib.parse import urlparse
+
 from src.core.database import Database
 from src.graph.state import AnalyzedItem, RawItem, ReviewedItem
 
@@ -1004,19 +1017,50 @@ PRACTICAL_TERMS = {
     "tool", "agent", "code", "developer", "rag", "mcp", "cli",
     "knowledge", "graph", "automation", "workflow", "copilot",
 }
+AI_DEVTOOLS_SOURCE_TERMS = {"ai", "devtools", "agent", "rag", "code", "mcp", "developer"}
 
 
-def _repo_name(raw: RawItem) -> str:
-    if raw.source_detail:
-        return raw.source_detail
-    return raw.url.rstrip("/").replace("https://github.com/", "")
+def _source_key(source_id: str, source_detail: str) -> str:
+    if source_id in PREFERRED_SOURCES:
+        return source_id
+    detail_terms = set(re.findall(r"[a-z0-9]+", source_detail.lower()))
+    if detail_terms & AI_DEVTOOLS_SOURCE_TERMS:
+        return "github_ai_devtools"
+    if "trending velocity" in source_detail.lower():
+        return "github_trending_velocity"
+    if "trending hot" in source_detail.lower():
+        return "github_trending_hot"
+    if "trending" in source_detail.lower():
+        return "github_trending"
+    return source_id
+
+
+def _repo_info(url: str) -> tuple[str, str] | None:
+    """Return (repo_name, normalized_repo_url), or None for non-root GitHub URLs."""
+    parsed = urlparse(url)
+    if parsed.scheme != "https" or parsed.netloc.lower() != "github.com":
+        return None
+    if parsed.params or parsed.query or parsed.fragment:
+        return None
+    parts = [part for part in parsed.path.strip("/").split("/") if part]
+    if len(parts) != 2:
+        return None
+    owner, repo = parts
+    if repo.endswith(".git"):
+        repo = repo[:-4]
+    if not owner or not repo:
+        return None
+    repo_name = f"{owner}/{repo}"
+    return repo_name, f"https://github.com/{repo_name}"
 
 
 async def _has_recent_report(db: Database, repo_url: str) -> bool:
     row = await db.fetch_one(
         """
         SELECT id FROM deep_reports
-        WHERE repo_url=? AND datetime(created_at) >= datetime('now', '+8 hours', '-7 days')
+        WHERE repo_url = ?
+          AND status = 'completed'
+          AND datetime(updated_at) >= datetime('now', '+8 hours', '-7 days')
         LIMIT 1
         """,
         (repo_url,),
@@ -1024,22 +1068,30 @@ async def _has_recent_report(db: Database, repo_url: str) -> bool:
     return row is not None
 
 
+def _effective_source_detail(raw: RawItem, analyzed: AnalyzedItem) -> str:
+    return analyzed.source_detail or raw.source_detail
+
+
 def _score_candidate(raw: RawItem, analyzed: AnalyzedItem, reviewed: ReviewedItem) -> tuple[int, str]:
     metadata = raw.raw_metadata or {}
     source_id = metadata.get("source_id", "")
+    source_detail = _effective_source_detail(raw, analyzed)
+    source_key = _source_key(source_id, source_detail)
+    topics = metadata.get("topics") if isinstance(metadata.get("topics"), (list, tuple, set)) else []
+    tags = analyzed.tags if isinstance(analyzed.tags, (list, tuple, set)) else []
     text = " ".join([
         raw.title or "",
         raw.description or "",
         analyzed.summary or "",
-        " ".join(analyzed.tags or []),
-        " ".join(metadata.get("topics", []) or []),
+        " ".join(str(tag) for tag in tags),
+        " ".join(str(topic) for topic in topics),
     ]).lower()
     practical_hits = sum(1 for term in PRACTICAL_TERMS if term in text)
     practical_score = min(45, practical_hits * 9)
-    engineering_score = 20 if raw.source_detail else 10
+    engineering_score = 20 if source_detail else 10
     reviewer_score = round((reviewed.total_score or 0) * 0.15)
     heat_score = min(10, int((metadata.get("stars") or 0) / 500))
-    source_bonus = PREFERRED_SOURCES.get(source_id, 0)
+    source_bonus = PREFERRED_SOURCES.get(source_key, 0)
     total = min(100, practical_score + engineering_score + reviewer_score + heat_score + source_bonus)
     reason = f"source={source_id}, practical_hits={practical_hits}, reviewer={reviewed.total_score}"
     return total, reason
@@ -1056,26 +1108,29 @@ async def select_deep_report_candidate(
     candidates: list[DeepReportCandidate] = []
 
     for raw in raw_items:
-        if raw.source != "github" or not raw.url.startswith("https://github.com/"):
+        repo_info = _repo_info(raw.url)
+        if raw.source != "github" or not repo_info:
             continue
+        repo_name, repo_url = repo_info
         analyzed = analyzed_by_url.get(raw.url)
         reviewed = reviewed_by_url.get(raw.url)
         if analyzed is None or reviewed is None:
             continue
         if reviewed.verdict not in {"approved", "retry"}:
             continue
-        if await _has_recent_report(db, raw.url):
+        if await _has_recent_report(db, repo_url):
             continue
 
         score, reason = _score_candidate(raw, analyzed, reviewed)
         if score < 70:
             continue
         metadata = raw.raw_metadata or {}
+        source_detail = _effective_source_detail(raw, analyzed)
         candidates.append(DeepReportCandidate(
-            repo_url=raw.url,
-            repo_name=_repo_name(raw),
+            repo_url=repo_url,
+            repo_name=repo_name,
             source_id=metadata.get("source_id", ""),
-            source_detail=raw.source_detail,
+            source_detail=source_detail,
             title=analyzed.title,
             summary=analyzed.summary,
             reviewer_score=reviewed.total_score,
