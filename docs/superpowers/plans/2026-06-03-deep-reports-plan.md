@@ -14,96 +14,96 @@
 
 Create:
 
-- `src/db/migrations/010_deep_reports.sql`  
+- `src/db/migrations/010_deep_reports.sql`
   Adds `deep_reports` table and bumps `schema_version` to 10.
 
-- `src/deep_reports/__init__.py`  
+- `src/deep_reports/__init__.py`
   Package marker.
 
-- `src/deep_reports/models.py`  
+- `src/deep_reports/models.py`
   Pydantic models and dataclasses for candidate selection, repo inspection, source package, and report output.
 
-- `src/deep_reports/selector.py`  
+- `src/deep_reports/selector.py`
   Selects at most one GitHub repo candidate from current pipeline state.
 
-- `src/deep_reports/inspector.py`  
+- `src/deep_reports/inspector.py`
   Clones repo, filters files, extracts README/manifest/tree/key files, never executes repo code.
 
-- `src/deep_reports/summarizer.py`  
+- `src/deep_reports/summarizer.py`
   Converts raw repo scan into a compact LLM input package.
 
-- `src/deep_reports/analyzer.py`  
+- `src/deep_reports/analyzer.py`
   Calls LLM through existing registry and parses deep report JSON.
 
-- `src/deep_reports/service.py`  
+- `src/deep_reports/service.py`
   Orchestrates selector → inspector → summarizer → analyzer → persistence and emits DAG events.
 
-- `src/api/deep_reports.py`  
+- `src/api/deep_reports.py`
   FastAPI endpoints for report list/latest/detail.
 
-- `src/site/templates/deep.html`  
+- `src/site/templates/deep.html`
   Static list page shell.
 
-- `src/site/templates/deep-report.html`  
+- `src/site/templates/deep-report.html`
   Static detail page shell.
 
-- `src/site/static/js/deep-reports.js`  
+- `src/site/static/js/deep-reports.js`
   Browser-side fetch and rendering for deep reports.
 
-- `prompts/deep_report.md`  
+- `prompts/deep_report.md`
   Prompt for source-code-level repo analysis.
 
-- `tests/test_deep_reports_db.py`  
+- `tests/test_deep_reports_db.py`
   Migration and DB operations tests.
 
-- `tests/test_deep_reports_selector.py`  
+- `tests/test_deep_reports_selector.py`
   Candidate scoring and dedupe tests.
 
-- `tests/test_repo_inspector.py`  
+- `tests/test_repo_inspector.py`
   File filtering, manifest parsing, and key file extraction tests.
 
-- `tests/test_deep_reports_analyzer.py`  
+- `tests/test_deep_reports_analyzer.py`
   JSON parsing and prompt contract tests.
 
-- `tests/test_deep_reports_api.py`  
+- `tests/test_deep_reports_api.py`
   API contract tests.
 
-- `tests/test_deep_reports_pipeline.py`  
+- `tests/test_deep_reports_pipeline.py`
   Pipeline orchestration tests proving deep failures do not fail main pipeline.
 
 Modify:
 
-- `src/db/operations.py`  
+- `src/db/operations.py`
   Add insert/query helpers for `deep_reports`.
 
-- `src/main.py`  
+- `src/main.py`
   Register deep report API router and call deep report service after source-run summaries.
 
-- `src/site/builder.py`  
+- `src/site/builder.py`
   Render new static pages.
 
-- `src/site/templates/base.html`  
+- `src/site/templates/base.html`
   Add navigation link for deep reports.
 
-- `src/site/static/css/style.css`  
+- `src/site/static/css/style.css`
   Add restrained styles for deep report list/detail.
 
-- `config/agents.yaml`  
+- `config/agents.yaml`
   Add `deep_report` agent configuration.
 
-- `docs/api.md`  
+- `docs/api.md`
   Document new API endpoints.
 
-- `docs/data-model.md`  
+- `docs/data-model.md`
   Document `deep_reports` table.
 
-- `docs/architecture.md`  
+- `docs/architecture.md`
   Add deep report post-pipeline stage.
 
-- `docs/codemap.md`  
+- `docs/codemap.md`
   Add module entry points.
 
-- `docs/task.md`  
+- `docs/task.md`
   Add task breakdown/status.
 
 ---
@@ -1619,7 +1619,7 @@ If `AGENTS.md` was not changed, remove it from the `git add` command.
 **Files:**
 - All files changed by Tasks 1-9.
 
-- [ ] **Step 1: Run full non-integration test suite**
+- [x] **Step 1: Run full non-integration test suite**
 
 ```bash
 .venv/bin/python -m pytest -m "not integration and not e2e"
@@ -1627,7 +1627,7 @@ If `AGENTS.md` was not changed, remove it from the `git add` command.
 
 Expected: all tests pass.
 
-- [ ] **Step 2: Run prompt regression tests**
+- [x] **Step 2: Run prompt regression tests**
 
 ```bash
 .venv/bin/python -m pytest tests/test_prompt_regression.py tests/test_deep_reports_analyzer.py -q
@@ -1635,7 +1635,7 @@ Expected: all tests pass.
 
 Expected: all tests pass.
 
-- [ ] **Step 3: Build static site locally**
+- [x] **Step 3: Build static site locally**
 
 Start app:
 
@@ -1653,7 +1653,7 @@ test -f output/deep-report.html
 
 Expected: build returns `{"code":0,...}` and both files exist.
 
-- [ ] **Step 4: Browser check**
+- [x] **Step 4: Browser check**
 
 Use browser automation to open:
 
@@ -1669,7 +1669,7 @@ http://127.0.0.1:8001/deep.html
 
 Expected: page renders list shell without console errors except optional favicon 404.
 
-- [ ] **Step 5: Verify pipeline skip path**
+- [x] **Step 5: Verify pipeline skip path**
 
 Run targeted test:
 
@@ -1679,7 +1679,7 @@ Run targeted test:
 
 Expected: PASS and no pipeline failure.
 
-- [ ] **Step 6: Verify diff cleanliness**
+- [x] **Step 6: Verify diff cleanliness**
 
 ```bash
 git diff --check

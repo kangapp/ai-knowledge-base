@@ -160,6 +160,12 @@
   - `docs/data-model.md` 记录 `deep_reports` 字段、索引、唯一约束、写入口径和 schema v10
   - `docs/architecture.md` 记录 Reviewer/入库后的后置阶段、源码扫描边界、失败隔离和静态页面
   - `docs/codemap.md`、`docs/structure.md` 补齐模块职责、测试入口和常见改动入口
+- [x] Deep Reports 最终验收（Task 10）
+  - 非 integration/e2e 测试 185 项通过，Prompt 回归 7 项通过
+  - 临时数据库和输出目录完成静态站构建，列表/详情 API 与页面联调通过
+  - 桌面端和 390px 移动端完成结构化报告、旧数据回退、异常状态和超长连续文本检查
+  - 无候选时深度阶段返回 skipped，不影响主 pipeline
+  - 深度报告完整提交范围通过 `git diff --check`，工作区无未提交文件
 - [ ] 统计服务层继续收口
   - 将 `quality/runtime/consumption` SQL 从 `src/db/operations.py` 逐步迁到更聚焦的统计服务文件
   - 每迁一个接口补一个契约测试
@@ -190,6 +196,9 @@
 - 已通过：`.venv/bin/python -m pytest tests/test_dashboard_frontend_contract.py tests/test_deep_reports_api.py tests/test_deep_reports_pipeline.py`
 - 已通过：`.venv/bin/python -m pytest tests/test_deep_reports_api.py tests/test_dashboard_frontend_contract.py`
 - 已通过：`.venv/bin/python -m pytest tests/test_dashboard_frontend_contract.py tests/test_deep_reports_api.py tests/test_deep_reports_pipeline.py tests/test_deep_reports_db.py`
+- 已通过：`.venv/bin/python -m pytest -m "not integration and not e2e" -q`（185 passed）
+- 已通过：`.venv/bin/python -m pytest tests/test_prompt_regression.py -q`（7 passed）
+- 已通过：`.venv/bin/python -m pytest tests/test_deep_reports_pipeline.py::test_deep_report_stage_skips_when_no_candidate -q`
 
 说明：
 - 当前 shell 中 `uv` 不可用，使用项目 `.venv/bin/python` 执行测试。
