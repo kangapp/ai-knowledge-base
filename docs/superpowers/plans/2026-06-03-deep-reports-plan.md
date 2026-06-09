@@ -1503,191 +1503,34 @@ git commit -m "Integrate deep report pipeline stage"
 - Modify: `src/site/static/css/style.css`
 - Test: `tests/test_dashboard_frontend_contract.py`
 
-- [ ] **Step 1: Write failing frontend contract test**
+- [x] **最终方案约束**
+  - 列表页独立为 `/deep.html`，详情页独立为 `/deep-report.html?id=...`，都继承 `base.html`，脚本通过 `{% block scripts %}` 以 `defer` 方式加载 `deep-reports.js`。
+  - `base.html` 导航新增“深度报告”，位置在“仪表盘”和“DAG”之间；`SiteBuilder` 生成 `deep.html` 和 `deep-report.html` 静态外壳。
+  - 列表页固定请求 `/api/deep-reports?page=1&page_size=100`，不做分页交互；公开列表 API 由后端直接返回 `status === 'completed'` 的报告，`total` 也是 completed 总数，排序使用 `updated_at DESC, id DESC`。前端保留 `status === 'completed'` 过滤仅作防御；内部审计继续使用全状态 `list_deep_reports()`。
+  - 公开详情请求 `/api/deep-reports/{id}` 时，后端只返回 `status='completed'` 的记录；`failed` 或不存在统一返回 `40401`。无 `id` 或 query 中 `id` 非法时，前端回退 `/api/deep-reports/latest`。
+  - 详情优先结构化渲染 `report_json`：`summary`、`tech_stack`、`architecture`、`data_flow`、`use_cases`、`strengths`、`limitations`、`actionable_takeaways`、`source_evidence`。数组为空时不渲染空 section。
+  - 兼容旧报告时回退 `report_markdown`，只允许 `escapeHtml(reportMarkdown)` 后放入 `<pre style="white-space: pre-wrap">`；禁止 `innerHTML = report_markdown` 或自制 Markdown parser。
+  - 所有外链通过 `safeHttpUrl()` 仅接受 `http/https`，渲染为 `target="_blank" rel="noopener noreferrer"`。
+  - 前端增加脏数据归一化 helper：`asObject(value)`、`asStringList(value)`、`normalizeEvidence(value)`、`asPositiveInt(value)`。`report_json` 非 plain object 当 `{}`；数组字段只接受字符串；`architecture` 只接受 object；`normalizeEvidence()` 统一把 `source_evidence` 收敛为至少含 `path`/`reason` 一项的安全对象数组，`[null,1,'x',{}]` 视为空；非法 `id` 不生成详情链接。
+  - `asPositiveInt(value)` 必须严格：number 只接受 `Number.isInteger(value) && value > 0`；string 必须 `trim()` 后匹配 `/^[1-9]\d*$/`，再转 `Number(value)` 并通过 `Number.isSafeInteger`。因此拒绝 `12abc`、`1e2`、`12<script>`、`01`。
+  - `normalizeEvidence()` 需要同时被 `renderEvidenceItems()` 和 `hasStructuredReport()` 复用，避免脏 evidence 单独触发结构化渲染，错误地阻止 markdown fallback。
+  - 列表项展示：`repo_name`、摘要（优先 `report_json.summary`）、候选分、前几项技术栈、更新时间、短 SHA、详情入口。
+  - 视觉风格保持现有浅色运维/知识库样式，列表项可用单层卡片，详情使用全宽 section，不做卡片套卡。
 
-Add to `tests/test_dashboard_frontend_contract.py`:
-
-```python
-from pathlib import Path
-
-
-def test_deep_report_templates_exist_and_use_api():
-    root = Path("src/site/templates")
-    deep = (root / "deep.html").read_text(encoding="utf-8")
-    detail = (root / "deep-report.html").read_text(encoding="utf-8")
-    script = Path("src/site/static/js/deep-reports.js").read_text(encoding="utf-8")
-
-    assert "deep-reports-list" in deep
-    assert "deep-report-detail" in detail
-    assert "/api/deep-reports" in script
-    assert "/api/deep-reports/latest" in script
-```
-
-- [ ] **Step 2: Run test to verify failure**
+- [x] **Task 8 测试与验证**
+  - 先补失败契约测试，再实现：
+    - `tests/test_dashboard_frontend_contract.py`
+    - `tests/test_deep_reports_api.py`
+  - 最低验证命令：
 
 ```bash
-.venv/bin/python -m pytest tests/test_dashboard_frontend_contract.py::test_deep_report_templates_exist_and_use_api -q
+.venv/bin/python -m pytest tests/test_deep_reports_api.py tests/test_dashboard_frontend_contract.py
+.venv/bin/python -m pytest tests/test_dashboard_frontend_contract.py tests/test_deep_reports_api.py tests/test_deep_reports_pipeline.py tests/test_deep_reports_db.py
+git diff --check HEAD~1 HEAD
 ```
 
-Expected: FAIL because files do not exist.
-
-- [ ] **Step 3: Add templates**
-
-Create `src/site/templates/deep.html`:
-
-```html
-{% extends "base.html" %}
-{% block title %}深度分析{% endblock %}
-{% block content %}
-<main class="deep-page">
-  <section class="page-header">
-    <h1>深度分析</h1>
-    <p>自动筛选高价值 GitHub AI 工具项目，生成源码级研究报告。</p>
-  </section>
-  <section id="deep-reports-list" class="deep-list"></section>
-</main>
-<script src="/static/js/deep-reports.js"></script>
-{% endblock %}
-```
-
-Create `src/site/templates/deep-report.html`:
-
-```html
-{% extends "base.html" %}
-{% block title %}深度报告{% endblock %}
-{% block content %}
-<main class="deep-page">
-  <section id="deep-report-detail" class="deep-report-detail"></section>
-</main>
-<script src="/static/js/deep-reports.js"></script>
-{% endblock %}
-```
-
-- [ ] **Step 4: Add JS renderer**
-
-Create `src/site/static/js/deep-reports.js`:
-
-```javascript
-(function () {
-    async function requestJson(url) {
-        const response = await fetch(url);
-        const body = await response.json();
-        if (!response.ok || body.code !== 0) {
-            throw new Error(body.message || '深度报告加载失败');
-        }
-        return body.data;
-    }
-
-    function escapeHtml(value) {
-        return String(value || '').replace(/[&<>"']/g, ch => ({
-            '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
-        }[ch]));
-    }
-
-    function renderList(data) {
-        const container = document.getElementById('deep-reports-list');
-        if (!container) return;
-        const items = data.items || [];
-        if (!items.length) {
-            container.innerHTML = '<p class="muted">暂无深度分析报告</p>';
-            return;
-        }
-        container.innerHTML = items.map(item => `
-            <article class="deep-card">
-                <div>
-                    <h2><a href="/deep-report.html?id=${item.id}">${escapeHtml(item.repo_name)}</a></h2>
-                    <p>${escapeHtml(item.trigger_reason)}</p>
-                </div>
-                <div class="deep-score">${item.candidate_score || 0}</div>
-            </article>
-        `).join('');
-    }
-
-    function renderDetail(item) {
-        const container = document.getElementById('deep-report-detail');
-        if (!container) return;
-        if (!item || !item.id) {
-            container.innerHTML = '<p class="muted">深度报告不存在</p>';
-            return;
-        }
-        container.innerHTML = `
-            <header class="deep-report-head">
-                <h1>${escapeHtml(item.repo_name)}</h1>
-                <a href="${escapeHtml(item.repo_url)}" target="_blank" rel="noopener">GitHub</a>
-                <div class="deep-score">${item.candidate_score || 0}</div>
-                <p>${escapeHtml(item.trigger_reason)}</p>
-            </header>
-            <article class="deep-markdown">${escapeHtml(item.report_markdown).replace(/\\n/g, '<br>')}</article>
-        `;
-    }
-
-    async function init() {
-        if (document.getElementById('deep-reports-list')) {
-            renderList(await requestJson('/api/deep-reports'));
-        }
-        if (document.getElementById('deep-report-detail')) {
-            const id = new URLSearchParams(location.search).get('id');
-            if (id) {
-                renderDetail(await requestJson(`/api/deep-reports/${id}`));
-            } else {
-                renderDetail(await requestJson('/api/deep-reports/latest'));
-            }
-        }
-    }
-
-    document.addEventListener('DOMContentLoaded', () => {
-        init().catch(error => {
-            const target = document.getElementById('deep-reports-list') || document.getElementById('deep-report-detail');
-            if (target) target.innerHTML = `<p class="dashboard-error">${escapeHtml(error.message)}</p>`;
-        });
-    });
-})();
-```
-
-- [ ] **Step 5: Wire builder and navigation**
-
-Modify `src/site/builder.py` where extra pages are rendered:
-
-```python
-for tmpl in ("config.html", "dag.html", "deep.html", "deep-report.html"):
-```
-
-Modify `src/site/templates/base.html` navigation:
-
-```html
-<a href="/deep.html">深度分析</a> |
-```
-
-Place it near dashboard/DAG links.
-
-- [ ] **Step 6: Add CSS**
-
-Append to `src/site/static/css/style.css`:
-
-```css
-.deep-page .page-header { margin-bottom: 1.5rem; }
-.deep-list { display: grid; gap: 1rem; }
-.deep-card { display: flex; justify-content: space-between; gap: 1rem; background: #fff; border: 1px solid #e0e0e0; border-radius: 8px; padding: 1rem; }
-.deep-card h2 { font-size: 1rem; margin-bottom: 0.35rem; }
-.deep-score { min-width: 48px; height: 48px; border-radius: 8px; background: #1a1a2e; color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 700; }
-.deep-report-head { background: #fff; border: 1px solid #e0e0e0; border-radius: 8px; padding: 1rem; margin-bottom: 1rem; }
-.deep-markdown { background: #fff; border: 1px solid #e0e0e0; border-radius: 8px; padding: 1rem; line-height: 1.7; }
-```
-
-- [ ] **Step 7: Run tests**
-
-```bash
-.venv/bin/python -m pytest tests/test_dashboard_frontend_contract.py -q
-```
-
-Expected: PASS.
-
-- [ ] **Step 8: Commit**
-
-```bash
-git add src/site/templates/deep.html src/site/templates/deep-report.html src/site/static/js/deep-reports.js src/site/builder.py src/site/templates/base.html src/site/static/css/style.css tests/test_dashboard_frontend_contract.py
-git commit -m "Add deep report static pages"
-```
+- [ ] **浏览器实机验证**
+  - 由主流程在页面集成完成后执行，不在本 Task 8 文档中提前标记为已完成。
 
 ---
 

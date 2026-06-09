@@ -1,6 +1,6 @@
 # 当前任务拆解
 
-更新时间：2026-06-02
+更新时间：2026-06-09
 
 ## P0 已完成
 
@@ -145,6 +145,16 @@
   - completed 报告先落库，`deep.persist_done` 观测事件失败只记日志，不得降级或覆盖已完成报告
   - 同一 `repo_url + commit_sha` 的历史 completed 报告，不会被后续失败尝试 upsert 降级为 failed
   - main 再保留最终兜底；deep report cost 独立入 `cost_logs`，不混入 source funnel `all_costs`；approved/retry 已持久化文章都会回填 `article_ids`
+- [x] 深度报告静态列表/详情页（Task 8）
+  - 新增独立 `deep.html` 列表页和 `deep-report.html` 详情页，导航入口放在“仪表盘”和“DAG”之间，不并入仪表盘 Tab
+  - 公开列表 `/api/deep-reports?page=1&page_size=100` 由后端直接按 `status='completed'` 过滤，`total` 也是 completed 总数，并按 `updated_at DESC, id DESC` 返回；前端保留 `status='completed'` 二次过滤仅作防御
+  - 公开详情页有 `id` 时请求 `/api/deep-reports/{id}`，接口只允许返回 `status='completed'`；`failed` 或不存在统一返回 `40401`
+  - 无 `id` 或 query 中 `id` 非法时回退 `/api/deep-reports/latest`，同样只基于最新 completed 报告
+  - 渲染优先使用 `report_json` 的结构化字段：概述、技术栈、架构、数据流、应用场景、优势、局限、可执行建议、源码证据；数组为空时不输出空 section
+  - 兼容旧数据时回退 `report_markdown`，仅以转义后的 `<pre style="white-space: pre-wrap">` 文本展示，不做不安全 HTML 注入或 Markdown 解析；当 `source_evidence` 只有脏值如 `[null, 1, "x", {}]` 且其它结构字段为空时，必须继续走 markdown fallback
+  - 新增 `requestJson`、`escapeHtml`、`safeHttpUrl` 前端契约，统一处理 HTTP/envelope 错误与外链安全
+  - 前端对脏数据做最小归一化：`report_json` 非 plain object 视为 `{}`，数组字段只接受字符串项，`normalizeEvidence()` 统一过滤 `evidence` 中的 `null`/数字/字符串/空对象，详情链接 `id` 必须是严格正整数
+  - `asPositiveInt()` 规则：number 仅接受 `Number.isInteger(value) && value > 0`；string 必须 `trim()` 后匹配 `/^[1-9]\d*$/` 并通过 `Number.isSafeInteger`，因此拒绝 `12abc`、`1e2`、`12<script>`、`01`
 - [ ] 统计服务层继续收口
   - 将 `quality/runtime/consumption` SQL 从 `src/db/operations.py` 逐步迁到更聚焦的统计服务文件
   - 每迁一个接口补一个契约测试
@@ -171,5 +181,15 @@
 - 已通过：`.venv/bin/python -m pytest tests/test_database.py tests/test_cost_accounting.py tests/test_pipeline_observability.py tests/test_api_contracts.py tests/test_analyzer.py tests/test_reviewer.py tests/test_pipeline.py -q`（34 passed）
 - 已通过：`.venv/bin/python -m pytest tests/test_deep_reports_pipeline.py`
 - 已通过：`.venv/bin/python -m pytest tests/test_deep_reports_pipeline.py tests/test_deep_reports_analyzer.py tests/test_deep_reports_selector.py tests/test_repo_inspector.py tests/test_pipeline.py tests/test_pipeline_observability.py`
+- 已通过：`.venv/bin/python -m pytest tests/test_dashboard_frontend_contract.py`
+- 已通过：`.venv/bin/python -m pytest tests/test_dashboard_frontend_contract.py tests/test_deep_reports_api.py tests/test_deep_reports_pipeline.py`
+- 已通过：`.venv/bin/python -m pytest tests/test_deep_reports_api.py tests/test_dashboard_frontend_contract.py`
+- 已通过：`.venv/bin/python -m pytest tests/test_dashboard_frontend_contract.py tests/test_deep_reports_api.py tests/test_deep_reports_pipeline.py tests/test_deep_reports_db.py`
 
-说明：当前 shell 中 `uv` 不可用，使用项目 `.venv/bin/python` 执行测试。
+说明：
+- 当前 shell 中 `uv` 不可用，使用项目 `.venv/bin/python` 执行测试。
+- 深度报告页面已完成浏览器级验证：
+  - 桌面端列表仅展示 completed 报告，候选分 0 正常显示，failed 报告不公开
+  - 结构化详情完整展示 8 个报告区块，旧数据安全回退为转义后的原始文本
+  - 非法 id 回退 latest，failed/not-found id 展示统一错误状态
+  - 390px 移动端列表与详情无横向溢出，长标题、标签和源码路径正常换行

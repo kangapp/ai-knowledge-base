@@ -1,3 +1,4 @@
+import json
 from pathlib import Path
 
 import pytest
@@ -124,6 +125,25 @@ def test_missing_detail_returns_404_envelope(api_client):
 
 
 @pytest.mark.asyncio
+async def test_failed_detail_returns_404_envelope(api_client, api_db):
+    report_id = await _save_report(
+        api_db,
+        repo_url="https://github.com/org/failed-tool",
+        repo_name="org/failed-tool",
+        status="failed",
+    )
+
+    response = api_client.get(f"/api/deep-reports/{report_id}")
+
+    assert response.status_code == 404
+    assert response.json() == {
+        "code": 40401,
+        "data": None,
+        "message": f"深度报告 {report_id} 不存在",
+    }
+
+
+@pytest.mark.asyncio
 async def test_latest_returns_empty_object_without_completed_report(api_client, api_db):
     await _save_report(
         api_db,
@@ -152,6 +172,13 @@ async def test_list_reports_uses_page_and_page_size(api_client, api_db):
         repo_name="org/second",
         candidate_score=90,
     )
+    await _save_report(
+        api_db,
+        repo_url="https://github.com/org/failed-third",
+        repo_name="org/failed-third",
+        status="failed",
+        candidate_score=99,
+    )
 
     response = api_client.get("/api/deep-reports?page=2&page_size=1")
 
@@ -163,3 +190,63 @@ async def test_list_reports_uses_page_and_page_size(api_client, api_db):
     assert body["data"]["page_size"] == 1
     assert len(body["data"]["items"]) == 1
     assert body["data"]["items"][0]["id"] in {first_id, second_id}
+    assert body["data"]["items"][0]["status"] == "completed"
+
+
+@pytest.mark.asyncio
+async def test_public_list_ignores_failed_reports_before_pagination(api_client, api_db):
+    completed_id = await _save_report(
+        api_db,
+        repo_url="https://github.com/org/completed-only",
+        repo_name="org/completed-only",
+        status="completed",
+        candidate_score=88,
+    )
+    await api_db.execute(
+        "UPDATE deep_reports SET updated_at = ?, created_at = ? WHERE id = ?",
+        ("2026-06-01T09:00:00+08:00", "2026-06-01T09:00:00+08:00", completed_id),
+    )
+
+    failed_rows = []
+    for index in range(101):
+        failed_rows.append((
+            f"https://github.com/org/failed-{index}",
+            f"org/failed-{index}",
+            12,
+            "run_1",
+            f"failedsha{index}",
+            "failed",
+            100 - (index % 10),
+            "should stay internal",
+            json.dumps({"summary": f"failed-{index}"}, ensure_ascii=False),
+            "",
+            "[]",
+            "{}",
+            "",
+            0.001,
+            128,
+            "clone failed",
+            f"2026-06-09T10:{index % 60:02d}:00+08:00",
+            f"2026-06-09T10:{index % 60:02d}:00+08:00",
+        ))
+
+    await api_db.execute_many(
+        """
+        INSERT INTO deep_reports
+        (repo_url, repo_name, article_id, run_id, commit_sha, status, candidate_score,
+         trigger_reason, report_json, report_markdown, evidence_json, tech_stack_json,
+         file_tree_summary, analysis_cost, analysis_tokens, error, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        failed_rows,
+    )
+    await api_db.commit()
+
+    response = api_client.get("/api/deep-reports?page=1&page_size=100")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["code"] == 0
+    assert body["data"]["total"] == 1
+    assert [item["id"] for item in body["data"]["items"]] == [completed_id]
+    assert all(item["status"] == "completed" for item in body["data"]["items"])

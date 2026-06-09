@@ -318,6 +318,14 @@ async def get_deep_report(db: Database, report_id: int) -> dict | None:
     return _deep_report_row(row) if row else None
 
 
+async def get_completed_deep_report(db: Database, report_id: int) -> dict | None:
+    row = await db.fetch_one(
+        "SELECT * FROM deep_reports WHERE id = ? AND status = 'completed'",
+        (report_id,),
+    )
+    return _deep_report_row(row) if row else None
+
+
 async def get_latest_deep_report(db: Database) -> dict | None:
     row = await db.fetch_one(
         "SELECT * FROM deep_reports WHERE status = 'completed' ORDER BY updated_at DESC, id DESC LIMIT 1"
@@ -333,6 +341,29 @@ async def list_deep_reports(db: Database, page: int = 1, page_size: int = 20) ->
     total = await db.fetch_one("SELECT COUNT(*) as c FROM deep_reports")
     rows = await db.fetch_all(
         "SELECT * FROM deep_reports ORDER BY created_at DESC, id DESC LIMIT ? OFFSET ?",
+        (page_size, offset),
+    )
+    return {
+        "items": [_deep_report_row(row) for row in rows],
+        "total": total["c"] if total else 0,
+        "page": page,
+        "page_size": page_size,
+    }
+
+
+async def list_completed_deep_reports(db: Database, page: int = 1, page_size: int = 20) -> dict:
+    page = max(page, 1)
+    page_size = max(page_size, 1)
+    offset = (page - 1) * page_size
+
+    total = await db.fetch_one("SELECT COUNT(*) as c FROM deep_reports WHERE status = 'completed'")
+    rows = await db.fetch_all(
+        """
+        SELECT * FROM deep_reports
+        WHERE status = 'completed'
+        ORDER BY updated_at DESC, id DESC
+        LIMIT ? OFFSET ?
+        """,
         (page_size, offset),
     )
     return {

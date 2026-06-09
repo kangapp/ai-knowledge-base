@@ -82,12 +82,12 @@ class SiteBuilder:
         # stats.json
         (tmp_dir / "stats.json").write_text(json.dumps(stats, ensure_ascii=False), encoding="utf-8")
 
-        # 新增页面：配置查看页、DAG 状态页（需要 API 数据，由浏览器 JS 渲染）
+        # 新增页面：配置查看页、DAG 状态页、深度报告页（需要 API 数据，由浏览器 JS 渲染）
         # base.html 需先复制，然后 config/dag.html 用 Jinja2 渲染
         base_src = self.template_dir / "base.html"
         if base_src.exists():
             shutil.copy2(base_src, tmp_dir / "base.html")
-        for tmpl in ("config.html", "dag.html"):
+        for tmpl in ("config.html", "dag.html", "deep.html", "deep-report.html"):
             src = self.template_dir / tmpl
             if src.exists():
                 rendered = self.env.get_template(tmpl).render()
