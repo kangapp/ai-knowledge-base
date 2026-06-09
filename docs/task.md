@@ -155,6 +155,11 @@
   - 新增 `requestJson`、`escapeHtml`、`safeHttpUrl` 前端契约，统一处理 HTTP/envelope 错误与外链安全
   - 前端对脏数据做最小归一化：`report_json` 非 plain object 视为 `{}`，数组字段只接受字符串项，`normalizeEvidence()` 统一过滤 `evidence` 中的 `null`/数字/字符串/空对象，详情链接 `id` 必须是严格正整数
   - `asPositiveInt()` 规则：number 仅接受 `Number.isInteger(value) && value > 0`；string 必须 `trim()` 后匹配 `/^[1-9]\d*$/` 并通过 `Number.isSafeInteger`，因此拒绝 `12abc`、`1e2`、`12<script>`、`01`
+- [x] 补齐 Deep Reports 正式文档（Task 9）
+  - `docs/api.md` 记录 completed-only 列表、latest 空对象和 failed/not-found 详情 404 契约
+  - `docs/data-model.md` 记录 `deep_reports` 字段、索引、唯一约束、写入口径和 schema v10
+  - `docs/architecture.md` 记录 Reviewer/入库后的后置阶段、源码扫描边界、失败隔离和静态页面
+  - `docs/codemap.md`、`docs/structure.md` 补齐模块职责、测试入口和常见改动入口
 - [ ] 统计服务层继续收口
   - 将 `quality/runtime/consumption` SQL 从 `src/db/operations.py` 逐步迁到更聚焦的统计服务文件
   - 每迁一个接口补一个契约测试

@@ -341,6 +341,44 @@ UNIQUE(repo_url, snapshot_date)
 - `github_trending_velocity` 使用最新快照与目标窗口前最近一次基线快照计算 star/day，不要求数据库里刚好存在精确 N 天前快照。
 - 增速筛选只作用于 `raw_metadata.source_id == github_trending_velocity` 的采集结果，不影响同一批次里的常规 GitHub、RSS 或 arXiv 数据。
 
+### deep_reports — GitHub 源码级深度报告
+
+| 列 | 类型 | 说明 |
+|----|------|------|
+| id | INTEGER PK | |
+| repo_url | TEXT | 规范化 GitHub 仓库 URL |
+| repo_name | TEXT | `owner/repo` |
+| article_id | INTEGER FK → articles.id | 关联文章，可为空 |
+| run_id | TEXT FK → pipeline_runs.id | 触发分析的 pipeline run |
+| commit_sha | TEXT DEFAULT '' | 本次源码扫描对应 commit |
+| status | TEXT | completed / failed |
+| candidate_score | INTEGER DEFAULT 0 | 候选选择分 |
+| trigger_reason | TEXT | 触发原因和评分摘要 |
+| report_json | TEXT DEFAULT '{}' | JSON：结构化深度报告 |
+| report_markdown | TEXT DEFAULT '' | 兼容展示的 Markdown 文本 |
+| evidence_json | TEXT DEFAULT '[]' | JSON：源码证据路径及理由 |
+| tech_stack_json | TEXT DEFAULT '{}' | JSON：扫描得到的技术栈 |
+| file_tree_summary | TEXT | 截断后的文件树摘要 |
+| analysis_cost | REAL DEFAULT 0 | 本次深度分析成本 |
+| analysis_tokens | INTEGER DEFAULT 0 | 本次深度分析 token 总量 |
+| error | TEXT | 失败原因；成功记录为空 |
+| created_at | TEXT DEFAULT (datetime('now', '+8 hours')) | 北京时间 |
+| updated_at | TEXT DEFAULT (datetime('now', '+8 hours')) | 北京时间 |
+
+UNIQUE(repo_url, commit_sha)
+
+**索引：**
+
+- `idx_deep_reports_status_created(status, created_at DESC)`
+- `idx_deep_reports_repo_url(repo_url)`
+- `idx_deep_reports_run_id(run_id)`
+
+**写入与公开口径：**
+
+- 同一 `repo_url + commit_sha` 使用 upsert；已完成记录不会被后续 failed 尝试降级覆盖。
+- `report_json/evidence_json/tech_stack_json` 在数据库中存 TEXT，DB operations 返回时解码为对象或数组。
+- failed 记录保留源码包、成本和错误信息用于排障；公开 API 只读取 completed 记录。
+
 ### provider_health — Provider 健康状态
 
 | 列 | 类型 | 说明 |
@@ -388,7 +426,7 @@ UNIQUE(repo_url, snapshot_date)
 
 | version |
 |---------|
-| 8 |
+| 10 |
 
 ## extra_data JSON 结构详解
 
