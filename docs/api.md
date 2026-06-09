@@ -382,6 +382,72 @@
 
 ---
 
+## 深度报告接口
+
+公开接口只返回 `status='completed'` 的深度报告；`failed` 记录仅用于内部排障，不参与公开列表、latest 或详情响应。
+
+### GET /api/deep-reports
+
+深度报告列表。
+
+**参数:**
+
+| 参数 | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| page | int | 1 | 页码，最小 1 |
+| page_size | int | 20 | 每页数量，范围 1-100 |
+
+**口径:**
+
+- `items` 和 `total` 都只统计 completed 报告。
+- 按 `updated_at DESC, id DESC` 排序后分页。
+- 列表只返回展示所需的摘要字段；完整 `report_json/report_markdown/evidence_json/file_tree_summary` 仅由 latest/detail 返回。
+
+**响应:**
+```json
+{
+  "code": 0,
+  "data": {
+    "items": [
+      {
+        "id": 1,
+        "repo_url": "https://github.com/org/tool",
+        "repo_name": "org/tool",
+        "status": "completed",
+        "candidate_score": 88,
+        "trigger_reason": "实用性高，源码结构清晰",
+        "report_summary": "项目概述",
+        "report_tech_stack": ["Python", "FastAPI"],
+        "tech_stack_json": {"languages": ["Python"]},
+        "updated_at": "2026-06-09T10:00:00"
+      }
+    ],
+    "total": 1,
+    "page": 1,
+    "page_size": 20
+  },
+  "message": "ok"
+}
+```
+
+### GET /api/deep-reports/latest
+
+返回按 `updated_at DESC, id DESC` 排序的最新 completed 深度报告。没有 completed 报告时仍返回成功信封，`data` 为 `{}`。
+
+### GET /api/deep-reports/{report_id}
+
+返回指定 completed 深度报告详情。
+
+**参数:**
+
+| 参数 | 类型 | 说明 |
+|------|------|------|
+| report_id | int | 深度报告 ID |
+
+**错误:** `40401` - 报告不存在，或记录存在但状态不是 completed。
+
+---
+
 ## 流水线接口
 
 ### POST /api/pipeline/run

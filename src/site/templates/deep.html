@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block title %}深度报告{% endblock %}
+{% block content %}
+<div class="deep-page">
+    <header class="content-page-header">
+        <h1>深度报告</h1>
+        <p class="page-subtitle">展示已完成的源码级项目分析报告。</p>
+    </header>
+
+    <section id="deep-reports-list" class="deep-list" aria-live="polite">
+        <div class="loading">正在加载深度报告...</div>
+    </section>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script defer src="/static/js/deep-reports.js"></script>
+{% endblock %}

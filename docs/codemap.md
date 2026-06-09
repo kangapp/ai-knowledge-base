@@ -1,6 +1,6 @@
 # 代码地图
 
-更新时间：2026-06-02
+更新时间：2026-06-09
 
 ## API 入口
 
@@ -36,6 +36,10 @@
 - `src/api/config.py`
   - 配置查看接口：读取 `llm/sources/agents` YAML，返回 raw + parsed。
 
+- `src/api/deep_reports.py`
+  - 深度报告公开 API：completed 列表、latest 和详情。
+  - 常见改动入口：分页限制、公开状态过滤、详情不存在时的错误契约。
+
 ## 业务与数据层
 
 - `src/services/dashboard_stats.py`
@@ -63,6 +67,32 @@
   - 项目业务时间统一入口，当前使用北京时间（Asia/Shanghai / UTC+8）。
   - 常见改动入口：日志时间、run_id、采集入库时间、站点构建更新时间。
   - 代码中不要直接使用 `datetime.now(timezone.utc)` 或 SQLite 裸 `datetime('now')` 作为业务时间。
+
+## Deep Reports
+
+- `src/deep_reports/models.py`
+  - 候选、仓库扫描结果、源码包、结构化报告和阶段结果模型。
+  - 常见改动入口：LLM 报告 schema、源码证据字段、阶段返回契约。
+
+- `src/deep_reports/selector.py`
+  - 从本轮 approved/retry GitHub 项目中选择最多 1 个候选，执行来源偏好、实用性、Reviewer 分数和 stars 综合评分，并跳过 7 天内已有 completed 报告的仓库。
+  - 常见改动入口：触发阈值、候选评分、重复分析窗口。
+
+- `src/deep_reports/inspector.py`
+  - 临时 shallow clone，过滤依赖/构建目录、二进制和超限文件，读取 README、manifest、入口文件、关键源码与 commit SHA；不执行仓库代码。
+  - 常见改动入口：文件大小/数量上限、跳过目录、关键文件识别。
+
+- `src/deep_reports/summarizer.py`
+  - 将仓库扫描结果压缩为受限源码包，提取技术栈、文件树摘要和证据列表。
+  - 常见改动入口：技术栈识别、证据优先级、LLM 输入体积。
+
+- `src/deep_reports/analyzer.py`
+  - 通过 `LLMRegistry` 调用 `deep_report` Agent，加载 `prompts/deep_report.md`，校验结构化输出并记录每次尝试成本。
+  - 常见改动入口：报告 schema、Prompt 参数、解析与重试策略。
+
+- `src/deep_reports/service.py`
+  - 编排 selector → inspector → summarizer → analyzer → persistence，并记录 `deep.*` pipeline events。
+  - 常见改动入口：主 pipeline 接入、失败隔离、成本/报告持久化、Markdown 兼容输出。
 
 ## Pipeline
 
@@ -121,6 +151,14 @@
   - Pipeline DAG 运行页。
   - 常见改动入口：阶段布局、source 漏斗、活跃 item、事件流日志展示。
 
+- `src/site/templates/deep.html` / `src/site/templates/deep-report.html`
+  - 深度报告列表和详情静态外壳，由浏览器端请求公开 API。
+  - 常见改动入口：页面结构、加载/空/错误状态容器。
+
+- `src/site/static/js/deep-reports.js`
+  - 深度报告列表/详情请求、脏数据归一化、安全转义和结构化区块渲染。
+  - 常见改动入口：报告字段展示、latest 回退、外链和旧 Markdown 数据兼容。
+
 - `src/site/static/js/app.js`
   - 首页文章列表筛选、来源/标签/日期过滤。
   - 不再承载 dashboard Tab 控制逻辑。
@@ -153,6 +191,15 @@
 
 - `tests/test_database.py`
   - SQLite migration、唯一约束、FTS5 同步、pipeline event 持久化。
+
+- `tests/test_deep_reports_db.py` / `tests/test_deep_reports_api.py`
+  - 深度报告迁移、upsert 保护、completed-only 公开查询和 404 契约。
+
+- `tests/test_deep_reports_selector.py` / `tests/test_repo_inspector.py`
+  - 候选评分/去重窗口和源码扫描安全边界。
+
+- `tests/test_deep_reports_analyzer.py` / `tests/test_deep_reports_pipeline.py`
+  - Prompt/结构化输出、成本记录、阶段编排和主 pipeline 失败隔离。
 
 ## 文档入口
 

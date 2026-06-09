@@ -167,3 +167,36 @@ def test_prepare_retry_review_items_reuses_existing_analysis():
     assert retry_items == [analyzed]
     assert retry_items[0].retry_count == 1
     assert retry_items[0].title == "repo analyzed"
+
+
+def test_merge_retry_review_result_accepts_review_only_result():
+    original = ReviewedItem(
+        ref_url="https://example.com/a",
+        total_score=60,
+        dimensions={},
+        verdict="retry",
+    )
+    updated = ReviewedItem(
+        ref_url="https://example.com/a",
+        total_score=72,
+        dimensions={},
+        verdict="approved",
+    )
+    cost = CostRecord(
+        agent="reviewer",
+        provider="minimax",
+        model="MiniMax-M3",
+        tokens_in=10,
+        tokens_out=5,
+        cost=0.001,
+        status="success",
+        ref_url=updated.ref_url,
+    )
+
+    reviewed = main._merge_retry_review_result(
+        all_reviewed=[original],
+        all_costs=[],
+        retry_result={"reviewed_items": [updated], "cost_records": [cost]},
+    )
+
+    assert reviewed == [updated]

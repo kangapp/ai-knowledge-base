@@ -22,7 +22,8 @@ ai-knowledge-base/
 │   ├── rss.md
 │   ├── feishu.md
 │   ├── arxiv.md
-│   └── reviewer.md         #   四维评分锚点 + retry_feedback 格式
+│   ├── reviewer.md         #   四维评分锚点 + retry_feedback 格式
+│   └── deep_report.md      #   GitHub 源码级深度报告 schema 与证据要求
 │
 ├── src/
 │   ├── main.py             # FastAPI 入口 + APScheduler (skip_if_running)
@@ -47,6 +48,14 @@ ai-knowledge-base/
 │   │       ├── feishu.py
 │   │       └── arxiv.py
 │   │
+│   ├── deep_reports/       # Reviewer/入库后的源码级 GitHub 深度分析
+│   │   ├── models.py       #   候选、扫描、源码包、报告模型
+│   │   ├── selector.py     #   候选评分、阈值和 7 天去重
+│   │   ├── inspector.py    #   shallow clone + 受限文本源码扫描
+│   │   ├── summarizer.py   #   技术栈、文件树和证据包压缩
+│   │   ├── analyzer.py     #   deep_report Agent 调用和结构化输出校验
+│   │   └── service.py      #   后置阶段编排、失败隔离和持久化
+│   │
 │   ├── db/                 # 数据访问层
 │   │   ├── operations.py   #   文章/标签/成本/pipeline/统计 SQL 操作
 │   │   └── migrations/     #   版本化 SQL 文件（001_init.sql, 002_xxx.sql, ...）
@@ -57,6 +66,7 @@ ai-knowledge-base/
 │   │   ├── stats.py        #   /api/stats/* 仪表盘统计接口
 │   │   ├── dashboard.py    #   /api/dashboard/summary 首屏 KPI 聚合
 │   │   ├── sources.py      #   /api/sources/* 数据源管理与健康统计
+│   │   ├── deep_reports.py #   /api/deep-reports completed-only 公开接口
 │   │   └── config.py       #   /api/config/{llm|sources|agents}
 │   │
 │   ├── services/           # API-facing 服务层
@@ -64,10 +74,14 @@ ai-knowledge-base/
 │   │
 │   └── site/               # 静态站点生成
 │       ├── builder.py      #   去抖合并（5min 计时器）+ output.tmp 原子 rename
-│       └── templates/      #   Jinja2 模板
-│           ├── index.html  #     预渲染 30 天首屏 + <script>window.__INIT__</script>
-│           ├── article.html#     JS 读 URL param + fetch /api/articles/{id}
-│           └── dashboard.html # 内联 window.__STATS__ + Chart.js
+│       ├── templates/      #   Jinja2 模板
+│       │   ├── index.html  #     预渲染 30 天首屏 + <script>window.__INIT__</script>
+│       │   ├── article.html#     JS 读 URL param + fetch /api/articles/{id}
+│       │   ├── dashboard.html # 内联 window.__STATS__ + Chart.js
+│       │   ├── deep.html   #     深度报告列表静态外壳
+│       │   └── deep-report.html # 深度报告详情静态外壳
+│       └── static/js/
+│           └── deep-reports.js # 深度报告 API 请求与安全渲染
 │
 ├── data/                   # SQLite + backup/ (volume mount)
 ├── output/                 # 静态站点产物 (volume mount, Caddy serve)
@@ -93,6 +107,7 @@ ai-knowledge-base/
 - **GitHub AI 开发工具源**：`github_ai_devtools` 专门捕获代码库理解、知识图谱、AI 编程工具类项目，避免与通用 LLM/RAG/MCP 源混在一起
 - **RSS 采集**：先用 `httpx.AsyncClient(timeout=30)` 获取 feed 文本，再由 `feedparser` 解析；英文关键词按词边界匹配；综合媒体源用 `filter_scope: title` 只匹配标题，减少长正文偶然提及 AI 带来的误采集
 - **Reviewer 审核**：模型只输出四维分，代码负责维度 key 规范化、总分重算和最终 verdict 裁决
+- **Deep Reports 后置阶段**：Reviewer/入库后最多选择 1 个高价值 GitHub repo，临时 clone 并只读取受限文本源码；阶段失败不影响主 pipeline。
 - **API 响应统一入口**：除 `/api/health` 外，成功响应走 `api.responses.envelope()`；`HTTPException`、参数校验错误、未捕获异常统一由 `src/main.py` 注册 handler。
 - **仪表盘统计口径集中化**：首屏 KPI 和 `/api/stats/enhanced` 的 summary 口径在 `src/services/dashboard_stats.py` 维护，避免前端重构时出现多个互相打架的统计来源。
 - **文章 API 契约**：`/api/articles` 的 `total` 是真实匹配总数；列表和详情都返回 `tags` 数组。

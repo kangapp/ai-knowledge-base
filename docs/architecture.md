@@ -31,6 +31,12 @@ APScheduler cron 分组触发 (同 cron 源合并为一个 pipeline run，skip_i
   入库 SQLite ─── articles + tags (新标签自动收录) + cost_logs + pipeline_runs
        │
        ▼
+  Deep Reports ─── Reviewer/入库后的图外后置阶段，最多选择 1 个高价值 GitHub repo
+       │              ├── 临时 shallow clone → 确定性源码扫描 → 紧凑证据包 → LLM 深度分析
+       │              ├── completed/failed 写入 deep_reports，LLM 调用独立写入 cost_logs
+       │              └── 任一环节失败仅记录 deep.failed，不影响主 pipeline completed
+       │
+       ▼
   Site Builder ─── 去抖触发 (5min 计时器) → output.tmp/ 渲染 → 原子 rename → 上线
                     └── 手动 POST /api/pipeline/build 可调 build_now() 跳过去抖
 
@@ -48,6 +54,8 @@ APScheduler cron 分组触发 (同 cron 源合并为一个 pipeline run，skip_i
 | 评分 | **ReviewedItem** | ref_url, total_score, dimensions{ai_relevance/内容深度/信息密度/时效性: {score, reason}}, verdict, retry_feedback | Reviewer |
 
 最终合并写入 articles 表：`raw.url/description/source` + `analyzed.title/summary/tags/language` + `reviewed.total_score/verdict/dimensions`。四维评分细节存入 `extra_data` JSON。ref_url 未匹配的数据自然丢弃，由 `pipeline_runs.summary` 记录。
+
+Reviewer 结果和文章持久化完成后，`run_deep_report_stage()` 作为图外后置阶段运行。它只从本轮 approved/retry 的 GitHub 仓库中选择最多 1 个达到阈值且 7 天内没有 completed 报告的候选，临时 shallow clone 后只读取受限大小的文本、manifest、入口文件和关键源码，不执行仓库代码。扫描结果压缩为证据包交给 `deep_report` Agent，completed 或 failed 结果写入 `deep_reports`；阶段返回状态也写入 `pipeline_runs.summary.deep_report`。该阶段采用 best-effort 隔离，候选选择、clone、扫描、LLM、成本或报告持久化失败均不会把主 pipeline 标记为失败。
 
 ## Reviewer 四维评分锚点
 
@@ -80,6 +88,8 @@ APScheduler cron 分组触发 (同 cron 源合并为一个 pipeline run，skip_i
 | 详情页 | `article.html` + JS 读 URL param → `fetch /api/articles/{id}` 渲染完整 summary | `/api/articles/{id}` 实时 SQL |
 | 仪表盘 | Jinja2 内联 `stats.json` 渲染 KPI 卡片 + Chart.js 画来源饼图 + 每日花费折线 | `stats.json`（KPI+分布+趋势，<10KB） |
 | DAG 运行页 | 5 秒轮询 `/api/pipeline/dag?detail=full`，展示阶段、source 漏斗、活跃 item、事件流 | `pipeline_runs` + `pipeline_phase_logs` + `pipeline_events` + `pipeline_source_runs` |
+| 深度报告列表 | `deep.html` 静态外壳 + JS 请求 completed 报告列表 | `/api/deep-reports` |
+| 深度报告详情 | `deep-report.html` 静态外壳 + JS 按 id 请求详情；无有效 id 时读取 latest | `/api/deep-reports/{id}` / `/api/deep-reports/latest` |
 | 搜索 | 300ms 去抖 → `/api/search?q=xxx` FTS5 全文检索 | `/api/search` FTS5 |
 
 ## 关键设计决策
@@ -91,6 +101,7 @@ APScheduler cron 分组触发 (同 cron 源合并为一个 pipeline run，skip_i
 - **RSS 采集口径**：RSS feed 先由 `httpx.AsyncClient(timeout=30, follow_redirects=True)` 获取文本，再交给 `feedparser` 解析；英文关键词按词边界匹配，综合媒体源可用 `filter_scope: title` 只看标题强信号，避免长正文偶然提及 AI 造成误采集。
 - **Reviewer 裁决口径**：LLM 只给四维分和原因；代码统一维度 key、重算 `total_score`，并按阈值裁决 verdict，避免模型自由放行弱相关内容。
 - **成本记账口径**：只要 LLM 返回 usage 就记录 `cost_logs`；解析失败和 retry 都按真实调用次数计费，文章级成本由同一 `ref_url` 的 Analyzer + Reviewer 成本汇总得到。
+- **Deep Reports 失败隔离**：源码级分析位于 Reviewer/入库后的图外阶段，最多处理一个候选；不执行仓库代码，失败记录保留排障信息但不阻塞主 pipeline。
 - **Prompt Schema 强制**：`response_format={"type": "json_object"}` + 首个完整 JSON 对象提取（兼容 `<think>`、markdown、尾部解释）+ Pydantic 校验 + 两次重试
 - **标签自动生长**：Analyzer 自由建议标签，新标签自动插入 `tags` 表收录（不做强制从池选）
 - **原子站点切换**：渲染到 `output.tmp/` → rename 双目录切换，Linux rename 原子操作

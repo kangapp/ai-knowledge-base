@@ -21,6 +21,9 @@ from .api.config import router as config_router
 from .api.stats import router as stats_router
 from .api.sources import router as sources_router
 from .api.dashboard import router as dashboard_router
+from .api.deep_reports import router as deep_reports_router, set_db as set_deep_reports_db
+from .deep_reports.models import DeepReportStageResult
+from .deep_reports.service import run_deep_report_stage
 from .scheduler.source_scheduler import setup_source_scheduler
 from .db.operations import (
     start_pipeline_run, end_pipeline_run, save_article, save_tags,
@@ -292,6 +295,21 @@ def _prepare_retry_review_items(
     return retry_items
 
 
+def _merge_retry_review_result(
+    all_reviewed: list[ReviewedItem],
+    all_costs: list,
+    retry_result: dict,
+) -> list[ReviewedItem]:
+    existing_urls = {item.ref_url for item in all_reviewed}
+    for item in retry_result.get("reviewed_items", []):
+        if item.ref_url in existing_urls:
+            all_reviewed = [current for current in all_reviewed if current.ref_url != item.ref_url]
+        all_reviewed.append(item)
+        existing_urls.add(item.ref_url)
+    all_costs.extend(retry_result.get("cost_records", []))
+    return all_reviewed
+
+
 async def _record_collected_items(db, run_id: str, items: list, status: str, reason: str):
     for item in items:
         source_id, source, source_detail = _source_identity(item)
@@ -557,16 +575,7 @@ async def run_pipeline(trigger: str = "cron", source_filter: str | list[str] | t
             )
 
             # 合并结果（同一 ref_url 的 reviewed_item 用最新一轮的覆盖）
-            existing_urls = {r.ref_url for r in all_reviewed}
-            for r in retry_result["reviewed_items"]:
-                if r.ref_url in existing_urls:
-                    # 替换旧结果
-                    all_reviewed = [x for x in all_reviewed if x.ref_url != r.ref_url]
-                all_reviewed.append(r)
-                existing_urls.add(r.ref_url)
-
-            all_costs.extend(retry_result["cost_records"])
-            all_analyzed.extend(retry_result["analyzed_items"])
+            all_reviewed = _merge_retry_review_result(all_reviewed, all_costs, retry_result)
 
         logger.info("pipeline.graph_done", extra={
             "analyzed": len(all_analyzed),
@@ -579,6 +588,7 @@ async def run_pipeline(trigger: str = "cron", source_filter: str | list[str] | t
         retry_count = 0
         discarded_count = 0
         inserted_urls: set[str] = set()
+        article_ids: dict[str, int] = {}
         cost_source_map = _build_cost_source_map(new_items)
         item_costs = _summarize_item_costs(all_costs)
 
@@ -593,6 +603,7 @@ async def run_pipeline(trigger: str = "cron", source_filter: str | list[str] | t
                 article_id = await save_article(_db, raw, analyzed, reviewed, analysis_cost, analysis_tokens)
                 if article_id:
                     inserted_urls.add(reviewed.ref_url)
+                    article_ids[raw.url] = article_id
                     source_id, source, source_detail = _source_identity(raw)
                     await record_collection_item(
                         _db,
@@ -654,7 +665,9 @@ async def run_pipeline(trigger: str = "cron", source_filter: str | list[str] | t
                     discarded_count += 1
                 else:
                     analysis_cost, analysis_tokens = item_costs.get(reviewed.ref_url, (0.0, 0))
-                    await save_article(_db, raw, analyzed, reviewed, analysis_cost, analysis_tokens)
+                    article_id = await save_article(_db, raw, analyzed, reviewed, analysis_cost, analysis_tokens)
+                    if article_id:
+                        article_ids[raw.url] = article_id
                     source_id, source, source_detail = _source_identity(raw)
                     await record_collection_item(
                         _db,
@@ -734,6 +747,20 @@ async def run_pipeline(trigger: str = "cron", source_filter: str | list[str] | t
             error_log=error_log,
         )
 
+        try:
+            deep_report_result = await run_deep_report_stage(
+                db=_db,
+                registry=_registry,
+                run_id=run_id,
+                raw_items=new_items,
+                analyzed_items=all_analyzed,
+                reviewed_items=all_reviewed,
+                article_ids=article_ids,
+            )
+        except Exception as exc:
+            logger.exception("deep_report.stage_unexpected_failure", extra={"run_id": run_id})
+            deep_report_result = DeepReportStageResult(status="failed", message=str(exc))
+
         summary = json.dumps({
             "collected": {"total": len(raw_items), "new": len(new_items)},
             "analyzed": len(all_analyzed),
@@ -741,6 +768,11 @@ async def run_pipeline(trigger: str = "cron", source_filter: str | list[str] | t
             "retry": retry_count,
             "discarded": discarded_count,
             "errors": error_log,
+            "deep_report": {
+                "status": deep_report_result.status,
+                "report_id": deep_report_result.report_id,
+                "repo_url": deep_report_result.repo_url,
+            },
         })
         await end_pipeline_run(_db, run_id, "completed", summary)
         await record_pipeline_event(
@@ -815,6 +847,7 @@ async def lifespan(app: FastAPI):
     _graph = build_pipeline(_registry)
 
     set_db(_db)
+    set_deep_reports_db(_db)
     set_pipeline_db(_db)
     set_run_pipeline(run_pipeline)
     template_dir = BASE_DIR / "src" / "site" / "templates"
@@ -850,6 +883,7 @@ def create_app() -> FastAPI:
     app.include_router(stats_router)
     app.include_router(sources_router)
     app.include_router(dashboard_router)
+    app.include_router(deep_reports_router, prefix="/api")
     app.add_exception_handler(HTTPException, http_exception_handler)
     app.add_exception_handler(RequestValidationError, validation_exception_handler)
     app.add_exception_handler(Exception, general_exception_handler)
