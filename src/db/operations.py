@@ -52,6 +52,13 @@ def _deep_report_row(row) -> dict:
     return item
 
 
+def _deep_report_list_row(row) -> dict:
+    item = dict(row)
+    item["report_tech_stack"] = _decode_json_field(item.get("report_tech_stack", ""), [])
+    item["tech_stack_json"] = _decode_json_field(item.get("tech_stack_json", ""), {})
+    return item
+
+
 async def save_article(db: Database, raw: RawItem, analyzed: AnalyzedItem, reviewed: ReviewedItem, cost: float, tokens: int) -> int | None:
     """保存文章，返回 article id（新插入或已存在行的 id）"""
     now = now_bj_iso()
@@ -359,7 +366,19 @@ async def list_completed_deep_reports(db: Database, page: int = 1, page_size: in
     total = await db.fetch_one("SELECT COUNT(*) as c FROM deep_reports WHERE status = 'completed'")
     rows = await db.fetch_all(
         """
-        SELECT * FROM deep_reports
+        SELECT id, repo_url, repo_name, status, candidate_score, trigger_reason,
+               commit_sha, created_at, updated_at, tech_stack_json,
+               CASE
+                   WHEN json_valid(report_json)
+                   THEN json_extract(report_json, '$.summary')
+                   ELSE ''
+               END AS report_summary,
+               CASE
+                   WHEN json_valid(report_json)
+                   THEN json_extract(report_json, '$.tech_stack')
+                   ELSE '[]'
+               END AS report_tech_stack
+        FROM deep_reports
         WHERE status = 'completed'
         ORDER BY updated_at DESC, id DESC
         LIMIT ? OFFSET ?
@@ -367,7 +386,7 @@ async def list_completed_deep_reports(db: Database, page: int = 1, page_size: in
         (page_size, offset),
     )
     return {
-        "items": [_deep_report_row(row) for row in rows],
+        "items": [_deep_report_list_row(row) for row in rows],
         "total": total["c"] if total else 0,
         "page": page,
         "page_size": page_size,

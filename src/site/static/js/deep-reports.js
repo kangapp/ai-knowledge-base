@@ -125,8 +125,7 @@
     }
 
     function firstTechStack(item) {
-        const report = asObject(item.report_json);
-        const reportStack = asStringList(report.tech_stack);
+        const reportStack = asStringList(item.report_tech_stack);
         if (reportStack.length) {
             return reportStack.slice(0, 4);
         }
@@ -155,8 +154,7 @@
     }
 
     function renderListItem(item) {
-        const report = asObject(item.report_json);
-        const summary = asString(report.summary) || asString(item.trigger_reason) || '暂无摘要';
+        const summary = asString(item.report_summary) || asString(item.trigger_reason) || '暂无摘要';
         const stack = firstTechStack(item);
         const stackHtml = stack.length
             ? `<div class="deep-tech-list">${stack.map(value => `<span class="deep-tech-tag">${escapeHtml(value)}</span>`).join('')}</div>`

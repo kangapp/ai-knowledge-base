@@ -97,6 +97,7 @@ def test_deep_report_templates_script_builder_and_nav_exist():
 
 def test_deep_report_script_contracts_for_filter_escape_structured_render_and_safe_fallback():
     script = (ROOT / "src/site/static/js/deep-reports.js").read_text()
+    styles = (ROOT / "src/site/static/css/style.css").read_text()
     escape_html_block = script.split("function escapeHtml(value) {", 1)[1].split("function safeHttpUrl", 1)[0]
 
     assert "function requestJson" in script
@@ -149,6 +150,8 @@ def test_deep_report_script_contracts_for_filter_escape_structured_render_and_sa
 
     assert "<pre" in script
     assert "white-space: pre-wrap" in script
+    deep_report_pre_block = styles.split(".deep-report-pre {", 1)[1].split("}", 1)[0]
+    assert "overflow-wrap: anywhere" in deep_report_pre_block
     assert "escapeHtml(item.report_markdown" in script or "escapeHtml(reportMarkdown" in script
     assert "innerHTML = item.report_markdown" not in script
     assert "innerHTML = report.report_markdown" not in script

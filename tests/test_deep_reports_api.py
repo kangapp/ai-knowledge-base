@@ -71,7 +71,7 @@ async def _save_report(
         status=status,
         candidate_score=candidate_score,
         trigger_reason="实用性高，源码结构清晰",
-        report_json={"project_overview": overview},
+        report_json={"project_overview": overview, "summary": overview},
         report_markdown=f"# {repo_name}",
         evidence_json=[{"path": "README.md", "reason": "overview"}],
         tech_stack_json={"languages": ["Python"]},
@@ -99,6 +99,12 @@ async def test_list_latest_and_detail_return_deep_reports(api_client, api_db):
     assert list_body["code"] == 0
     assert list_body["data"]["total"] == 1
     assert list_body["data"]["items"][0]["id"] == report_id
+    assert "report_json" not in list_body["data"]["items"][0]
+    assert "report_markdown" not in list_body["data"]["items"][0]
+    assert "evidence_json" not in list_body["data"]["items"][0]
+    assert "file_tree_summary" not in list_body["data"]["items"][0]
+    assert list_body["data"]["items"][0]["report_summary"] == "overview"
+    assert list_body["data"]["items"][0]["report_tech_stack"] == []
 
     assert latest_response.status_code == 200
     latest_body = latest_response.json()
