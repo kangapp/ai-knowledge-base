@@ -22,3 +22,9 @@ def test_deploy_waits_for_pipeline_health_then_builds_static_site():
     assert "docker compose logs --tail=100 pipeline" in workflow
     assert "test -f output/deep.html" in workflow
     assert "test -f output/deep-report.html" in workflow
+
+
+def test_pipeline_image_installs_repo_inspector_runtime_dependencies():
+    dockerfile = (ROOT / "Dockerfile").read_text()
+
+    assert "apt-get install -y --no-install-recommends curl git" in dockerfile
