@@ -173,6 +173,9 @@
 - [x] Deep Reports 生产镜像补齐 Git
   - 根因：源码检查器调用系统 `git clone`，原 pipeline 镜像只安装 `curl`
   - Dockerfile 安装 `curl git`，避免候选选中后因缺少 Git 直接写入 failed 报告
+- [x] Deep Reports 解析失败定向修复
+  - 首轮输出通过 JSON 提取但未通过 Pydantic Schema 时，第二轮不再重复完整源码分析请求
+  - 修复请求只携带首轮输出、详细校验错误和目标 Schema，降低重复输入并提高结构修复成功率
 - [ ] 统计服务层继续收口
   - 将 `quality/runtime/consumption` SQL 从 `src/db/operations.py` 逐步迁到更聚焦的统计服务文件
   - 每迁一个接口补一个契约测试
@@ -206,6 +209,7 @@
 - 已通过：`.venv/bin/python -m pytest -m "not integration and not e2e" -q`（185 passed）
 - 已通过：`.venv/bin/python -m pytest tests/test_prompt_regression.py -q`（7 passed）
 - 已通过：`.venv/bin/python -m pytest tests/test_deep_reports_pipeline.py::test_deep_report_stage_skips_when_no_candidate -q`
+- 已通过：`.venv/bin/python -m pytest -m "not integration and not e2e" -q`（188 passed）
 
 说明：
 - 当前 shell 中 `uv` 不可用，使用项目 `.venv/bin/python` 执行测试。

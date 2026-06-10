@@ -87,7 +87,7 @@
   - 常见改动入口：技术栈识别、证据优先级、LLM 输入体积。
 
 - `src/deep_reports/analyzer.py`
-  - 通过 `LLMRegistry` 调用 `deep_report` Agent，加载 `prompts/deep_report.md`，校验结构化输出并记录每次尝试成本。
+  - 通过 `LLMRegistry` 调用 `deep_report` Agent，加载 `prompts/deep_report.md`，校验结构化输出并记录每次尝试成本；首轮解析失败时，第二轮使用原输出、校验错误和 Schema 做定向 JSON 修复。
   - 常见改动入口：报告 schema、Prompt 参数、解析与重试策略。
 
 - `src/deep_reports/service.py`

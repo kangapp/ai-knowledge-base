@@ -40,7 +40,7 @@ def parse_deep_report_output(raw: str) -> DeepReportOutput:
     try:
         return DeepReportOutput.model_validate(data)
     except ValidationError as exc:
-        raise ValueError("Deep report output does not match schema") from exc
+        raise ValueError(f"Deep report output does not match schema: {exc}") from exc
 
 
 def _build_candidate_context(candidate: DeepReportCandidate) -> str:
@@ -63,6 +63,22 @@ def _build_source_package_payload(source_package: SourcePackage) -> str:
     return json.dumps(source_package.model_dump(), ensure_ascii=False, indent=2)
 
 
+def _build_repair_messages(raw_output: str, error: str) -> list[dict[str, str]]:
+    return [
+        {
+            "role": "system",
+            "content": f"你负责修复深度报告 JSON。只输出修复后的合法 JSON，格式：{DEEP_REPORT_SCHEMA_DESC}",
+        },
+        {
+            "role": "user",
+            "content": (
+                f"校验错误：\n{error}\n\n"
+                f"待修复输出：\n{raw_output[-16_000:]}"
+            ),
+        },
+    ]
+
+
 async def analyze_deep_report(
     candidate: DeepReportCandidate,
     source_package: SourcePackage,
@@ -79,6 +95,7 @@ async def analyze_deep_report(
     )
 
     cost_records: list[CostRecord] = []
+    repair_messages: list[dict[str, str]] | None = None
 
     for attempt in range(2):
         content = ""
@@ -86,7 +103,7 @@ async def analyze_deep_report(
         try:
             kwargs = dict(
                 model=model_id,
-                messages=[
+                messages=repair_messages or [
                     {
                         "role": "system",
                         "content": f"你是源码级 GitHub 项目研究员。只输出 JSON，格式：{DEEP_REPORT_SCHEMA_DESC}",
@@ -135,6 +152,7 @@ async def analyze_deep_report(
                 cost_record.error = str(exc)
                 cost_records.append(cost_record)
                 registry.health.record_failure(provider, str(exc))
+                repair_messages = _build_repair_messages(content, str(exc))
                 continue
 
             cost_records.append(cost_record)

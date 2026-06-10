@@ -786,3 +786,33 @@ if m:
 3. 增加 retry 复用已有分析结果的回归测试。
 
 **相关文件**: `src/main.py`, `tests/test_pipeline_observability.py`
+
+---
+
+## Bug 39: Deep Reports 在生产环境无法 clone 仓库
+
+**发现时间**: 2026-06-10
+**发现场景**: VPS 已选中 `Egonex-AI/Understand-Anything`，但深度报告立即写入 failed。
+**根因**: `src/deep_reports/inspector.py` 调用系统 `git clone`，pipeline 镜像只安装了 `curl`，容器内不存在 `git`。
+
+**处理**:
+1. Dockerfile 使用 `--no-install-recommends` 安装 `curl git`。
+2. 增加镜像运行时依赖契约测试。
+3. 部署后确认容器内 `command -v git` 返回 `/usr/bin/git`。
+
+**相关文件**: `Dockerfile`, `tests/test_deploy_workflow.py`
+
+---
+
+## Bug 40: Deep Reports 解析重试未消费首轮错误
+
+**发现时间**: 2026-06-10
+**发现场景**: 源码 clone/扫描成功后，MiniMax-M3 首轮返回合法 JSON 但未通过报告 Schema，第二轮又返回无效 JSON。
+**根因**: 两次分析请求完全相同，第二轮没有携带首轮输出和 Pydantic 校验错误，无法针对缺失或错误字段做修复。
+
+**处理**:
+1. Pydantic 校验错误保留具体字段信息。
+2. 首轮解析失败后，第二轮切换为 JSON 修复请求，只携带原输出、校验错误和目标 Schema。
+3. 网络请求失败仍保留原完整分析重试逻辑。
+
+**相关文件**: `src/deep_reports/analyzer.py`, `tests/test_deep_reports_analyzer.py`

@@ -109,6 +109,7 @@ class _FakeRegistry:
         self._supports_json_mode = supports_json_mode
         self._responses = list(responses)
         self.last_kwargs = None
+        self.calls = []
         self.budget = _FakeBudget()
         self.health = _FakeHealth()
 
@@ -127,6 +128,7 @@ class _FakeRegistry:
 
     async def _create(self, **kwargs):
         self.last_kwargs = kwargs
+        self.calls.append(kwargs)
         result = self._responses.pop(0)
         if isinstance(result, Exception):
             raise result
@@ -352,6 +354,30 @@ async def test_analyze_deep_report_retries_after_parse_failure_and_keeps_both_co
     assert len(registry.budget.calls) == 2
     assert registry.health.success_calls == [("minimax", 0), ("minimax", 0)]
     assert len(registry.health.failure_calls) == 1
+
+
+@pytest.mark.asyncio
+async def test_analyze_deep_report_uses_validation_feedback_for_repair_attempt():
+    from src.deep_reports.analyzer import analyze_deep_report
+
+    invalid_output = '{"title":"缺少其余必填字段"}'
+    registry = _FakeRegistry(
+        supports_json_mode=False,
+        responses=[
+            _response(invalid_output),
+            _response(_valid_output_json()),
+        ],
+    )
+
+    report, cost_records = await analyze_deep_report(_candidate(), _source_package(), registry)
+
+    assert report is not None
+    assert len(cost_records) == 2
+    repair_messages = registry.calls[1]["messages"]
+    assert "修复" in repair_messages[0]["content"]
+    assert invalid_output in repair_messages[1]["content"]
+    assert "Deep report output does not match schema" in repair_messages[1]["content"]
+    assert "源码摘要包" not in repair_messages[1]["content"]
 
 
 @pytest.mark.asyncio

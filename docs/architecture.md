@@ -102,6 +102,6 @@ Reviewer 结果和文章持久化完成后，`run_deep_report_stage()` 作为图
 - **Reviewer 裁决口径**：LLM 只给四维分和原因；代码统一维度 key、重算 `total_score`，并按阈值裁决 verdict，避免模型自由放行弱相关内容。
 - **成本记账口径**：只要 LLM 返回 usage 就记录 `cost_logs`；解析失败和 retry 都按真实调用次数计费，文章级成本由同一 `ref_url` 的 Analyzer + Reviewer 成本汇总得到。
 - **Deep Reports 失败隔离**：源码级分析位于 Reviewer/入库后的图外阶段，最多处理一个候选；不执行仓库代码，失败记录保留排障信息但不阻塞主 pipeline。
-- **Prompt Schema 强制**：`response_format={"type": "json_object"}` + 首个完整 JSON 对象提取（兼容 `<think>`、markdown、尾部解释）+ Pydantic 校验 + 两次重试
+- **Prompt Schema 强制**：`response_format={"type": "json_object"}` + 首个完整 JSON 对象提取（兼容 `<think>`、markdown、尾部解释）+ Pydantic 校验；Deep Reports 首轮解析失败后，第二轮只携带原输出、校验错误和 Schema 做定向 JSON 修复
 - **标签自动生长**：Analyzer 自由建议标签，新标签自动插入 `tags` 表收录（不做强制从池选）
 - **原子站点切换**：渲染到 `output.tmp/` → rename 双目录切换，Linux rename 原子操作
