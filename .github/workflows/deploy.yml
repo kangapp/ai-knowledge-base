@@ -52,13 +52,24 @@ jobs:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.VPS_SSH_KEY }}
-          timeout: 10m
+          timeout: 30s
+          command_timeout: 25m
           script: |
             set -e
             cd /opt/ai-knowledge-base
             git fetch origin master
             git reset --hard origin/master
-            docker compose pull
+            for pull_attempt in 1 2 3; do
+              if timeout 8m docker compose pull; then
+                break
+              fi
+              if [ "$pull_attempt" -eq 3 ]; then
+                echo "docker compose pull failed after 3 attempts"
+                exit 1
+              fi
+              echo "docker compose pull attempt $pull_attempt failed, retrying"
+              sleep 10
+            done
             docker compose up -d
             for attempt in $(seq 1 30); do
               if docker compose exec -T pipeline curl -fsS http://localhost:8000/api/health; then

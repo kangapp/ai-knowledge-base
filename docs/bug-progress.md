@@ -1,5 +1,20 @@
 # Bug 处理记录
 
+## 部署远程命令超时（2026-06-11）
+
+**现象**：test 和 build-image 成功，deploy 远程步骤运行约 10 分钟后失败；VPS 仓库 HEAD 已更新，但容器仍运行旧镜像。
+
+**根因**：`appleboy/ssh-action` 的远程命令默认上限为 10 分钟。GHCR 镜像拉取发生网络抖动，`docker compose pull` 未在窗口内完成。原工作流只设置 `timeout: 10m`，该字段控制 SSH 建连，不会延长远程命令执行时间。
+
+**处理**：
+
+- SSH 建连超时改为 `30s`。
+- 显式设置 `command_timeout: 25m`。
+- `docker compose pull` 使用单次 `8m` 超时，失败后最多重试 3 次。
+- 保留容器健康检查、静态站强制构建和关键文件验证。
+
+---
+
 ## Bug 1: parse_and_validate tags 超过 max_length 导致整批崩溃
 
 **发现时间**: 2026-05-17

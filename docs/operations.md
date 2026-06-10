@@ -37,6 +37,7 @@ GitHub Actions (push main):
 - E2E（全 mock 完整流程）部署前本地跑：`pytest -m e2e`
 - 部署任务仅在 pipeline 健康后构建静态站；健康检查、构建请求或关键静态页面检查失败时，deploy job 直接失败。
 - pipeline 镜像必须包含 `curl`（健康/构建请求）和 `git`（Deep Reports 临时 clone GitHub 仓库）。
+- SSH 部署连接超时为 30 秒，远程命令上限为 25 分钟；`docker compose pull` 单次最多 8 分钟并重试 3 次，避免 GHCR 短时网络抖动直接耗尽整个部署窗口。
 
 ## VPS 初始化（5 步）
 
@@ -75,6 +76,7 @@ GitHub Actions (push main):
 - **调度重叠**：采集任务按 cron 分组注册并使用北京时间；若上一轮仍未完成，新任务记录 `pipeline.queued` 后等待进程内锁，上一轮结束后继续执行，不再跳过整组。
 - **连续零采集**：先查 `/api/sources/stats` 的 `health_status/last_error/last_run_at`。`failed` 是请求失败，`success_zero` 是请求成功但关键词零命中，`dedup_only` 是本轮全部重复，`analysis_failed` 是已采集但分析阶段失败。
 - **RSS 地址失效**：优先切换到来源官方 Feed；不存在稳定官方 Feed 时在 `config/sources.yaml` 设为 `enabled: false`，不要用不稳定代理伪装成可用源。
+- **部署精确在 10 分钟失败**：检查 `ssh-action` 的 `command_timeout`。连接 `timeout` 只控制 SSH 建连，不能替代远程命令上限；镜像拉取应有独立超时和重试。
 
 ## 日志与排查
 

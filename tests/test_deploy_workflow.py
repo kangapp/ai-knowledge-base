@@ -24,6 +24,16 @@ def test_deploy_waits_for_pipeline_health_then_builds_static_site():
     assert "test -f output/deep-report.html" in workflow
 
 
+def test_deploy_allows_slow_remote_commands_and_retries_image_pull():
+    workflow = (ROOT / ".github/workflows/deploy.yml").read_text()
+
+    assert "timeout: 30s" in workflow
+    assert "command_timeout: 25m" in workflow
+    assert "for pull_attempt in 1 2 3" in workflow
+    assert "timeout 8m docker compose pull" in workflow
+    assert 'if [ "$pull_attempt" -eq 3 ]' in workflow
+
+
 def test_pipeline_image_installs_repo_inspector_runtime_dependencies():
     dockerfile = (ROOT / "Dockerfile").read_text()
 
