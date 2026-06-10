@@ -166,6 +166,10 @@
   - 桌面端和 390px 移动端完成结构化报告、旧数据回退、异常状态和超长连续文本检查
   - 无候选时深度阶段返回 skipped，不影响主 pipeline
   - 深度报告完整提交范围通过 `git diff --check`，工作区无未提交文件
+- [x] 部署后自动重建静态站
+  - `docker compose up -d` 后在 pipeline 容器内轮询 `/api/health`
+  - 服务健康后调用 `/api/pipeline/build`，并检查深度报告列表/详情静态文件存在
+  - 健康超时、构建失败或关键页面缺失时，deploy job 直接失败并输出 pipeline 日志
 - [ ] 统计服务层继续收口
   - 将 `quality/runtime/consumption` SQL 从 `src/db/operations.py` 逐步迁到更聚焦的统计服务文件
   - 每迁一个接口补一个契约测试

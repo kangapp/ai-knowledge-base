@@ -60,4 +60,17 @@ jobs:
             git reset --hard origin/master
             docker compose pull
             docker compose up -d
+            for attempt in $(seq 1 30); do
+              if docker compose exec -T pipeline curl -fsS http://localhost:8000/api/health; then
+                break
+              fi
+              if [ "$attempt" -eq 30 ]; then
+                docker compose logs --tail=100 pipeline
+                exit 1
+              fi
+              sleep 2
+            done
+            docker compose exec -T pipeline curl -fsS -X POST http://localhost:8000/api/pipeline/build
+            test -f output/deep.html
+            test -f output/deep-report.html
             docker compose ps

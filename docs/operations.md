@@ -29,10 +29,13 @@ GitHub Actions (push main):
     → docker build
       → docker save → scp → docker load
         → docker compose up -d
+          → 容器内轮询 /api/health
+            → POST /api/pipeline/build 强制重建静态站
 ```
 
 - 集成测试（真实 API+LLM）手动跑：`pytest -m integration`
 - E2E（全 mock 完整流程）部署前本地跑：`pytest -m e2e`
+- 部署任务仅在 pipeline 健康后构建静态站；健康检查、构建请求或关键静态页面检查失败时，deploy job 直接失败。
 
 ## VPS 初始化（5 步）
 
