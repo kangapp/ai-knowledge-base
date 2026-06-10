@@ -263,6 +263,15 @@ def test_prompt_template_contains_required_placeholders():
     assert "源码摘要" in rendered
     assert '"components":["string"]' in rendered
     assert '"reason":"string"' in rendered
+    assert "总长度不超过 5000 个中文字符" in rendered
+
+
+def test_deep_report_config_has_enough_output_budget():
+    import yaml
+
+    config = yaml.safe_load((REPO_ROOT / "config/agents.yaml").read_text())
+
+    assert config["agents"]["deep_report"]["params"]["max_tokens"] == 8192
 
 
 @pytest.mark.asyncio

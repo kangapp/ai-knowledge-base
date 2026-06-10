@@ -198,3 +198,17 @@ def test_build_source_package_evidence_covers_all_output_key_files():
     evidence_paths = {item["path"] for item in package.evidence}
     assert len(package.evidence) <= 30
     assert key_paths <= evidence_paths
+
+
+def test_build_source_package_limits_each_key_file_content():
+    inspection = RepoInspection(
+        repo_url="https://github.com/org/tool",
+        repo_name="org/tool",
+        key_files=[
+            RepoFile(path="src/main.py", size=5000, content="x" * 5000, reason="入口文件"),
+        ],
+    )
+
+    package = build_source_package(inspection)
+
+    assert len(package.key_files[0].content) == 2000

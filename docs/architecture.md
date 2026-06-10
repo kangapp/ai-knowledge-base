@@ -55,7 +55,7 @@ APScheduler cron 分组触发 (同 cron 源合并为一个 pipeline run，skip_i
 
 最终合并写入 articles 表：`raw.url/description/source` + `analyzed.title/summary/tags/language` + `reviewed.total_score/verdict/dimensions`。四维评分细节存入 `extra_data` JSON。ref_url 未匹配的数据自然丢弃，由 `pipeline_runs.summary` 记录。
 
-Reviewer 结果和文章持久化完成后，`run_deep_report_stage()` 作为图外后置阶段运行。它只从本轮 approved/retry 的 GitHub 仓库中选择最多 1 个达到阈值且 7 天内没有 completed 报告的候选，临时 shallow clone 后只读取受限大小的文本、manifest、入口文件和关键源码，不执行仓库代码。扫描结果压缩为证据包交给 `deep_report` Agent，completed 或 failed 结果写入 `deep_reports`；阶段返回状态也写入 `pipeline_runs.summary.deep_report`。该阶段采用 best-effort 隔离，候选选择、clone、扫描、LLM、成本或报告持久化失败均不会把主 pipeline 标记为失败。
+Reviewer 结果和文章持久化完成后，`run_deep_report_stage()` 作为图外后置阶段运行。它只从本轮 approved/retry 的 GitHub 仓库中选择最多 1 个达到阈值且 7 天内没有 completed 报告的候选，临时 shallow clone 后只读取受限大小的文本、manifest、入口文件和关键源码，不执行仓库代码。扫描结果压缩为证据包交给 `deep_report` Agent，其中每个关键文件内容最多保留 2,000 字符；completed 或 failed 结果写入 `deep_reports`，阶段返回状态也写入 `pipeline_runs.summary.deep_report`。该阶段采用 best-effort 隔离，候选选择、clone、扫描、LLM、成本或报告持久化失败均不会把主 pipeline 标记为失败。
 
 ## Reviewer 四维评分锚点
 

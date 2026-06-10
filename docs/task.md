@@ -176,6 +176,10 @@
 - [x] Deep Reports 解析失败定向修复
   - 首轮输出通过 JSON 提取但未通过 Pydantic Schema 时，第二轮不再重复完整源码分析请求
   - 修复请求只携带首轮输出、详细校验错误和目标 Schema，降低重复输入并提高结构修复成功率
+- [x] Deep Reports 输入输出长度治理
+  - 每个关键源码文件进入 LLM 前最多保留 2,000 字符，降低大型仓库输入成本
+  - Prompt 要求报告总长度不超过 5,000 中文字符、数组最多 8 项
+  - `deep_report.params.max_tokens` 从 4,096 提升到 8,192，避免完整 JSON 在尾部被截断
 - [ ] 统计服务层继续收口
   - 将 `quality/runtime/consumption` SQL 从 `src/db/operations.py` 逐步迁到更聚焦的统计服务文件
   - 每迁一个接口补一个契约测试
@@ -210,6 +214,7 @@
 - 已通过：`.venv/bin/python -m pytest tests/test_prompt_regression.py -q`（7 passed）
 - 已通过：`.venv/bin/python -m pytest tests/test_deep_reports_pipeline.py::test_deep_report_stage_skips_when_no_candidate -q`
 - 已通过：`.venv/bin/python -m pytest -m "not integration and not e2e" -q`（188 passed）
+- 已通过：`.venv/bin/python -m pytest -m "not integration and not e2e" -q`（190 passed）
 
 说明：
 - 当前 shell 中 `uv` 不可用，使用项目 `.venv/bin/python` 执行测试。

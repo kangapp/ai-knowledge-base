@@ -10,6 +10,7 @@
 - 必须包含全部字段：title、summary、tech_stack、architecture、data_flow、use_cases、strengths、limitations、actionable_takeaways、source_evidence。
 - architecture 必须包含 pattern 和 components。
 - source_evidence 中每一项都必须包含 path 和 reason。
+- 报告总长度不超过 5000 个中文字符；每个数组最多 8 项，每项保持简洁。
 
 仓库名称：{repo_name}
 仓库地址：{repo_url}

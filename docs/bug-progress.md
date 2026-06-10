@@ -808,11 +808,16 @@ if m:
 
 **发现时间**: 2026-06-10
 **发现场景**: 源码 clone/扫描成功后，MiniMax-M3 首轮返回合法 JSON 但未通过报告 Schema，第二轮又返回无效 JSON。
-**根因**: 两次分析请求完全相同，第二轮没有携带首轮输出和 Pydantic 校验错误，无法针对缺失或错误字段做修复。
+**根因**:
+1. 两次分析请求完全相同，第二轮没有携带首轮输出和 Pydantic 校验错误。
+2. 两次 completion 都达到 4,096 tokens 上限，完整顶层 JSON 被截断，解析器只能提取到尾部前最后一个完整嵌套对象。
+3. 大型仓库的关键文件内容未在 summarizer 阶段限长，首轮输入达到 43,443 tokens。
 
 **处理**:
 1. Pydantic 校验错误保留具体字段信息。
 2. 首轮解析失败后，第二轮切换为 JSON 修复请求，只携带原输出、校验错误和目标 Schema。
-3. 网络请求失败仍保留原完整分析重试逻辑。
+3. 每个关键文件内容限制为 2,000 字符；Prompt 限制报告总长度和数组项数。
+4. Deep Report 输出上限从 4,096 提升到 8,192 tokens。
+5. 网络请求失败仍保留原完整分析重试逻辑。
 
-**相关文件**: `src/deep_reports/analyzer.py`, `tests/test_deep_reports_analyzer.py`
+**相关文件**: `src/deep_reports/analyzer.py`, `src/deep_reports/summarizer.py`, `config/agents.yaml`, `prompts/deep_report.md`, `tests/test_deep_reports_analyzer.py`, `tests/test_repo_inspector.py`

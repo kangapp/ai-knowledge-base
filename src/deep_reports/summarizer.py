@@ -2,6 +2,8 @@ from pathlib import Path
 
 from .models import RepoInspection, SourcePackage
 
+MAX_KEY_FILE_CONTENT = 2000
+
 
 def _manifest_names(manifests: dict[str, str]) -> set[str]:
     return {Path(path).name.lower() for path in manifests}
@@ -84,6 +86,10 @@ def _build_evidence(inspection: RepoInspection) -> list[dict]:
 
 
 def build_source_package(inspection: RepoInspection) -> SourcePackage:
+    key_files = [
+        item.model_copy(update={"content": item.content[:MAX_KEY_FILE_CONTENT]})
+        for item in inspection.key_files[:15]
+    ]
     return SourcePackage(
         repo_url=inspection.repo_url,
         repo_name=inspection.repo_name,
@@ -92,6 +98,6 @@ def build_source_package(inspection: RepoInspection) -> SourcePackage:
         tech_stack=_detect_tech_stack(inspection.manifests, inspection.file_tree),
         file_tree_summary="\n".join(inspection.file_tree[:300]),
         entry_files=inspection.entry_files,
-        key_files=inspection.key_files[:15],
+        key_files=key_files,
         evidence=_build_evidence(inspection),
     )

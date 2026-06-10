@@ -43,7 +43,7 @@ agents:
     model:
       primary: { provider: minimax, model: MiniMax-M3 }
       fallback: []
-    params: { temperature: 0.2, max_tokens: 4096 }
+    params: { temperature: 0.2, max_tokens: 8192 }
     prompt: prompts/deep_report.md
     budget_weight: 1.0
 
