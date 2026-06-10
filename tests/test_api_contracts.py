@@ -232,6 +232,121 @@ async def test_source_stats_period_uses_calendar_window(api_client, api_db, monk
     assert week["avg_score"] == 85.0
 
 
+@pytest.mark.parametrize(
+    ("enabled", "latest", "expected"),
+    [
+        (False, None, "disabled"),
+        (True, None, "not_scheduled"),
+        (True, {"collected": 0, "new_items": 0, "failed": 1}, "failed"),
+        (True, {"collected": 0, "new_items": 0, "failed": 0}, "success_zero"),
+        (True, {"collected": 10, "new_items": 0, "failed": 0}, "dedup_only"),
+        (
+            True,
+            {"collected": 3, "new_items": 3, "analyzed": 0, "analysis_failed": 3, "failed": 0},
+            "analysis_failed",
+        ),
+        (
+            True,
+            {"collected": 3, "new_items": 2, "analyzed": 2, "analysis_failed": 0, "failed": 0},
+            "healthy",
+        ),
+    ],
+)
+def test_source_health_status_distinguishes_pipeline_stages(enabled, latest, expected):
+    from src.api.sources import _derive_health_status
+
+    source = SourceConfig(
+        id="rss_test",
+        name="RSS Test",
+        type="rss",
+        enabled=enabled,
+        priority=2,
+        cron="0 9 * * *",
+        max_items=5,
+        config={"url": "https://example.com/feed.xml"},
+    )
+
+    assert _derive_health_status(source, latest) == expected
+
+
+@pytest.mark.asyncio
+async def test_source_stats_returns_configured_sources_without_health_history(
+    api_client,
+    api_db,
+    monkeypatch,
+):
+    await api_db.execute(
+        """
+        INSERT INTO pipeline_runs (id, started_at, status, trigger)
+        VALUES ('run_failed_source', '2026-05-31T09:00:00', 'completed', 'test')
+        """
+    )
+    await api_db.execute(
+        """
+        INSERT INTO pipeline_source_runs
+        (run_id, source_id, source, source_detail, collected, new_items, dedup_skipped,
+         analyzed, analysis_failed, approved, retry, discarded, inserted, failed, cost, tokens)
+        VALUES ('run_failed_source', 'rss_failed', 'rss', 'Failed RSS', 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0)
+        """
+    )
+    await api_db.execute(
+        """
+        INSERT INTO pipeline_events
+        (run_id, ts, phase, event, level, status, source_id, message)
+        VALUES
+        ('run_failed_source', '2026-05-31T09:00:01', 'collect', 'collector.source_error',
+         'error', 'failed', 'rss_failed', '404 Not Found')
+        """
+    )
+    await api_db.commit()
+    monkeypatch.setattr(
+        "src.api.sources.SourceManager.load",
+        lambda: [
+            SourceConfig(
+                id="rss_failed",
+                name="Failed RSS",
+                type="rss",
+                enabled=True,
+                priority=2,
+                cron="0 9 * * *",
+                max_items=5,
+                config={"url": "https://example.com/failed.xml"},
+            ),
+            SourceConfig(
+                id="rss_pending",
+                name="Pending RSS",
+                type="rss",
+                enabled=True,
+                priority=2,
+                cron="0 10 * * *",
+                max_items=5,
+                config={"url": "https://example.com/pending.xml"},
+            ),
+            SourceConfig(
+                id="rss_disabled",
+                name="Disabled RSS",
+                type="rss",
+                enabled=False,
+                priority=2,
+                cron="0 11 * * *",
+                max_items=5,
+                config={"url": "https://example.com/disabled.xml"},
+            ),
+        ],
+    )
+    monkeypatch.setattr("src.api.sources._today", lambda: "2026-05-31")
+
+    body = api_client.get("/api/sources/stats?period=day").json()["data"]
+    sources = {source["id"]: source for source in body["sources"]}
+
+    assert set(sources) == {"rss_failed", "rss_pending", "rss_disabled"}
+    assert sources["rss_failed"]["health_status"] == "failed"
+    assert sources["rss_failed"]["last_error"] == "404 Not Found"
+    assert sources["rss_failed"]["last_run_at"] is not None
+    assert sources["rss_pending"]["health_status"] == "not_scheduled"
+    assert sources["rss_disabled"]["health_status"] == "disabled"
+
+
 @pytest.mark.asyncio
 async def test_dashboard_summary_returns_first_screen_contract(api_client, api_db):
     await _insert_article(api_db, title="A", url="https://example.com/a", source="rss")

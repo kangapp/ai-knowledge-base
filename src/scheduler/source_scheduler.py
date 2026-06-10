@@ -6,6 +6,7 @@ from ..core.source_manager import SourceManager
 from ..core.source_health import SourceHealthTracker
 from ..core.source_discovery import SourceDiscovery
 from ..core.database import Database
+from ..core.time import BEIJING_TZ
 
 logger = logging.getLogger("pipeline")
 
@@ -47,7 +48,7 @@ def setup_source_scheduler(scheduler: AsyncIOScheduler):
     """将每周维护任务注册到 scheduler"""
     scheduler.add_job(
         run_weekly_source_maintenance,
-        CronTrigger(day_of_week="mon", hour=9, minute=0),
+        CronTrigger(day_of_week="mon", hour=9, minute=0, timezone=BEIJING_TZ),
         id="source_weekly_maintenance",
         name="数据源健康维护（发现+淘汰）",
         max_instances=1,

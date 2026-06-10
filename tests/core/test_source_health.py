@@ -51,3 +51,19 @@ async def test_should_not_evict_healthy(mock_db):
     ]
     should, reason = await tracker.should_evict("test_source")
     assert should is False
+
+
+@pytest.mark.asyncio
+async def test_health_average_score_ignores_days_without_approved_score(mock_db):
+    mock_db.fetch_all.side_effect = [
+        [{"source_id": "rss_test"}],
+        [
+            {"total_collected": 5, "approved": 1, "avg_score": 80.0},
+            {"total_collected": 5, "approved": 0, "avg_score": None},
+        ],
+    ]
+    tracker = SourceHealthTracker(mock_db)
+
+    health = await tracker.get_all_sources_health(start_date="2026-06-01")
+
+    assert health[0]["avg_score"] == 80.0

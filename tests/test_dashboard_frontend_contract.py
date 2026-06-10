@@ -47,8 +47,23 @@ def test_dashboard_source_health_uses_display_names_not_storage_ids():
 
     assert "function sourceDisplayName" in renderers
     assert "sources.map(sourceDisplayName)" in renderers
-    assert "<td>${sourceDisplayName(s)}</td>" in renderers
+    assert "<td>${escapeHtml(sourceDisplayName(s))}</td>" in renderers
     assert "sources.map(s => s.id)" not in renderers
+
+
+def test_dashboard_source_health_shows_stage_status_and_recent_funnel():
+    renderers = (ROOT / "src/site/static/js/dashboard/renderers.js").read_text()
+    styles = (ROOT / "src/site/static/css/style.css").read_text()
+
+    assert "function sourceHealthLabel" in renderers
+    assert "health_status" in renderers
+    assert "last_new_items" in renderers
+    assert "last_dedup_skipped" in renderers
+    assert "last_analysis_failed" in renderers
+    assert "last_run_at" in renderers
+    assert "last_error" in renderers
+    assert "sources.filter(s => (s.total_collected || 0) > 0)" in renderers
+    assert ".source-health-status" in styles
 
 
 def test_dashboard_consumption_passes_trend_window_separately():

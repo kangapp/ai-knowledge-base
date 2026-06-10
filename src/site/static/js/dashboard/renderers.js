@@ -27,6 +27,31 @@
         return sourceLabel(source.name || source.label || source.source_detail || source.source || source.id);
     }
 
+    function escapeHtml(value) {
+        return String(value == null ? '' : value)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;');
+    }
+
+    function sourceHealthLabel(status) {
+        return {
+            healthy: '正常',
+            dedup_only: '本轮全重复',
+            success_zero: '本轮零命中',
+            analysis_failed: '分析失败',
+            failed: '请求失败',
+            not_scheduled: '尚未运行',
+            disabled: '已禁用',
+        }[status] || '未知';
+    }
+
+    function sourceLastRun(value) {
+        if (!value) return '-';
+        return String(value).replace('T', ' ').slice(0, 16);
+    }
+
     function dimScore(dim) {
         if (!dim || !dim.max_score) return 0;
         return Math.round((dim.avg_score || 0) / dim.max_score * 100);
@@ -161,11 +186,19 @@
 
     function renderSources(data) {
         const sources = data.sources || [];
+        const activeStatuses = new Set(['healthy', 'dedup_only', 'success_zero', 'analysis_failed']);
+        const activeSources = sources.filter(s => activeStatuses.has(s.health_status));
+        const ratedSources = sources.filter(s => (s.total_collected || 0) > 0);
+        const scoredSources = sources.filter(s => s.avg_score != null);
         const totalCollected = sources.reduce((sum, s) => sum + (s.total_collected || 0), 0);
-        const avgRate = sources.length ? sources.reduce((sum, s) => sum + (s.approved_rate || 0), 0) / sources.length : null;
-        const avgScore = sources.length ? sources.reduce((sum, s) => sum + (s.avg_score || 0), 0) / sources.length : null;
+        const avgRate = ratedSources.length
+            ? ratedSources.reduce((sum, s) => sum + (s.approved_rate || 0), 0) / ratedSources.length
+            : null;
+        const avgScore = scoredSources.length
+            ? scoredSources.reduce((sum, s) => sum + Number(s.avg_score), 0) / scoredSources.length
+            : null;
 
-        text('src-active-count', sources.length);
+        text('src-active-count', activeSources.length);
         text('src-avg-rate', percent(avgRate));
         text('src-total-collected', totalCollected);
         text('src-avg-score', avgScore == null ? '-' : avgScore.toFixed(1));
@@ -175,18 +208,32 @@
 
         const table = document.getElementById('src-quality-table');
         if (!table) return;
-        const rows = [...sources].sort((a, b) => (b.avg_score || 0) - (a.avg_score || 0));
+        const rows = [...sources].sort((a, b) => {
+            if (a.enabled !== b.enabled) return a.enabled ? -1 : 1;
+            return (b.last_run_at || '').localeCompare(a.last_run_at || '');
+        });
         table.innerHTML = `
             <table class="log-table">
-                <thead><tr><th>数据源</th><th>采集量</th><th>通过率</th><th>平均分</th><th>趋势</th></tr></thead>
+                <thead>
+                    <tr>
+                        <th>数据源</th><th>状态</th><th>窗口采集</th><th>本轮新增</th>
+                        <th>本轮去重</th><th>分析失败</th><th>通过率</th><th>平均分</th>
+                        <th>最近运行</th><th>错误</th>
+                    </tr>
+                </thead>
                 <tbody>
                     ${rows.map(s => `
                         <tr>
-                            <td>${sourceDisplayName(s)}</td>
+                            <td>${escapeHtml(sourceDisplayName(s))}</td>
+                            <td><span class="source-health-status ${escapeHtml(s.health_status)}">${sourceHealthLabel(s.health_status)}</span></td>
                             <td>${s.total_collected || 0}</td>
+                            <td>${s.last_new_items || 0}</td>
+                            <td>${s.last_dedup_skipped || 0}</td>
+                            <td>${s.last_analysis_failed || 0}</td>
                             <td>${((s.approved_rate || 0) * 100).toFixed(1)}%</td>
-                            <td>${(s.avg_score || 0).toFixed(1)}</td>
-                            <td>${s.trend === 'rising' ? '上升' : s.trend === 'falling' ? '下降' : '稳定'}</td>
+                            <td>${s.avg_score == null ? '-' : Number(s.avg_score).toFixed(1)}</td>
+                            <td>${escapeHtml(sourceLastRun(s.last_run_at))}</td>
+                            <td class="source-health-error" title="${escapeHtml(s.last_error)}">${escapeHtml(s.last_error || '-')}</td>
                         </tr>
                     `).join('')}
                 </tbody>

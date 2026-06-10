@@ -1,3 +1,4 @@
+import asyncio
 from unittest.mock import AsyncMock
 
 import pytest
@@ -69,8 +70,33 @@ def test_register_source_jobs_registers_one_job_per_cron_group():
     assert [job["id"] for job in scheduler.jobs] == ["collect-group-1", "collect-group-2"]
     assert [job["minute"] for job in scheduler.jobs] == ["0", "30"]
     assert [job["hour"] for job in scheduler.jobs] == ["8", "9"]
+    assert all(str(job["timezone"]) == "Asia/Shanghai" for job in scheduler.jobs)
     assert scheduler.jobs[0]["func"].keywords["source_filter"] == ["rss_a", "rss_b"]
     assert scheduler.jobs[1]["func"].keywords["source_filter"] == ["rss_c"]
+
+
+@pytest.mark.asyncio
+async def test_pipeline_slot_waits_for_previous_run_instead_of_skipping(monkeypatch):
+    from src import main
+
+    monkeypatch.setattr(main, "_pipeline_lock", asyncio.Lock())
+    order = []
+
+    async def worker(name: str, delay: float):
+        lock = await main._wait_for_pipeline_slot(name)
+        try:
+            order.append(f"{name}:start")
+            await asyncio.sleep(delay)
+            order.append(f"{name}:done")
+        finally:
+            lock.release()
+
+    first = asyncio.create_task(worker("rss_a", 0.02))
+    await asyncio.sleep(0)
+    second = asyncio.create_task(worker("rss_b", 0))
+    await asyncio.gather(first, second)
+
+    assert order == ["rss_a:start", "rss_a:done", "rss_b:start", "rss_b:done"]
 
 
 @pytest.mark.asyncio
@@ -111,3 +137,19 @@ async def test_weekly_source_maintenance_initializes_kb_database(monkeypatch):
     await source_scheduler.run_weekly_source_maintenance()
 
     assert calls == [("path", "data/kb.db"), ("initialize", None), ("close", None)]
+
+
+def test_weekly_source_maintenance_uses_beijing_timezone():
+    from src.scheduler import source_scheduler
+
+    class FakeScheduler:
+        def __init__(self):
+            self.job = None
+
+        def add_job(self, func, trigger, **kwargs):
+            self.job = {"func": func, "trigger": trigger, **kwargs}
+
+    scheduler = FakeScheduler()
+    source_scheduler.setup_source_scheduler(scheduler)
+
+    assert str(scheduler.job["trigger"].timezone) == "Asia/Shanghai"

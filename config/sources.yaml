@@ -83,7 +83,7 @@ sources:
   - id: rss_huxiu
     name: 虎嗅
     type: rss
-    enabled: true
+    enabled: false
     priority: 2
     cron: "0 */4 * * *"
     max_items: 10
@@ -95,7 +95,7 @@ sources:
   - id: rss_juejin
     name: 稀土掘金
     type: rss
-    enabled: true
+    enabled: false
     priority: 2
     cron: "0 */4 * * *"
     max_items: 10
@@ -156,7 +156,7 @@ sources:
   - id: rss_reuters
     name: Reuters Science
     type: rss
-    enabled: true
+    enabled: false
     priority: 3
     cron: "0 8 * * *"
     max_items: 10
@@ -173,7 +173,7 @@ sources:
     cron: "0 9 * * *"
     max_items: 10
     config:
-      url: "https://feeds.feedburner.com/producthunt"
+      url: "https://www.producthunt.com/feed"
       filter_keywords: [AI, artificial intelligence]
       filter_scope: title
 

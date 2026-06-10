@@ -1,12 +1,12 @@
 # 代码地图
 
-更新时间：2026-06-09
+更新时间：2026-06-10
 
 ## API 入口
 
 - `src/main.py`
   - FastAPI app 创建、lifespan 初始化、路由注册、异常 handler 注册。
-  - APScheduler 采集任务按 cron 分组注册，同一时间的一组源在单个 pipeline run 中串行入口、组内并行采集，避免多个源互抢 `_running` 锁。
+  - APScheduler 和 CronTrigger 显式使用北京时间；采集任务按 cron 分组注册，重叠 pipeline 通过 `_pipeline_lock` 排队，不丢弃已触发任务。
   - `run_pipeline(source_filter=...)` 支持 `None`、单个 source id、多个 source id。
   - 新增 API 路由后需要在 `create_app()` 中 `include_router()`。
 
@@ -30,8 +30,8 @@
 - `src/api/sources.py`
   - 数据源列表、数据源健康统计、启用/停用/删除、清理 source health、候选源列表。
   - 优先复用 `src/api/routes.py` 注入的全局 DB，测试或单独调用时 fallback 到 `data/kb.db`。
-  - `/api/sources/stats` 只展示能与 `config/sources.yaml` 配置 id 对齐的健康数据。
-  - 健康统计响应中 `id` 是存储主键，`name` 是前端展示用的来源简称。
+  - `/api/sources/stats` 返回全部配置源，并从最近 `pipeline_source_runs` 与 `pipeline_events` 推导请求失败、零命中、全重复、分析失败、未调度和禁用状态。
+  - 健康统计响应中 `id` 是存储主键，`name` 是前端展示简称；常见状态入口为 `_derive_health_status()`。
 
 - `src/api/config.py`
   - 配置查看接口：读取 `llm/sources/agents` YAML，返回 raw + parsed。
@@ -98,7 +98,7 @@
 
 - `src/graph/collector.py`
   - 多源采集和 DB 查重。
-  - GitHub 采集将 `topics`/`keywords` 拆成最多 5 个单条件 Search 请求后合并去重，避免对 `topic:` qualifier 使用无效 `OR`；`exclude_terms` 在返回 repo 后本地过滤。
+  - GitHub 采集将 `topics`/`keywords` 拆成最多 5 个单条件 Search 请求，每个请求获取扩大后的候选池；合并和阈值过滤后优先返回 DB 中未出现的 repo。
   - `github_ai_devtools` 用于抓取代码库理解、交互式知识图谱、AI 编程工具类仓库，关键词在 `config/sources.yaml` 维护。
   - RSS 采集先用 `httpx.AsyncClient(timeout=30)` 拉取 feed 文本，再交给 `feedparser` 解析；关键词过滤使用 `_matches_rss_keywords()`，英文关键词按词边界匹配，综合媒体可用 `filter_scope: title` 避免长正文噪音。
   - `RawItem.raw_metadata.source_id` 保存配置 id，供 source health、成本归因等后续阶段使用。
@@ -114,7 +114,7 @@
 
 - `src/scheduler/source_scheduler.py`
   - 每周数据源健康维护：低质量源淘汰、候选源发现。
-  - 使用 `data/kb.db` 并显式初始化数据库连接。
+  - 使用 `data/kb.db` 并显式初始化数据库连接；维护 Cron 使用 `Asia/Shanghai`。
 
 - `src/graph/router.py`
   - 按 `RawItem.source` 做规则路由。

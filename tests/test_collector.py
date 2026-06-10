@@ -120,6 +120,48 @@ async def test_collect_github_merges_multiple_queries_and_deduplicates():
 
 
 @pytest.mark.asyncio
+async def test_collect_github_fetches_larger_candidate_pool():
+    source = make_source(
+        type="github",
+        max_items=10,
+        config={"topics": ["ai"], "min_stars": 1, "lookback_days": 7},
+    )
+    mock_resp = AsyncMock(status_code=200, json=lambda: {"items": []})
+    mock_resp.raise_for_status = lambda: None
+
+    with patch("httpx.AsyncClient.get", return_value=mock_resp) as mock_get:
+        await collect_github(source)
+
+    assert mock_get.call_args.kwargs["params"]["per_page"] == 30
+
+
+@pytest.mark.asyncio
+async def test_collect_github_prioritizes_urls_not_already_in_database():
+    source = make_source(
+        type="github",
+        max_items=2,
+        config={"topics": ["ai"], "min_stars": 1, "lookback_days": 7},
+    )
+    repos = [
+        {"full_name": "old/top", "name": "top", "html_url": "https://github.com/old/top", "description": "old", "stargazers_count": 300, "forks_count": 50, "watchers_count": 30, "language": "Python", "topics": ["ai"], "pushed_at": "2026-05-15T10:00:00Z"},
+        {"full_name": "new/mid", "name": "mid", "html_url": "https://github.com/new/mid", "description": "new", "stargazers_count": 200, "forks_count": 50, "watchers_count": 30, "language": "Python", "topics": ["ai"], "pushed_at": "2026-05-15T10:00:00Z"},
+        {"full_name": "new/low", "name": "low", "html_url": "https://github.com/new/low", "description": "new", "stargazers_count": 100, "forks_count": 50, "watchers_count": 30, "language": "Python", "topics": ["ai"], "pushed_at": "2026-05-15T10:00:00Z"},
+    ]
+    mock_resp = AsyncMock(status_code=200, json=lambda: {"items": repos})
+    mock_resp.raise_for_status = lambda: None
+    db = AsyncMock()
+    db.fetch_all.return_value = [{"url": "https://github.com/old/top"}]
+
+    with patch("httpx.AsyncClient.get", return_value=mock_resp):
+        items = await collect_github(source, db=db)
+
+    assert [item.url for item in items] == [
+        "https://github.com/new/mid",
+        "https://github.com/new/low",
+    ]
+
+
+@pytest.mark.asyncio
 async def test_collect_rss_records_config_source_id():
     source = make_source(
         id="rss_36kr",

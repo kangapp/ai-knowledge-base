@@ -1,4 +1,5 @@
 # src/main.py
+import asyncio
 import os, json, logging, sys, uuid
 from pathlib import Path
 from contextlib import asynccontextmanager
@@ -11,7 +12,7 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from .core.config import load_llm_config, load_sources_config, load_agents_config
 from .core.database import Database
 from .core.llm_client import LLMRegistry
-from .core.time import now_bj_iso, run_id_bj
+from .core.time import BEIJING_TZ, now_bj_iso, run_id_bj
 from .graph.pipeline import build_pipeline, record_phase_start, record_phase_end, set_pipeline_db, reset_analyzer_counter
 from .graph.state import PipelineState, ReviewedItem
 from .graph.collector import collect_all
@@ -78,7 +79,7 @@ _db: Database | None = None
 _scheduler: AsyncIOScheduler | None = None
 _builder: DebouncedBuilder | None = None
 _graph = None  # LangGraph 编译图
-_running = False
+_pipeline_lock: asyncio.Lock | None = None
 
 
 def _filter_sources(sources, source_filter: str | list[str] | tuple[str, ...] | set[str] | None):
@@ -127,6 +128,7 @@ def _register_source_jobs(scheduler: AsyncIOScheduler, sources, run_pipeline_cb)
             day=parts[2],
             month=parts[3],
             day_of_week=parts[4],
+            timezone=BEIJING_TZ,
             id=f"collect-group-{index}",
         )
         logger.info("scheduler.registered", extra={
@@ -135,6 +137,21 @@ def _register_source_jobs(scheduler: AsyncIOScheduler, sources, run_pipeline_cb)
             "source_count": len(source_ids),
             "source_filter": ",".join(source_ids),
         })
+
+
+async def _wait_for_pipeline_slot(source_filter) -> asyncio.Lock:
+    global _pipeline_lock
+
+    if _pipeline_lock is None:
+        _pipeline_lock = asyncio.Lock()
+    if _pipeline_lock.locked():
+        logger.info("pipeline.queued", extra={
+            "reason": "previous run still in progress",
+            "source_filter": _source_filter_label(source_filter),
+            "source_count": _source_filter_count(source_filter),
+        })
+    await _pipeline_lock.acquire()
+    return _pipeline_lock
 
 
 def _apply_github_velocity_filter(raw_items: list, source, trending_urls: set[str]) -> list:
@@ -361,16 +378,9 @@ async def _record_source_summaries(
 
 async def run_pipeline(trigger: str = "cron", source_filter: str | list[str] | tuple[str, ...] | set[str] | None = None):
     """source_filter 为 None 时采集所有源；否则采集指定 source.id 或一组 source.id。"""
-    global _registry, _db, _builder, _running, _graph
+    global _registry, _db, _builder, _graph
 
-    if _running:
-        logger.warning("pipeline.skip", extra={
-            "reason": "previous run still in progress",
-            "source_filter": _source_filter_label(source_filter),
-            "source_count": _source_filter_count(source_filter),
-        })
-        return
-    _running = True
+    pipeline_lock = await _wait_for_pipeline_slot(source_filter)
 
     run_id: str | None = None
 
@@ -826,7 +836,7 @@ async def run_pipeline(trigger: str = "cron", source_filter: str | list[str] | t
             )
             await end_pipeline_run(_db, run_id, "failed", str(e))
     finally:
-        _running = False
+        pipeline_lock.release()
 
 
 @asynccontextmanager
@@ -857,7 +867,7 @@ async def lifespan(app: FastAPI):
 
     # APScheduler
     sources_cfg = load_sources_config(CONFIG_DIR / "sources.yaml")
-    _scheduler = AsyncIOScheduler()
+    _scheduler = AsyncIOScheduler(timezone=BEIJING_TZ)
     _register_source_jobs(_scheduler, sources_cfg.sources, run_pipeline)
     _scheduler.start()
     setup_source_scheduler(_scheduler)

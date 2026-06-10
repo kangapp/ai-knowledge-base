@@ -38,7 +38,7 @@
 | 数据库 | SQLite (aiosqlite) | FTS5 全文索引 |
 | Web 框架 | FastAPI | API 端点 + 定时调度 |
 | 模板引擎 | Jinja2 | 静态站点生成（预渲染首屏） |
-| 调度 | APScheduler | cron 表达式，skip_if_running 防重叠 |
+| 调度 | APScheduler | 北京时间 cron 分组，进程内锁排队防重叠 |
 | Web 服务 | Caddy | 静态文件 + 自动 HTTPS + 反向代理 |
 | 部署 | Docker Compose | 2 容器 (pipeline + web) |
 | CI/CD | GitHub Actions | 分层测试 → build → deploy |

@@ -26,7 +26,7 @@ ai-knowledge-base/
 │   └── deep_report.md      #   GitHub 源码级深度报告 schema 与证据要求
 │
 ├── src/
-│   ├── main.py             # FastAPI 入口 + APScheduler (skip_if_running)
+│   ├── main.py             # FastAPI 入口 + 北京时间 APScheduler + pipeline 排队锁
 │   │
 │   ├── core/               # 基础设施
 │   │   ├── config.py       #   配置加载 (llm/sources/agents YAML → Pydantic)

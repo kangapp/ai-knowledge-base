@@ -1,8 +1,17 @@
 # 当前任务拆解
 
-更新时间：2026-06-09
+更新时间：2026-06-10
 
 ## P0 已完成
+
+- [x] 修复数据源健康可靠性
+  - APScheduler、采集 Cron 和每周维护任务统一使用北京时间
+  - pipeline 碰撞从静默跳过改为进程内锁排队，记录 `pipeline.queued`
+  - Product Hunt 切换官方 Feed；虎嗅、掘金、Reuters 失效源暂时禁用
+  - GitHub Search 扩大候选池并优先选择数据库中未出现的仓库
+  - `/api/sources/stats` 返回全部配置源并区分禁用、未调度、请求失败、零命中、全重复、分析失败和正常状态
+  - 数据源健康表格展示最近新增、去重、分析失败、运行时间和错误原因
+  - 平均评分忽略无 approved 文章的空评分日期，不再按 0 分稀释
 
 - [x] GitHub repo 审核策略分流
   - 为 `AnalyzedItem` 增加 `source/source_id/source_detail/metadata` 上下文

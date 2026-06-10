@@ -67,7 +67,7 @@ def _matches_rss_keywords(text: str, keywords: list[str]) -> bool:
     return False
 
 
-async def collect_github(source: SourceConfig) -> list[RawItem]:
+async def collect_github(source: SourceConfig, db=None) -> list[RawItem]:
     cfg = source.config
     url = "https://api.github.com/search/repositories"
     headers = {"Accept": "application/vnd.github.v3+json"}
@@ -76,15 +76,16 @@ async def collect_github(source: SourceConfig) -> list[RawItem]:
         headers["Authorization"] = f"Bearer {token}"
 
     repos_by_url = {}
+    candidate_pool_size = min(max(source.max_items * 3, source.max_items), 100)
     async with httpx.AsyncClient(timeout=30, follow_redirects=True) as client:
         for q in _build_github_queries(cfg):
-            params = {"q": q, "sort": "stars", "order": "desc", "per_page": source.max_items}
+            params = {"q": q, "sort": "stars", "order": "desc", "per_page": candidate_pool_size}
             resp = await client.get(url, params=params, headers=headers)
             resp.raise_for_status()
             for repo in resp.json().get("items", []):
                 repos_by_url[repo["html_url"]] = repo
 
-    items = []
+    eligible_repos = []
     now = now_bj_iso()
     min_stars = cfg.get("min_stars", 0)
     min_forks = cfg.get("min_forks", 0)
@@ -104,6 +105,27 @@ async def collect_github(source: SourceConfig) -> list[RawItem]:
             continue
         if repo.get("watchers_count", 0) < min_watchers:
             continue
+        eligible_repos.append(repo)
+
+    existing_urls = set()
+    if db is not None and eligible_repos:
+        urls = [repo["html_url"] for repo in eligible_repos]
+        placeholders = ",".join("?" * len(urls))
+        rows = await db.fetch_all(
+            f"SELECT url FROM articles WHERE url IN ({placeholders})",
+            tuple(urls),
+        )
+        existing_urls = {row["url"] for row in rows}
+
+    eligible_repos.sort(
+        key=lambda repo: (
+            repo["html_url"] in existing_urls,
+            -repo.get("stargazers_count", 0),
+        )
+    )
+
+    items = []
+    for repo in eligible_repos[:source.max_items]:
         items.append(RawItem(
             url=repo["html_url"],
             title=repo["name"],
@@ -114,8 +136,6 @@ async def collect_github(source: SourceConfig) -> list[RawItem]:
             raw_metadata={"stars": repo.get("stargazers_count", 0), "forks": repo.get("forks_count", 0), "watchers": repo.get("watchers_count", 0), "language": repo.get("language", ""), "topics": repo.get("topics", []), "source_id": source.id},
             collected_at=now,
         ))
-        if len(items) >= source.max_items:
-            break
     return items
 
 
@@ -282,7 +302,10 @@ async def collect_all(db, sources: list[SourceConfig], collectors: dict | None =
             continue
         fn = cmap.get(src.type)
         if fn:
-            tasks[src.id] = asyncio.ensure_future(fn(src))
+            if collectors is None and src.type == "github":
+                tasks[src.id] = asyncio.ensure_future(fn(src, db=db))
+            else:
+                tasks[src.id] = asyncio.ensure_future(fn(src))
 
     results = await asyncio.gather(*tasks.values(), return_exceptions=True)
 

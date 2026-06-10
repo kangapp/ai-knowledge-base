@@ -104,7 +104,8 @@ class SourceHealthTracker:
             total_collected = sum(r["total_collected"] for r in records)
             total_approved = sum(r["approved"] for r in records)
             approved_rate = total_approved / total_collected if total_collected > 0 else 0
-            avg_score = sum(r["avg_score"] or 0 for r in records) / len(records) if records else None
+            scores = [r["avg_score"] for r in records if r["avg_score"] is not None]
+            avg_score = sum(scores) / len(scores) if scores else None
             result.append({
                 "source_id": source_id,
                 "recent_approved_rate": round(approved_rate, 3),

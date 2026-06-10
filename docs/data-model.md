@@ -252,7 +252,7 @@ UNIQUE(run_id, url)
 
 UNIQUE(run_id, source_id)
 
-该表是仪表盘数据源健康 Tab 的扩展事实表，适合展示 source 级采集漏斗、成本效率和失败定位。
+该表是仪表盘数据源健康 Tab 的扩展事实表，适合展示 source 级采集漏斗、成本效率和失败定位。健康接口以每个 `source_id` 最新一行为状态事实：请求失败、零命中、全重复和分析失败均由该行的漏斗字段推导；错误文本从同源最近一次 `collector.source_error` 事件读取，不在本表重复存储。
 
 **审核评分口径：**
 
@@ -292,6 +292,7 @@ UNIQUE(source_id, date)
 - `source_detail` 只作为展示和文章来源细分，不作为健康统计主键。
 - 这样 RSS 展示名（如 `36氪`）和 arXiv 分类（如 `cs.AI`）不会被误当成数据源 id。
 - 迁移 `007_normalize_source_health_ids.sql` 会将历史 `36氪` 合并到 `rss_36kr`，将历史 `cs.AI/cs.CL/cs.LG` 合并到 `rss_arxiv`。
+- `source_health` 继续承担按天累计和历史趋势；当前状态以 `pipeline_source_runs` 最近一行为准，避免把旧日累计值误当成本轮结果。
 
 ### discovered_sources — 已发现待审核的数据源
 

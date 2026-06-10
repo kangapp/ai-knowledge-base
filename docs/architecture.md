@@ -3,11 +3,11 @@
 ## LangGraph DAG 流程
 
 ```
-APScheduler cron 分组触发 (同 cron 源合并为一个 pipeline run，skip_if_running 防重叠)
+APScheduler 北京时间 cron 分组触发 (同 cron 源合并为一个 pipeline run，重叠任务按触发顺序排队)
        │
        ▼
   Collector ─── 按源并行采集 (httpx + asyncio.gather, 含飞书 token 惰性刷新)
-       │           ├── GitHub 写入 repo 星标快照，trend_mode 仅过滤本源采集结果
+       │           ├── GitHub 扩大候选池并优先选择 DB 中未出现的 repo，再写入星标快照
        │           └── DB 批量查重 WHERE url IN (...) → 过滤已入库 url
        │
        ▼
@@ -97,7 +97,8 @@ Reviewer 结果和文章持久化完成后，`run_deep_report_stage()` 作为图
 - **Router 纯规则**：100% 按 `RawItem.source` 字段分流，无需 LLM
 - **Fan-out 并行**：4 个 SubAgent 各自专属 Prompt 和 model，共享通用 `analyze_items()`
 - **采集阶段去重**：Collector 后立即 DB 批量查重，已存在 url 不进入 LLM 分析
-- **GitHub 采集口径**：Search API 查询由最多 5 个 `topic:` qualifier / 显式 `keywords` 单条件请求组成，再在本地合并去重，避免对 `topic:` qualifier 使用无效 `OR`；`exclude_terms` 在返回 repo 后本地过滤；增速源基于 `github_repo_snapshots` 的最新快照与窗口前最近基线快照计算 star/day。
+- **调度口径**：APScheduler、采集 Cron 和每周维护任务均显式使用 `Asia/Shanghai`；同一进程内 pipeline 使用 `asyncio.Lock` 串行执行，碰撞任务记录 `pipeline.queued` 并等待，不静默漏跑。
+- **GitHub 采集口径**：Search API 查询由最多 5 个 `topic:` qualifier / 显式 `keywords` 单条件请求组成，每个查询获取 `max_items * 3`（最大 100）个候选；本地合并、阈值过滤后优先返回数据库中未出现的 repo，再用已存在 repo 补足。增速源基于 `github_repo_snapshots` 的最新快照与窗口前最近基线快照计算 star/day。
 - **RSS 采集口径**：RSS feed 先由 `httpx.AsyncClient(timeout=30, follow_redirects=True)` 获取文本，再交给 `feedparser` 解析；英文关键词按词边界匹配，综合媒体源可用 `filter_scope: title` 只看标题强信号，避免长正文偶然提及 AI 造成误采集。
 - **Reviewer 裁决口径**：LLM 只给四维分和原因；代码统一维度 key、重算 `total_score`，并按阈值裁决 verdict，避免模型自由放行弱相关内容。
 - **成本记账口径**：只要 LLM 返回 usage 就记录 `cost_logs`；解析失败和 retry 都按真实调用次数计费，文章级成本由同一 `ref_url` 的 Analyzer + Reviewer 成本汇总得到。

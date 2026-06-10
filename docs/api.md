@@ -589,16 +589,26 @@
 - `sources[].id` 使用 `config/sources.yaml` 中的数据源配置 id，例如 `rss_36kr`、`github_trending`、`rss_arxiv`。
 - `sources[].name` 使用 `config/sources.yaml` 中的数据源展示名，例如 `36氪`、`arXiv AI/ML`；前端图表和表格展示该简称，不直接展示存储 id。
 - `sources[].type` 使用配置中的数据源类型，例如 `rss`、`github`、`arxiv`。
+- 接口返回 `config/sources.yaml` 中的全部配置源，包括禁用源和尚无健康历史的源。
 - `period` 映射到真实日期窗口：day=今天、week=近 7 个自然日（含今天）、month=近 30 个自然日（含今天）。
 - `total_collected` 为窗口内 `source_health.total_collected` 求和。
 - `approved_rate` 为窗口内 `approved / total_collected`。
-- `avg_score` 为窗口内每日 `avg_score` 的简单平均。
+- `avg_score` 只对窗口内非空的每日评分求平均；没有 approved 文章的日期不按 0 分参与计算。
 - `trend` 通过窗口前后半段 approved rate 对比得出：超过 10% 为 `rising`，低于 10% 为 `falling`，否则 `stable`。
 - `source_health` 按天合并：Collector 累加 `total_collected/failed`，Reviewer 累加 `approved/rejected`，`avg_score` 按 approved 数加权合并。
 - `new_items/dedup_skipped/analyzed/analysis_failed/retry/discarded/inserted/failed/cost/tokens` 来自 `pipeline_source_runs`，表示窗口内每个 source 的 pipeline 漏斗和成本效率。
 - `filtered_items = retry + discarded`，表示采集后被质量门槛拦下或仍需重审的数量；它不是采集失败。
 - `request_success_rate = collected / (collected + failed)`，用于区分上游源不可用和内容被正常过滤。
 - `insert_rate = inserted / new_items`，用于衡量新采集内容最终入库效率。
+- `health_status` 按最近一次 `pipeline_source_runs` 推导：
+  - `disabled`：配置禁用。
+  - `not_scheduled`：尚无运行记录。
+  - `failed`：最近一次请求失败且没有采集结果。
+  - `success_zero`：请求成功但关键词过滤后为 0。
+  - `dedup_only`：有原始采集，但查重后没有新条目。
+  - `analysis_failed`：有新条目，但最近一次全部分析失败。
+  - `healthy`：最近一次正常推进到后续阶段。
+- `last_run_at/last_error` 返回最近运行时间和最近采集错误；`last_collected/last_new_items/last_dedup_skipped/last_analyzed/last_analysis_failed/last_inserted` 返回最近一次漏斗。
 - GitHub repo 的审核策略与普通文章不同：系统会按 repo-aware 维度裁决，因此 `approved/retry/discarded` 不能直接与 RSS 新闻按同一内容深度标准比较。
 
 **响应:**
@@ -612,6 +622,8 @@
         "id": "github_trending",
         "name": "GitHub Trending AI",
         "type": "github",
+        "enabled": true,
+        "health_status": "healthy",
         "approved_rate": 0.75,
         "total_collected": 20,
         "avg_score": 82.5,
@@ -628,7 +640,15 @@
         "request_success_rate": 1,
         "insert_rate": 0.714,
         "cost": 0.12,
-        "tokens": 3200
+        "tokens": 3200,
+        "last_run_at": "2026-06-10 14:08:11",
+        "last_error": null,
+        "last_collected": 10,
+        "last_new_items": 4,
+        "last_dedup_skipped": 6,
+        "last_analyzed": 4,
+        "last_analysis_failed": 0,
+        "last_inserted": 3
       }
     ]
   },

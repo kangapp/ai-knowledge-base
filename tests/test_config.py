@@ -63,3 +63,14 @@ def test_project_sources_include_github_ai_devtools():
         "codebase understanding",
         "repository analysis",
     ]
+
+
+def test_project_sources_disable_broken_feeds_and_use_official_producthunt_feed():
+    cfg = load_sources_config(Path("config/sources.yaml"))
+    sources = {source.id: source for source in cfg.sources}
+
+    assert sources["rss_huxiu"].enabled is False
+    assert sources["rss_juejin"].enabled is False
+    assert sources["rss_reuters"].enabled is False
+    assert sources["rss_producthunt"].enabled is True
+    assert sources["rss_producthunt"].config["url"] == "https://www.producthunt.com/feed"

@@ -89,6 +89,68 @@ async def _get_source_run_metrics(db: Database, start_date: str) -> dict[str, di
     }
 
 
+async def _get_latest_source_runs(db: Database) -> dict[str, dict]:
+    rows = await db.fetch_all("""
+        WITH ranked AS (
+            SELECT
+                psr.*,
+                ROW_NUMBER() OVER (
+                    PARTITION BY psr.source_id
+                    ORDER BY psr.updated_at DESC, psr.id DESC
+                ) AS row_number
+            FROM pipeline_source_runs psr
+        )
+        SELECT *
+        FROM ranked
+        WHERE row_number = 1
+    """)
+    return {row["source_id"]: dict(row) for row in rows}
+
+
+async def _get_latest_source_errors(db: Database) -> dict[str, str]:
+    rows = await db.fetch_all("""
+        WITH ranked AS (
+            SELECT
+                source_id,
+                message,
+                ROW_NUMBER() OVER (
+                    PARTITION BY source_id
+                    ORDER BY ts DESC, id DESC
+                ) AS row_number
+            FROM pipeline_events
+            WHERE source_id != ''
+              AND event = 'collector.source_error'
+        )
+        SELECT source_id, message
+        FROM ranked
+        WHERE row_number = 1
+    """)
+    return {
+        row["source_id"]: row["message"] or "数据源请求失败"
+        for row in rows
+    }
+
+
+def _derive_health_status(source: SourceConfig, latest: dict | None) -> str:
+    if not source.enabled:
+        return "disabled"
+    if latest is None:
+        return "not_scheduled"
+    if latest.get("failed", 0) > 0 and latest.get("collected", 0) == 0:
+        return "failed"
+    if (
+        latest.get("new_items", 0) > 0
+        and latest.get("analyzed", 0) == 0
+        and latest.get("analysis_failed", 0) >= latest.get("new_items", 0)
+    ):
+        return "analysis_failed"
+    if latest.get("collected", 0) > 0 and latest.get("new_items", 0) == 0:
+        return "dedup_only"
+    if latest.get("collected", 0) == 0:
+        return "success_zero"
+    return "healthy"
+
+
 @router.get("/")
 async def list_sources():
     """数据源列表（含状态）"""
@@ -120,16 +182,20 @@ async def get_source_stats(period: str = "week"):
         health_data = await tracker.get_all_sources_health(start_date=start_date)
 
         sources = SourceManager.load()
-        source_map = {s.id: s for s in sources}
         source_run_metrics = await _get_source_run_metrics(db, start_date)
+        latest_source_runs = await _get_latest_source_runs(db)
+        latest_source_errors = await _get_latest_source_errors(db)
+        health_map = {h["source_id"]: h for h in health_data}
 
         stats = []
-        for h in health_data:
-            source = source_map.get(h["source_id"])
-            if not source:
-                continue
+        for source in sources:
+            h = health_map.get(source.id, {
+                "recent_total": 0,
+                "avg_score": None,
+                "records": [],
+            })
             total = h["recent_total"]
-            approved = sum(r["approved"] for r in h["records"]) if h["records"] else 0
+            approved = sum(r["approved"] for r in h["records"])
             approved_rate = approved / total if total > 0 else 0
 
             # 计算趋势
@@ -151,11 +217,15 @@ async def get_source_stats(period: str = "week"):
             else:
                 trend = "stable"
 
-            metrics = source_run_metrics.get(h["source_id"], {})
+            metrics = source_run_metrics.get(source.id, {})
+            latest = latest_source_runs.get(source.id)
+            health_status = _derive_health_status(source, latest)
             stats.append({
-                "id": h["source_id"],
+                "id": source.id,
                 "name": source.name,
                 "type": source.type,
+                "enabled": source.enabled,
+                "health_status": health_status,
                 "approved_rate": round(approved_rate, 3),
                 "total_collected": total,
                 "avg_score": h["avg_score"],
@@ -173,6 +243,18 @@ async def get_source_stats(period: str = "week"):
                 "insert_rate": metrics.get("insert_rate", 0),
                 "cost": metrics.get("cost", 0),
                 "tokens": metrics.get("tokens", 0),
+                "last_run_at": latest.get("updated_at") if latest else None,
+                "last_error": (
+                    latest_source_errors.get(source.id, "数据源请求失败")
+                    if health_status == "failed"
+                    else None
+                ),
+                "last_collected": latest.get("collected", 0) if latest else 0,
+                "last_new_items": latest.get("new_items", 0) if latest else 0,
+                "last_dedup_skipped": latest.get("dedup_skipped", 0) if latest else 0,
+                "last_analyzed": latest.get("analyzed", 0) if latest else 0,
+                "last_analysis_failed": latest.get("analysis_failed", 0) if latest else 0,
+                "last_inserted": latest.get("inserted", 0) if latest else 0,
             })
 
         return envelope({"period": period, "sources": stats})

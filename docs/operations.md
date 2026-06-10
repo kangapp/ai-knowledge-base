@@ -7,7 +7,7 @@ VPS (1C2G)
 └── Docker Compose
     ├── pipeline (Python)
     │   ├── FastAPI (:8000)
-    │   ├── APScheduler (AsyncIOScheduler, skip_if_running)
+    │   ├── APScheduler (AsyncIOScheduler, Asia/Shanghai, pipeline lock queue)
     │   ├── LangGraph Pipeline (全链路 async，不阻塞 event loop)
     │   └── Jinja2 Site Builder → output.tmp → rename → /output
     │
@@ -72,7 +72,9 @@ GitHub Actions (push main):
 - **LLM Provider 全挂**：`TrackedClient` 遍历 fallback[] 链，全失败则当天文章以 `pending_review` 状态入库
 - **单源 API 故障**：try/except 隔离，返回空列表 + 记录 error_log，其余源继续
 - **SQLite 损坏**：`cp data/backup/knowledge-YYYYMMDD.db data/knowledge.db` + restart pipeline
-- **调度重叠**：采集任务按 cron 分组注册，同一时间的一组源只启动一个 pipeline run；若上一轮仍未完成，`skip_if_running` 会跳过整组并在日志记录 `source_filter/source_count`
+- **调度重叠**：采集任务按 cron 分组注册并使用北京时间；若上一轮仍未完成，新任务记录 `pipeline.queued` 后等待进程内锁，上一轮结束后继续执行，不再跳过整组。
+- **连续零采集**：先查 `/api/sources/stats` 的 `health_status/last_error/last_run_at`。`failed` 是请求失败，`success_zero` 是请求成功但关键词零命中，`dedup_only` 是本轮全部重复，`analysis_failed` 是已采集但分析阶段失败。
+- **RSS 地址失效**：优先切换到来源官方 Feed；不存在稳定官方 Feed 时在 `config/sources.yaml` 设为 `enabled: false`，不要用不稳定代理伪装成可用源。
 
 ## 日志与排查
 
@@ -96,3 +98,9 @@ Log 事件命名：`{module}.{action}` — `collector.start`, `collector.done`, 
 ```sql
 SELECT * FROM pipeline_runs ORDER BY started_at DESC LIMIT 5;
 ```
+
+当前源配置决策（2026-06-10）：
+
+- Product Hunt 使用官方 `https://www.producthunt.com/feed`。
+- 虎嗅、掘金、Reuters 因原地址 404 或持续超时暂时禁用。
+- Ars Technica 保持启用，由北京时间调度和排队机制保证执行。
