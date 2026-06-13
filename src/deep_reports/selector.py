@@ -302,12 +302,32 @@ def _is_incidental_capability_segment(segment: str) -> bool:
     if _contains_any(segment, {"benchmark", "dataset", "evaluation", "leaderboard"}):
         return True
 
+    if _contains_any(
+        segment,
+        {
+            "release automation examples",
+            "developer automation examples",
+            "development automation examples",
+            "documentation automation examples",
+        },
+    ):
+        return True
+
+    if _contains_any(
+        segment,
+        {"documentation automation", "developer documentation automation"},
+    ):
+        return False
+
     documentation_terms = {"documentation", "docs", "readme"}
     explanation_terms = {
         "discusses",
         "mentions",
         "shows",
         "provides",
+        "includes",
+        "describes",
+        "covers",
         "walkthrough",
         "example",
         "examples",
