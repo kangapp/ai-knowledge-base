@@ -5,7 +5,15 @@ from types import SimpleNamespace
 import pytest
 from unittest.mock import AsyncMock
 
-from src.deep_reports.models import DeepReportCandidate, DeepReportOutput, RepoFile, SourcePackage
+from src.deep_reports.models import (
+    ArchitectureEdge,
+    ArchitectureNode,
+    DeepReportCandidate,
+    DeepReportOutput,
+    FlowStep,
+    RepoFile,
+    SourcePackage,
+)
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
@@ -211,7 +219,7 @@ def test_parse_deep_report_output_accepts_noisy_json():
 def test_parse_deep_report_output_rejects_missing_required_fields():
     from src.deep_reports.analyzer import parse_deep_report_output
 
-    with pytest.raises(Exception):
+    with pytest.raises(ValueError):
         parse_deep_report_output('{"title": "only title"}')
 
 
@@ -233,7 +241,7 @@ def test_parse_deep_report_output_rejects_missing_nested_required_fields(missing
         target = target[key]
     target.pop(missing_path[-1])
 
-    with pytest.raises(Exception):
+    with pytest.raises(ValueError):
         parse_deep_report_output(json.dumps(payload, ensure_ascii=False))
 
 
@@ -251,7 +259,7 @@ def test_parse_deep_report_output_rejects_extra_fields(mutator):
     payload = _valid_output_payload()
     mutator(payload)
 
-    with pytest.raises(Exception):
+    with pytest.raises(ValueError):
         parse_deep_report_output(json.dumps(payload, ensure_ascii=False))
 
 
@@ -280,6 +288,33 @@ def test_parse_deep_report_output_rejects_invalid_v2_relationships(mutator):
 
     with pytest.raises(ValueError):
         parse_deep_report_output(json.dumps(payload, ensure_ascii=False))
+
+
+def test_parse_deep_report_output_rejects_empty_flow_step_id():
+    from src.deep_reports.analyzer import parse_deep_report_output
+
+    payload = _valid_output_payload()
+    payload["runtime_data_flow"][0]["id"] = ""
+
+    with pytest.raises(ValueError):
+        parse_deep_report_output(json.dumps(payload, ensure_ascii=False))
+
+
+@pytest.mark.parametrize(
+    ("model", "payload"),
+    [
+        (FlowStep, {"id": "", "title": "输入", "description": "接收请求"}),
+        (
+            ArchitectureNode,
+            {"id": "", "label": "API", "role": "接收请求", "group": "interface"},
+        ),
+        (ArchitectureEdge, {"source": "", "target": "agent", "label": "任务"}),
+        (ArchitectureEdge, {"source": "api", "target": "", "label": "任务"}),
+    ],
+)
+def test_deep_report_models_reject_empty_ids(model, payload):
+    with pytest.raises(ValueError):
+        model.model_validate(payload)
 
 
 def test_prompt_template_contains_required_placeholders():

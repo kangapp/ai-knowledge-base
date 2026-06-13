@@ -49,7 +49,7 @@ class DeepReportCandidate(BaseModel):
 class FlowStep(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    id: str
+    id: str = Field(min_length=1)
     title: str
     description: str
 
@@ -88,7 +88,7 @@ class DeepReportDecision(BaseModel):
 class ArchitectureNode(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    id: str
+    id: str = Field(min_length=1)
     label: str
     role: str
     group: str | None
@@ -97,8 +97,8 @@ class ArchitectureNode(BaseModel):
 class ArchitectureEdge(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    source: str
-    target: str
+    source: str = Field(min_length=1)
+    target: str = Field(min_length=1)
     label: str
 
 
