@@ -22,27 +22,6 @@ SOURCE_DETAIL_PHRASES = {
     "github_trending": "github_trending",
     "trending": "github_trending",
 }
-DEVELOPER_CONTEXT_TERMS = {
-    "code",
-    "coding",
-    "developer",
-    "development",
-    "software",
-    "repo",
-    "repository",
-    "ide",
-    "editor",
-    "debugger",
-    "debugging",
-    "test generator",
-    "test generation",
-    "code review",
-    "lint",
-    "build",
-    "release",
-}
-
-
 class DeepCandidateSelector:
     def __init__(self, db: Database):
         self.db = db
@@ -208,8 +187,16 @@ def _coding_capabilities(raw: RawItem, analyzed: AnalyzedItem) -> set[str]:
         capabilities.add("repo_understanding")
     if _contains_any(text, {"ide", "editor extension", "vscode extension", "vs code extension"}):
         capabilities.add("developer_interface")
-    if _contains_any(text, {"cli", "command line"}) and _contains_any(
-        text, DEVELOPER_CONTEXT_TERMS
+    if _contains_any(
+        text,
+        {
+            "developer cli",
+            "coding cli",
+            "code cli",
+            "cli for developer",
+            "cli for developers",
+            "cli for coding",
+        },
     ):
         capabilities.add("developer_interface")
     if _contains_any(
@@ -225,14 +212,41 @@ def _coding_capabilities(raw: RawItem, analyzed: AnalyzedItem) -> set[str]:
         },
     ):
         capabilities.add("code_quality")
-    if _contains_any(text, {"mcp", "model context protocol"}) and _contains_any(
-        text, DEVELOPER_CONTEXT_TERMS
+    if _contains_any(
+        text,
+        {
+            "developer mcp",
+            "coding mcp",
+            "code mcp",
+            "mcp server for developer tools",
+            "mcp server exposing developer tools",
+        },
     ):
         capabilities.add("developer_mcp")
-    if _contains_any(text, {"skill", "skills"}) and _contains_any(
-        text, DEVELOPER_CONTEXT_TERMS
+    if _contains_any(
+        text,
+        {
+            "coding skill",
+            "developer skill",
+            "developer skills",
+            "code skill",
+            "code skills",
+        },
     ):
         capabilities.add("coding_skill")
+    if _contains_any(
+        text,
+        {
+            "code generation",
+            "code generator",
+            "code completion",
+            "code autocomplete",
+            "generates source code",
+            "modifies source code",
+            "code editing",
+        },
+    ):
+        capabilities.add("code_generation")
     if _contains_any(
         text,
         {

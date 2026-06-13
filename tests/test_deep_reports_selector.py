@@ -194,6 +194,59 @@ async def test_selector_rejects_software_agent_benchmark_without_developer_conte
 
 
 @pytest.mark.asyncio
+async def test_selector_rejects_software_agent_benchmark_cli(tmp_path):
+    db = await _init_db(tmp_path)
+    try:
+        url = "https://github.com/acme/software-agent-cli"
+        raw = _raw(
+            url,
+            title="Software Agent Benchmark CLI",
+            description="Command line benchmark for autonomous software agents",
+            stars=50000,
+            topics=["software-agent", "benchmark", "cli"],
+        )
+        analyzed = _analyzed(
+            url,
+            title="Software Agent Benchmark CLI",
+            summary="Run benchmark datasets from the command line",
+            tags=["software-agent", "benchmark", "cli"],
+        )
+
+        candidate = await _select_one(
+            db,
+            url,
+            raw=raw,
+            analyzed=analyzed,
+            reviewed=_reviewed(url, score=95),
+        )
+
+        assert candidate is None
+        assert selector._coding_capabilities(raw, analyzed) == set()
+    finally:
+        await db.close()
+
+
+def test_generic_mcp_does_not_inherit_developer_context_from_another_sentence():
+    url = "https://github.com/acme/calendar-mcp"
+    raw = _raw(
+        url,
+        title="Calendar MCP Server",
+        description="Calendar MCP server. Includes software release automation examples.",
+        topics=["mcp", "calendar"],
+    )
+    analyzed = _analyzed(
+        url,
+        title="Calendar MCP Server",
+        summary="Manage calendar events. The documentation discusses software release automation.",
+        tags=["mcp", "calendar"],
+    )
+
+    capabilities = selector._coding_capabilities(raw, analyzed)
+
+    assert "developer_mcp" not in capabilities
+
+
+@pytest.mark.asyncio
 async def test_stars_cannot_push_candidate_over_threshold(tmp_path):
     db = await _init_db(tmp_path)
     try:
@@ -280,6 +333,14 @@ async def test_stars_cannot_push_candidate_over_threshold(tmp_path):
             [],
             [],
             "repo_understanding",
+        ),
+        (
+            "Code Completion",
+            "Code completion that generates and modifies source code",
+            "Install, configure, and run the code autocomplete demo",
+            ["code-completion"],
+            [],
+            "code_generation",
         ),
     ],
 )
