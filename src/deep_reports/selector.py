@@ -167,13 +167,17 @@ def _repo_info(url: str) -> tuple[str, str] | None:
 
 
 def _coding_capabilities(raw: RawItem, analyzed: AnalyzedItem) -> set[str]:
-    text = _capability_text(raw, analyzed)
+    segments = [
+        segment
+        for segment in _capability_segments(raw, analyzed)
+        if not _is_incidental_capability_segment(segment)
+    ]
     capabilities = set()
 
-    if _contains_any(text, {"coding agent", "code agent"}):
+    if _segments_contain_any(segments, {"coding agent", "code agent"}):
         capabilities.add("coding_agent")
-    if _contains_any(
-        text,
+    if _segments_contain_any(
+        segments,
         {
             "code understanding",
             "codebase understanding",
@@ -185,10 +189,13 @@ def _coding_capabilities(raw: RawItem, analyzed: AnalyzedItem) -> set[str]:
         },
     ):
         capabilities.add("repo_understanding")
-    if _contains_any(text, {"ide", "editor extension", "vscode extension", "vs code extension"}):
+    if _segments_contain_any(
+        segments,
+        {"ide", "editor extension", "vscode extension", "vs code extension"},
+    ):
         capabilities.add("developer_interface")
-    if _contains_any(
-        text,
+    if _segments_contain_any(
+        segments,
         {
             "developer cli",
             "coding cli",
@@ -199,12 +206,16 @@ def _coding_capabilities(raw: RawItem, analyzed: AnalyzedItem) -> set[str]:
         },
     ):
         capabilities.add("developer_interface")
-    if _contains_any(
-        text,
+    if _segments_contain_any(
+        segments,
         {
             "test generator",
             "test generation",
+            "testing tool",
+            "testing assistant",
+            "test tool",
             "debugger",
+            "debugging assistant",
             "debugging tool",
             "code review",
             "lint",
@@ -212,8 +223,8 @@ def _coding_capabilities(raw: RawItem, analyzed: AnalyzedItem) -> set[str]:
         },
     ):
         capabilities.add("code_quality")
-    if _contains_any(
-        text,
+    if _segments_contain_any(
+        segments,
         {
             "developer mcp",
             "coding mcp",
@@ -223,8 +234,8 @@ def _coding_capabilities(raw: RawItem, analyzed: AnalyzedItem) -> set[str]:
         },
     ):
         capabilities.add("developer_mcp")
-    if _contains_any(
-        text,
+    if _segments_contain_any(
+        segments,
         {
             "coding skill",
             "developer skill",
@@ -234,8 +245,8 @@ def _coding_capabilities(raw: RawItem, analyzed: AnalyzedItem) -> set[str]:
         },
     ):
         capabilities.add("coding_skill")
-    if _contains_any(
-        text,
+    if _segments_contain_any(
+        segments,
         {
             "code generation",
             "code generator",
@@ -244,17 +255,27 @@ def _coding_capabilities(raw: RawItem, analyzed: AnalyzedItem) -> set[str]:
             "generates source code",
             "modifies source code",
             "code editing",
+            "code modification",
+            "code modifying",
+            "source code modification",
         },
     ):
         capabilities.add("code_generation")
-    if _contains_any(
-        text,
+    if _segments_contain_any(
+        segments,
         {
             "developer workflow",
             "development workflow",
+            "developer automation",
+            "development automation",
             "build automation",
             "release automation",
             "build and release automation",
+            "documentation automation for developer",
+            "documentation automation for developers",
+            "documentation automation for software developer",
+            "documentation automation for software developers",
+            "developer documentation automation",
         },
     ):
         capabilities.add("developer_automation")
@@ -262,33 +283,43 @@ def _coding_capabilities(raw: RawItem, analyzed: AnalyzedItem) -> set[str]:
     return capabilities
 
 
-def _capability_text(raw: RawItem, analyzed: AnalyzedItem) -> str:
+def _capability_segments(raw: RawItem, analyzed: AnalyzedItem) -> list[str]:
     topics = _sequence_values(raw.raw_metadata.get("topics"))
     tags = _sequence_values(analyzed.tags)
-    text = "\n".join(
-        [
-            raw.title,
-            raw.description,
-            analyzed.summary,
-            " ".join(str(tag) for tag in tags),
-            " ".join(str(topic) for topic in topics),
-        ]
-    ).lower().replace("-", " ").replace("_", " ")
-    incidental_phrases = {
+    values = [raw.title, raw.description, analyzed.summary, *tags, *topics]
+    segments = []
+    for value in values:
+        normalized = str(value).lower().replace("-", " ").replace("_", " ")
+        segments.extend(
+            segment.strip()
+            for segment in re.split(r"[.?!\n]+", normalized)
+            if segment.strip()
+        )
+    return segments
+
+
+def _is_incidental_capability_segment(segment: str) -> bool:
+    if _contains_any(segment, {"benchmark", "dataset", "evaluation", "leaderboard"}):
+        return True
+
+    documentation_terms = {"documentation", "docs", "readme"}
+    explanation_terms = {
+        "discusses",
+        "mentions",
+        "shows",
+        "provides",
+        "walkthrough",
         "example",
         "examples",
-        "documentation discusses",
-        "documentation mentions",
-        "docs discuss",
-        "docs mention",
     }
-    sentences = re.split(r"[.?!\n]+", text)
-    capability_sentences = [
-        sentence
-        for sentence in sentences
-        if not _contains_any(sentence, incidental_phrases)
-    ]
-    return " ".join(capability_sentences)
+    return _contains_any(segment, documentation_terms) and _contains_any(
+        segment,
+        explanation_terms,
+    )
+
+
+def _segments_contain_any(segments: list[str], terms: set[str]) -> bool:
+    return any(_contains_any(segment, terms) for segment in segments)
 
 
 def _readiness_hits(raw: RawItem, analyzed: AnalyzedItem) -> int:
