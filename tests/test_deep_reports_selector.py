@@ -4,6 +4,7 @@ import pytest
 
 from src.core.database import Database
 from src.db.operations import save_deep_report
+from src.deep_reports import selector
 from src.deep_reports.selector import select_deep_report_candidate
 from src.graph.state import AnalyzedItem, RawItem, ReviewedItem
 
@@ -45,7 +46,7 @@ def _raw(
         raw_metadata={
             "source_id": source_id,
             "stars": stars,
-            "topics": topics if topics is not None else ["agent", "developer-tools"],
+            "topics": topics if topics is not None else ["coding-agent", "developer-tools"],
         },
         collected_at="2026-06-03T10:00:00+08:00",
     )
@@ -54,17 +55,19 @@ def _raw(
 def _analyzed(
     url: str,
     *,
-    summary: str = "实用的 AI agent developer tool，支持 CLI workflow automation",
+    title: str = "Dev Agent",
+    summary: str = "AI coding agent CLI for developer workflow automation",
     tags: list[str] | None = None,
     source_id: str = "github_ai_devtools",
+    source_detail: str = "github trending",
 ) -> AnalyzedItem:
     return AnalyzedItem(
         ref_url=url,
-        title="Dev Agent",
+        title=title,
         summary=summary,
-        tags=tags if tags is not None else ["AI", "Agent", "CLI"],
+        tags=tags if tags is not None else ["coding-agent", "CLI"],
         source="github",
-        source_detail="github trending",
+        source_detail=source_detail,
         source_id=source_id,
     )
 
@@ -73,51 +76,321 @@ def _reviewed(url: str, *, score: int = 85, verdict: str = "approved") -> Review
     return ReviewedItem(ref_url=url, total_score=score, dimensions={}, verdict=verdict)
 
 
+async def _select_one(db, url, *, raw=None, analyzed=None, reviewed=None):
+    return await select_deep_report_candidate(
+        db,
+        raw_items=[raw or _raw(url)],
+        analyzed_items=[analyzed or _analyzed(url)],
+        reviewed_items=[reviewed or _reviewed(url)],
+    )
+
+
+def test_selector_thresholds_are_fixed_at_85():
+    assert getattr(selector, "MIN_REVIEWER_SCORE", None) == 85
+    assert selector.MIN_CANDIDATE_SCORE == 85
+
+
 @pytest.mark.asyncio
-async def test_selector_prefers_practical_github_ai_tool(tmp_path):
+@pytest.mark.parametrize(
+    ("verdict", "score"),
+    [
+        ("retry", 100),
+        ("approved", 84),
+    ],
+)
+async def test_selector_requires_approved_verdict_and_reviewer_score_85(tmp_path, verdict, score):
     db = await _init_db(tmp_path)
     try:
-        practical_url = "https://github.com/acme/dev-agent"
-        hot_but_less_practical_url = "https://github.com/acme/model-zoo"
-        rss_url = "https://example.com/news"
+        url = "https://github.com/acme/dev-agent"
+        candidate = await _select_one(db, url, reviewed=_reviewed(url, score=score, verdict=verdict))
 
+        assert candidate is None
+    finally:
+        await db.close()
+
+
+@pytest.mark.asyncio
+async def test_selector_rejects_high_score_popular_general_rag(tmp_path):
+    db = await _init_db(tmp_path)
+    try:
+        url = "https://github.com/acme/general-rag"
+        candidate = await _select_one(
+            db,
+            url,
+            raw=_raw(
+                url,
+                title="Universal Knowledge Base",
+                description="General RAG chatbot over documents and model weights",
+                stars=50000,
+                topics=["rag", "knowledge-base", "chatbot"],
+            ),
+            analyzed=_analyzed(
+                url,
+                title="Universal Knowledge Base",
+                summary="A benchmark dataset and general retrieval system",
+                tags=["RAG", "Knowledge Base"],
+            ),
+            reviewed=_reviewed(url, score=95),
+        )
+
+        assert candidate is None
+    finally:
+        await db.close()
+
+
+@pytest.mark.asyncio
+async def test_stars_cannot_push_candidate_over_threshold(tmp_path):
+    db = await _init_db(tmp_path)
+    try:
+        url = "https://github.com/acme/repo-context"
+        raw = _raw(
+            url,
+            title="Repo Context Builder",
+            description="Understands source repositories",
+            source_id="github_trending",
+            stars=100000,
+            topics=["repository-analysis"],
+        )
+        analyzed = _analyzed(
+            url,
+            title="Repo Context Builder",
+            summary="Builds repository context for source code understanding",
+            tags=["repo-context"],
+            source_id="github_trending",
+        )
+
+        candidate = await _select_one(db, url, raw=raw, analyzed=analyzed)
+
+        assert candidate is None
+    finally:
+        await db.close()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("title", "description", "summary", "tags", "topics", "expected_capability"),
+    [
+        (
+            "Coding Agent",
+            "Autonomous software agent",
+            "Install, configure, and run a coding agent demo",
+            ["coding-agent"],
+            [],
+            "coding_agent",
+        ),
+        (
+            "IDE Review Assistant",
+            "VS Code extension for code review",
+            "Install the editor extension and try the demo",
+            ["IDE", "code-review"],
+            [],
+            "code_quality",
+        ),
+        (
+            "Debug Test CLI",
+            "Developer CLI debugger and test generator",
+            "Install the package and run the CLI demo",
+            ["debugger", "test-generation"],
+            [],
+            "code_quality",
+        ),
+        (
+            "Developer MCP Server",
+            "MCP server exposing developer tools",
+            "Install with Docker and configure the developer MCP server",
+            ["MCP", "developer-tools"],
+            [],
+            "developer_mcp",
+        ),
+        (
+            "Coding Skill",
+            "Coding skill for software developers",
+            "Install the package, configure it, and run the demo",
+            ["coding-skill"],
+            [],
+            "coding_skill",
+        ),
+        (
+            "Repo Context Builder",
+            "Repository analysis and code understanding",
+            "Install the package, configure it, and run the demo",
+            ["repo-context"],
+            ["repository-analysis"],
+            "repo_understanding",
+        ),
+    ],
+)
+async def test_selector_accepts_coding_capabilities(
+    tmp_path,
+    title,
+    description,
+    summary,
+    tags,
+    topics,
+    expected_capability,
+):
+    db = await _init_db(tmp_path)
+    try:
+        url = "https://github.com/acme/coding-tool"
+        candidate = await _select_one(
+            db,
+            url,
+            raw=_raw(url, title=title, description=description, topics=topics),
+            analyzed=_analyzed(url, title=title, summary=summary, tags=tags),
+        )
+
+        assert candidate is not None
+        assert expected_capability in candidate.metadata["coding_capabilities"]
+        assert candidate.candidate_score >= 85
+    finally:
+        await db.close()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("title", "description", "tags"),
+    [
+        ("Universal MCP Server", "MCP server for calendars and documents", ["MCP"]),
+        ("Reusable Skills", "A collection of general productivity skills", ["skills"]),
+    ],
+)
+async def test_selector_rejects_generic_mcp_and_skills_without_developer_context(
+    tmp_path, title, description, tags
+):
+    db = await _init_db(tmp_path)
+    try:
+        url = "https://github.com/acme/general-tool"
+        candidate = await _select_one(
+            db,
+            url,
+            raw=_raw(url, title=title, description=description, topics=[]),
+            analyzed=_analyzed(
+                url,
+                title=title,
+                summary="Install the package, configure it, and run the demo",
+                tags=tags,
+            ),
+            reviewed=_reviewed(url, score=100),
+        )
+
+        assert candidate is None
+    finally:
+        await db.close()
+
+
+@pytest.mark.asyncio
+async def test_candidate_metadata_contains_capabilities_and_score_parts(tmp_path):
+    db = await _init_db(tmp_path)
+    try:
+        url = "https://github.com/acme/review-cli"
+        candidate = await _select_one(
+            db,
+            url,
+            raw=_raw(
+                url,
+                title="IDE Code Review CLI",
+                description="VS Code extension and developer CLI for code review",
+                stars=99999,
+                topics=["code-review", "developer-tools"],
+            ),
+            analyzed=_analyzed(
+                url,
+                title="IDE Code Review CLI",
+                summary="Install the package, configure the CLI, and run tests and a demo",
+                tags=["IDE", "code-review", "CLI"],
+            ),
+        )
+
+        assert candidate is not None
+        assert candidate.metadata["coding_capabilities"] == [
+            "code_quality",
+            "developer_interface",
+        ]
+        assert candidate.metadata["score_parts"] == {
+            "coding": 45,
+            "reviewer": 29,
+            "source": 10,
+            "readiness": 8,
+        }
+        assert candidate.candidate_score == 92
+        assert "50000" not in candidate.trigger_reason
+        assert "85" in candidate.trigger_reason
+        assert candidate.metadata["raw_metadata"]["stars"] == 99999
+    finally:
+        await db.close()
+
+
+@pytest.mark.asyncio
+async def test_candidate_score_threshold_accepts_exactly_85(tmp_path):
+    db = await _init_db(tmp_path)
+    try:
+        url = "https://github.com/acme/coding-skill"
+        candidate = await _select_one(
+            db,
+            url,
+            raw=_raw(
+                url,
+                title="Coding Skill",
+                description="Coding skill for developers",
+                topics=[],
+            ),
+            analyzed=_analyzed(
+                url,
+                title="Coding Skill",
+                summary="Install the package, configure it, and run a demo",
+                tags=["coding-skill"],
+            ),
+        )
+
+        assert candidate is not None
+        assert candidate.candidate_score == 85
+    finally:
+        await db.close()
+
+
+@pytest.mark.asyncio
+async def test_selector_keeps_source_priority(tmp_path):
+    db = await _init_db(tmp_path)
+    try:
+        preferred_url = "https://github.com/acme/preferred"
+        trending_url = "https://github.com/acme/trending"
         candidate = await select_deep_report_candidate(
             db,
             raw_items=[
                 _raw(
-                    hot_but_less_practical_url,
-                    title="Model Zoo",
-                    description="Collection of benchmark models",
-                    source_id="github_trending",
-                    stars=12000,
-                    topics=["models"],
+                    preferred_url,
+                    title="Coding Agent CLI",
+                    source_id="",
+                    source_detail="GitHub AI devtools source",
                 ),
-                _raw(practical_url),
-                _raw(rss_url, title="RSS Item", source="rss", source_id="rss"),
+                _raw(
+                    trending_url,
+                    title="Coding Agent CLI",
+                    source_id="github_trending",
+                ),
             ],
             analyzed_items=[
                 _analyzed(
-                    hot_but_less_practical_url,
-                    summary="模型集合和榜单",
-                    tags=["AI"],
+                    preferred_url,
+                    title="Coding Agent CLI",
+                    source_id="",
+                    source_detail="",
+                ),
+                _analyzed(
+                    trending_url,
+                    title="Coding Agent CLI",
                     source_id="github_trending",
                 ),
-                _analyzed(practical_url),
-                _analyzed(rss_url),
             ],
             reviewed_items=[
-                _reviewed(hot_but_less_practical_url, score=88),
-                _reviewed(practical_url, score=84),
-                _reviewed(rss_url, score=95),
+                _reviewed(preferred_url, score=100),
+                _reviewed(trending_url, score=100),
             ],
         )
 
         assert candidate is not None
-        assert candidate.repo_url == practical_url
-        assert candidate.repo_name == "acme/dev-agent"
-        assert candidate.reviewer_score == 84
-        assert candidate.candidate_score >= 70
-        assert "github_ai_devtools" in candidate.trigger_reason
+        assert candidate.repo_url == preferred_url
+        assert candidate.metadata["score_parts"]["source"] == 10
     finally:
         await db.close()
 
@@ -127,7 +400,7 @@ async def test_selector_skips_recently_reported_repo(tmp_path):
     db = await _init_db(tmp_path)
     try:
         recent_url = "https://github.com/acme/dev-agent"
-        fallback_url = "https://github.com/acme/rag-workflow"
+        fallback_url = "https://github.com/acme/test-generator"
         await save_deep_report(
             db,
             repo_url=recent_url,
@@ -150,228 +423,28 @@ async def test_selector_skips_recently_reported_repo(tmp_path):
 
         candidate = await select_deep_report_candidate(
             db,
-            raw_items=[_raw(recent_url), _raw(fallback_url, title="RAG Workflow", stars=700)],
-            analyzed_items=[_analyzed(recent_url), _analyzed(fallback_url)],
-            reviewed_items=[_reviewed(recent_url, score=92), _reviewed(fallback_url, score=82)],
+            raw_items=[
+                _raw(recent_url),
+                _raw(
+                    fallback_url,
+                    title="Test Generator CLI",
+                    description="CLI test generator for developers",
+                ),
+            ],
+            analyzed_items=[
+                _analyzed(recent_url),
+                _analyzed(
+                    fallback_url,
+                    title="Test Generator CLI",
+                    summary="Install the package, configure the CLI, and run a demo",
+                    tags=["test-generation", "CLI"],
+                ),
+            ],
+            reviewed_items=[_reviewed(recent_url, score=95), _reviewed(fallback_url)],
         )
 
         assert candidate is not None
         assert candidate.repo_url == fallback_url
-    finally:
-        await db.close()
-
-
-@pytest.mark.asyncio
-async def test_selector_ignores_discarded_and_low_candidate_score(tmp_path):
-    db = await _init_db(tmp_path)
-    try:
-        candidate = await select_deep_report_candidate(
-            db,
-            raw_items=[
-                _raw("https://github.com/acme/discarded"),
-                _raw(
-                    "https://github.com/acme/low-candidate-score",
-                    title="Model Archive",
-                    description="Benchmark collection",
-                    source_id="unknown",
-                    source_detail="",
-                    stars=0,
-                    topics=["models"],
-                ),
-            ],
-            analyzed_items=[
-                _analyzed("https://github.com/acme/discarded"),
-                _analyzed(
-                    "https://github.com/acme/low-candidate-score",
-                    summary="模型归档和榜单",
-                    tags=["AI"],
-                    source_id="unknown",
-                ),
-            ],
-            reviewed_items=[
-                _reviewed("https://github.com/acme/discarded", score=95, verdict="discarded"),
-                _reviewed("https://github.com/acme/low-candidate-score", score=100),
-            ],
-        )
-
-        assert candidate is None
-    finally:
-        await db.close()
-
-
-@pytest.mark.asyncio
-async def test_selector_chooses_highest_candidate_score(tmp_path):
-    db = await _init_db(tmp_path)
-    try:
-        lower_url = "https://github.com/acme/plain-ai"
-        higher_url = "https://github.com/acme/mcp-copilot"
-
-        candidate = await select_deep_report_candidate(
-            db,
-            raw_items=[
-                _raw(lower_url, source_id="github_trending", stars=200, topics=["ai"]),
-                _raw(higher_url, source_id="github_trending_velocity", stars=2500, topics=["mcp", "copilot"]),
-            ],
-            analyzed_items=[
-                _analyzed(lower_url, summary="AI project", tags=["AI"], source_id="github_trending"),
-                _analyzed(
-                    higher_url,
-                    summary="MCP copilot CLI tool for developer workflow",
-                    tags=["MCP", "CLI", "Agent"],
-                    source_id="github_trending_velocity",
-                ),
-            ],
-            reviewed_items=[
-                _reviewed(lower_url, score=88),
-                _reviewed(higher_url, score=80),
-            ],
-        )
-
-        assert candidate is not None
-        assert candidate.repo_url == higher_url
-        assert candidate.candidate_score >= 70
-    finally:
-        await db.close()
-
-
-@pytest.mark.asyncio
-async def test_selector_uses_source_detail_for_ai_devtools_priority(tmp_path):
-    db = await _init_db(tmp_path)
-    try:
-        source_detail_url = "https://github.com/acme/detail-agent"
-        trending_url = "https://github.com/acme/plain-trending"
-
-        candidate = await select_deep_report_candidate(
-            db,
-            raw_items=[
-                _raw(
-                    source_detail_url,
-                    source_id="",
-                    source_detail="GitHub AI devtools agent source",
-                    stars=5000,
-                    topics=["ai"],
-                ),
-                _raw(
-                    trending_url,
-                    source_id="github_trending",
-                    source_detail="github trending",
-                    stars=5000,
-                    topics=["ai"],
-                ),
-            ],
-            analyzed_items=[
-                _analyzed(
-                    source_detail_url,
-                    summary="AI project",
-                    tags=["AI"],
-                    source_id="",
-                ).model_copy(update={"source_detail": ""}),
-                _analyzed(
-                    trending_url,
-                    summary="AI project",
-                    tags=["AI"],
-                    source_id="github_trending",
-                ),
-            ],
-            reviewed_items=[
-                _reviewed(source_detail_url, score=100),
-                _reviewed(trending_url, score=100),
-            ],
-        )
-
-        assert candidate is not None
-        assert candidate.repo_url == source_detail_url
-        assert candidate.candidate_score >= 70
-        assert candidate.metadata["score_parts"]["source"] == 25
-    finally:
-        await db.close()
-
-
-@pytest.mark.asyncio
-async def test_selector_uses_analyzed_source_detail_when_raw_source_detail_empty(tmp_path):
-    db = await _init_db(tmp_path)
-    try:
-        repo_url = "https://github.com/acme/analyzed-detail-agent"
-
-        candidate = await select_deep_report_candidate(
-            db,
-            raw_items=[
-                _raw(
-                    repo_url,
-                    source_id="unknown",
-                    source_detail="",
-                    stars=5000,
-                    topics=["ai"],
-                )
-            ],
-            analyzed_items=[
-                _analyzed(
-                    repo_url,
-                    summary="AI project",
-                    tags=["AI"],
-                    source_id="unknown",
-                ).model_copy(update={"source_detail": "GitHub AI devtools agent source"})
-            ],
-            reviewed_items=[_reviewed(repo_url, score=100)],
-        )
-
-        assert candidate is not None
-        assert candidate.repo_url == repo_url
-        assert candidate.source_detail == "GitHub AI devtools agent source"
-        assert candidate.candidate_score >= 70
-        assert candidate.metadata["score_parts"]["source"] == 25
-        assert candidate.metadata["score_parts"]["source_detail"] == 5
-    finally:
-        await db.close()
-
-
-@pytest.mark.asyncio
-async def test_selector_allows_low_reviewer_score_when_candidate_score_meets_threshold(tmp_path):
-    db = await _init_db(tmp_path)
-    try:
-        repo_url = "https://github.com/acme/dev-agent"
-
-        candidate = await select_deep_report_candidate(
-            db,
-            raw_items=[_raw(repo_url, stars=5000)],
-            analyzed_items=[_analyzed(repo_url)],
-            reviewed_items=[_reviewed(repo_url, score=60)],
-        )
-
-        assert candidate is not None
-        assert candidate.reviewer_score == 60
-        assert candidate.candidate_score >= 70
-    finally:
-        await db.close()
-
-
-@pytest.mark.asyncio
-async def test_selector_ignores_github_issue_and_tree_urls(tmp_path):
-    db = await _init_db(tmp_path)
-    try:
-        issue_url = "https://github.com/acme/dev-agent/issues/1"
-        tree_url = "https://github.com/acme/dev-agent/tree/main"
-        pull_url = "https://github.com/acme/dev-agent/pull/1"
-        query_url = "https://github.com/acme/dev-agent?tab=readme"
-
-        candidate = await select_deep_report_candidate(
-            db,
-            raw_items=[_raw(issue_url), _raw(tree_url), _raw(pull_url), _raw(query_url)],
-            analyzed_items=[
-                _analyzed(issue_url),
-                _analyzed(tree_url),
-                _analyzed(pull_url),
-                _analyzed(query_url),
-            ],
-            reviewed_items=[
-                _reviewed(issue_url),
-                _reviewed(tree_url),
-                _reviewed(pull_url),
-                _reviewed(query_url),
-            ],
-        )
-
-        assert candidate is None
     finally:
         await db.close()
 
@@ -382,12 +455,7 @@ async def test_selector_accepts_repo_root_url_with_trailing_slash_and_git_suffix
     try:
         repo_url = "https://github.com/acme/dev-agent.git/"
 
-        candidate = await select_deep_report_candidate(
-            db,
-            raw_items=[_raw(repo_url)],
-            analyzed_items=[_analyzed(repo_url)],
-            reviewed_items=[_reviewed(repo_url)],
-        )
+        candidate = await _select_one(db, repo_url)
 
         assert candidate is not None
         assert candidate.repo_url == "https://github.com/acme/dev-agent"
@@ -397,35 +465,17 @@ async def test_selector_accepts_repo_root_url_with_trailing_slash_and_git_suffix
 
 
 @pytest.mark.asyncio
-async def test_selector_skips_recent_completed_report_for_git_suffix_variant(tmp_path):
+async def test_selector_ignores_github_issue_and_tree_urls(tmp_path):
     db = await _init_db(tmp_path)
     try:
-        await save_deep_report(
-            db,
-            repo_url="https://github.com/acme/dev-agent",
-            repo_name="acme/dev-agent",
-            article_id=12,
-            run_id="run_1",
-            commit_sha="abc123",
-            status="completed",
-            candidate_score=95,
-            trigger_reason="recent",
-            report_json={},
-            report_markdown="",
-            evidence_json=[],
-            tech_stack_json={},
-            file_tree_summary="",
-            analysis_cost=0,
-            analysis_tokens=0,
-            error="",
-        )
-        variant_url = "https://github.com/acme/dev-agent.git/"
+        issue_url = "https://github.com/acme/dev-agent/issues/1"
+        tree_url = "https://github.com/acme/dev-agent/tree/main"
 
         candidate = await select_deep_report_candidate(
             db,
-            raw_items=[_raw(variant_url)],
-            analyzed_items=[_analyzed(variant_url)],
-            reviewed_items=[_reviewed(variant_url)],
+            raw_items=[_raw(issue_url), _raw(tree_url)],
+            analyzed_items=[_analyzed(issue_url), _analyzed(tree_url)],
+            reviewed_items=[_reviewed(issue_url), _reviewed(tree_url)],
         )
 
         assert candidate is None
@@ -434,178 +484,14 @@ async def test_selector_skips_recent_completed_report_for_git_suffix_variant(tmp
 
 
 @pytest.mark.asyncio
-async def test_selector_does_not_skip_completed_report_outside_recent_window(tmp_path):
+async def test_selector_handles_non_sequence_topics_and_tags(tmp_path):
     db = await _init_db(tmp_path)
     try:
-        repo_url = "https://github.com/acme/dev-agent"
-        await save_deep_report(
-            db,
-            repo_url=repo_url,
-            repo_name="acme/dev-agent",
-            article_id=12,
-            run_id="run_1",
-            commit_sha="abc123",
-            status="completed",
-            candidate_score=95,
-            trigger_reason="old",
-            report_json={},
-            report_markdown="",
-            evidence_json=[],
-            tech_stack_json={},
-            file_tree_summary="",
-            analysis_cost=0,
-            analysis_tokens=0,
-            error="",
-        )
-        await db.execute(
-            "UPDATE deep_reports SET updated_at = strftime('%Y-%m-%dT%H:%M:%S', 'now', '+8 hours', '-7 days', '-1 hour') WHERE repo_url = ?",
-            (repo_url,),
-        )
-        await db.commit()
-
-        candidate = await select_deep_report_candidate(
-            db,
-            raw_items=[_raw(repo_url)],
-            analyzed_items=[_analyzed(repo_url)],
-            reviewed_items=[_reviewed(repo_url)],
-        )
-
-        assert candidate is not None
-        assert candidate.repo_url == repo_url
-    finally:
-        await db.close()
-
-
-@pytest.mark.asyncio
-async def test_selector_does_not_skip_failed_recent_report(tmp_path):
-    db = await _init_db(tmp_path)
-    try:
-        repo_url = "https://github.com/acme/dev-agent"
-        await save_deep_report(
-            db,
-            repo_url=repo_url,
-            repo_name="acme/dev-agent",
-            article_id=12,
-            run_id="run_1",
-            commit_sha="abc123",
-            status="failed",
-            candidate_score=95,
-            trigger_reason="failed",
-            report_json={},
-            report_markdown="",
-            evidence_json=[],
-            tech_stack_json={},
-            file_tree_summary="",
-            analysis_cost=0,
-            analysis_tokens=0,
-            error="clone failed",
-        )
-
-        candidate = await select_deep_report_candidate(
-            db,
-            raw_items=[_raw(repo_url)],
-            analyzed_items=[_analyzed(repo_url)],
-            reviewed_items=[_reviewed(repo_url)],
-        )
-
-        assert candidate is not None
-        assert candidate.repo_url == repo_url
-    finally:
-        await db.close()
-
-
-@pytest.mark.asyncio
-@pytest.mark.parametrize("status", ["pending", "report"])
-async def test_selector_does_not_skip_pending_or_report_recent_report(tmp_path, status):
-    db = await _init_db(tmp_path)
-    try:
-        repo_url = "https://github.com/acme/dev-agent"
-        await save_deep_report(
-            db,
-            repo_url=repo_url,
-            repo_name="acme/dev-agent",
-            article_id=12,
-            run_id="run_1",
-            commit_sha="abc123",
-            status=status,
-            candidate_score=95,
-            trigger_reason=status,
-            report_json={},
-            report_markdown="",
-            evidence_json=[],
-            tech_stack_json={},
-            file_tree_summary="",
-            analysis_cost=0,
-            analysis_tokens=0,
-            error="",
-        )
-
-        candidate = await select_deep_report_candidate(
-            db,
-            raw_items=[_raw(repo_url)],
-            analyzed_items=[_analyzed(repo_url)],
-            reviewed_items=[_reviewed(repo_url)],
-        )
-
-        assert candidate is not None
-        assert candidate.repo_url == repo_url
-    finally:
-        await db.close()
-
-
-@pytest.mark.asyncio
-async def test_selector_handles_non_sequence_topics(tmp_path):
-    db = await _init_db(tmp_path)
-    try:
-        int_topics_url = "https://github.com/acme/int-topics"
-        string_topics_url = "https://github.com/acme/string-topics"
-
-        candidate = await select_deep_report_candidate(
-            db,
-            raw_items=[
-                _raw(int_topics_url, topics=123),
-                _raw(
-                    string_topics_url,
-                    title="Plain Project",
-                    description="Reference implementation",
-                    source_id="unknown",
-                    source_detail="",
-                    stars=0,
-                    topics="agent cli developer workflow automation tool",
-                ),
-            ],
-            analyzed_items=[
-                _analyzed(int_topics_url),
-                _analyzed(
-                    string_topics_url,
-                    summary="参考实现",
-                    tags=[],
-                    source_id="unknown",
-                ),
-            ],
-            reviewed_items=[
-                _reviewed(int_topics_url),
-                _reviewed(string_topics_url, score=100),
-            ],
-        )
-
-        assert candidate is not None
-        assert candidate.repo_url == int_topics_url
-    finally:
-        await db.close()
-
-
-@pytest.mark.asyncio
-async def test_selector_handles_non_sequence_tags(tmp_path):
-    db = await _init_db(tmp_path)
-    try:
-        int_tags_url = "https://github.com/acme/int-tags"
-        string_tags_url = "https://github.com/acme/string-tags"
-
-        int_tags = AnalyzedItem.model_construct(
-            ref_url=int_tags_url,
-            title="Dev Agent",
-            summary="实用的 AI agent developer tool，支持 CLI workflow automation",
+        url = "https://github.com/acme/dev-agent"
+        analyzed = AnalyzedItem.model_construct(
+            ref_url=url,
+            title="Coding Agent",
+            summary="Install and run the coding agent CLI demo",
             tags=123,
             language="zh",
             retry_count=0,
@@ -614,41 +500,19 @@ async def test_selector_handles_non_sequence_tags(tmp_path):
             source_id="github_ai_devtools",
             metadata={},
         )
-        string_tags = AnalyzedItem.model_construct(
-            ref_url=string_tags_url,
-            title="Plain Project",
-            summary="参考实现",
-            tags="agent cli developer workflow automation tool",
-            language="zh",
-            retry_count=0,
-            source="github",
-            source_detail="",
-            source_id="unknown",
-            metadata={},
-        )
 
-        candidate = await select_deep_report_candidate(
+        candidate = await _select_one(
             db,
-            raw_items=[
-                _raw(int_tags_url),
-                _raw(
-                    string_tags_url,
-                    title="Plain Project",
-                    description="Reference implementation",
-                    source_id="unknown",
-                    source_detail="",
-                    stars=0,
-                    topics=[],
-                ),
-            ],
-            analyzed_items=[int_tags, string_tags],
-            reviewed_items=[
-                _reviewed(int_tags_url),
-                _reviewed(string_tags_url, score=100),
-            ],
+            url,
+            raw=_raw(url, title="Coding Agent", topics="coding-agent"),
+            analyzed=analyzed,
         )
 
         assert candidate is not None
-        assert candidate.repo_url == int_tags_url
+        assert candidate.metadata["coding_capabilities"] == [
+            "coding_agent",
+            "developer_automation",
+            "developer_interface",
+        ]
     finally:
         await db.close()
