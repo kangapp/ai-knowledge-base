@@ -359,6 +359,24 @@ def test_test_generation_capability_is_not_a_readiness_signal():
     assert selector._readiness_hits(raw, analyzed) == 0
 
 
+def test_example_project_is_not_a_readiness_signal():
+    url = "https://github.com/acme/example-project"
+    raw = _raw(
+        url,
+        title="Example Project",
+        description="An example project for learning patterns",
+        topics=[],
+    )
+    analyzed = _analyzed(
+        url,
+        title="Example Project",
+        summary="Reference example project",
+        tags=[],
+    )
+
+    assert selector._readiness_hits(raw, analyzed) == 0
+
+
 @pytest.mark.asyncio
 async def test_candidate_metadata_contains_capabilities_and_score_parts(tmp_path):
     db = await _init_db(tmp_path)

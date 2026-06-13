@@ -253,7 +253,15 @@ def _readiness_hits(raw: RawItem, analyzed: AnalyzedItem) -> int:
     readiness_groups = (
         {"install", "installation", "quick start", "quickstart", "getting started", "安装"},
         {"cli", "command line", "ide", "editor extension", "vscode", "命令行", "插件"},
-        {"configure", "configuration", "config example", "example", "配置", "示例"},
+        {
+            "configure",
+            "configuration",
+            "configuration example",
+            "config example",
+            "example config",
+            "配置",
+            "示例",
+        },
         {"docker", "pypi", "npm package", "package release", "包发布"},
         {"tests passing", "test passing", "demo", "playground", "测试通过", "演示"},
     )
