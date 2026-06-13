@@ -110,30 +110,85 @@ async def test_selector_requires_approved_verdict_and_reviewer_score_85(tmp_path
 
 
 @pytest.mark.asyncio
-async def test_selector_rejects_high_score_popular_general_rag(tmp_path):
+@pytest.mark.parametrize(
+    ("name", "description"),
+    [
+        ("rag", "General RAG system over documents"),
+        ("knowledge-base", "Universal knowledge base for documents"),
+        ("chatbot", "General purpose chatbot"),
+        ("model-weights", "Collection of open model weights"),
+        ("dataset", "Large language model dataset"),
+        ("benchmark", "Benchmark suite for language models"),
+    ],
+)
+async def test_selector_rejects_popular_non_coding_projects(tmp_path, name, description):
     db = await _init_db(tmp_path)
     try:
-        url = "https://github.com/acme/general-rag"
+        url = f"https://github.com/acme/{name}"
         candidate = await _select_one(
             db,
             url,
             raw=_raw(
                 url,
-                title="Universal Knowledge Base",
-                description="General RAG chatbot over documents and model weights",
+                title=name,
+                description=description,
                 stars=50000,
-                topics=["rag", "knowledge-base", "chatbot"],
+                topics=[name],
             ),
             analyzed=_analyzed(
                 url,
-                title="Universal Knowledge Base",
-                summary="A benchmark dataset and general retrieval system",
-                tags=["RAG", "Knowledge Base"],
+                title=name,
+                summary=description,
+                tags=[name],
             ),
             reviewed=_reviewed(url, score=95),
         )
 
         assert candidate is None
+    finally:
+        await db.close()
+
+
+@pytest.mark.asyncio
+async def test_selector_rejects_software_agent_benchmark_without_developer_context(tmp_path):
+    db = await _init_db(tmp_path)
+    try:
+        url = "https://github.com/acme/software-agent-benchmark"
+        candidate = await _select_one(
+            db,
+            url,
+            raw=_raw(
+                url,
+                title="Software Agent Benchmark",
+                description="A benchmark for general autonomous software agents",
+                stars=50000,
+                topics=["software-agent", "benchmark"],
+            ),
+            analyzed=_analyzed(
+                url,
+                title="Software Agent Benchmark",
+                summary="Dataset and leaderboard for general software agents",
+                tags=["software-agent", "benchmark"],
+            ),
+            reviewed=_reviewed(url, score=95),
+        )
+
+        assert candidate is None
+        assert selector._coding_capabilities(
+            _raw(
+                url,
+                title="Software Agent Benchmark",
+                description="A benchmark for general autonomous software agents",
+                stars=50000,
+                topics=["software-agent", "benchmark"],
+            ),
+            _analyzed(
+                url,
+                title="Software Agent Benchmark",
+                summary="Dataset and leaderboard for general software agents",
+                tags=["software-agent", "benchmark"],
+            ),
+        ) == set()
     finally:
         await db.close()
 
@@ -218,6 +273,14 @@ async def test_stars_cannot_push_candidate_over_threshold(tmp_path):
             ["repository-analysis"],
             "repo_understanding",
         ),
+        (
+            "Context Builder",
+            "Repository understanding and context builder",
+            "Install, configure, and run its demo",
+            [],
+            [],
+            "repo_understanding",
+        ),
     ],
 )
 async def test_selector_accepts_coding_capabilities(
@@ -276,6 +339,24 @@ async def test_selector_rejects_generic_mcp_and_skills_without_developer_context
         assert candidate is None
     finally:
         await db.close()
+
+
+def test_test_generation_capability_is_not_a_readiness_signal():
+    url = "https://github.com/acme/test-generator"
+    raw = _raw(
+        url,
+        title="Test Generator",
+        description="Generates unit tests for source code",
+        topics=["test-generation"],
+    )
+    analyzed = _analyzed(
+        url,
+        title="Test Generator",
+        summary="Test generation for Python code",
+        tags=["test-generation"],
+    )
+
+    assert selector._readiness_hits(raw, analyzed) == 0
 
 
 @pytest.mark.asyncio
@@ -445,6 +526,120 @@ async def test_selector_skips_recently_reported_repo(tmp_path):
 
         assert candidate is not None
         assert candidate.repo_url == fallback_url
+    finally:
+        await db.close()
+
+
+@pytest.mark.asyncio
+async def test_selector_does_not_skip_completed_report_outside_recent_window(tmp_path):
+    db = await _init_db(tmp_path)
+    try:
+        repo_url = "https://github.com/acme/dev-agent"
+        await save_deep_report(
+            db,
+            repo_url=repo_url,
+            repo_name="acme/dev-agent",
+            article_id=12,
+            run_id="run_1",
+            commit_sha="abc123",
+            status="completed",
+            candidate_score=95,
+            trigger_reason="old",
+            report_json={},
+            report_markdown="",
+            evidence_json=[],
+            tech_stack_json={},
+            file_tree_summary="",
+            analysis_cost=0,
+            analysis_tokens=0,
+            error="",
+        )
+        await db.execute(
+            """
+            UPDATE deep_reports
+            SET updated_at = strftime(
+                '%Y-%m-%dT%H:%M:%S',
+                'now',
+                '+8 hours',
+                '-7 days',
+                '-1 hour'
+            )
+            WHERE repo_url = ?
+            """,
+            (repo_url,),
+        )
+        await db.commit()
+
+        candidate = await _select_one(db, repo_url)
+
+        assert candidate is not None
+        assert candidate.repo_url == repo_url
+    finally:
+        await db.close()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("status", ["failed", "pending", "report"])
+async def test_selector_does_not_skip_recent_non_completed_report(tmp_path, status):
+    db = await _init_db(tmp_path)
+    try:
+        repo_url = "https://github.com/acme/dev-agent"
+        await save_deep_report(
+            db,
+            repo_url=repo_url,
+            repo_name="acme/dev-agent",
+            article_id=12,
+            run_id="run_1",
+            commit_sha="abc123",
+            status=status,
+            candidate_score=95,
+            trigger_reason=status,
+            report_json={},
+            report_markdown="",
+            evidence_json=[],
+            tech_stack_json={},
+            file_tree_summary="",
+            analysis_cost=0,
+            analysis_tokens=0,
+            error="clone failed" if status == "failed" else "",
+        )
+
+        candidate = await _select_one(db, repo_url)
+
+        assert candidate is not None
+        assert candidate.repo_url == repo_url
+    finally:
+        await db.close()
+
+
+@pytest.mark.asyncio
+async def test_selector_skips_recent_completed_report_for_normalized_git_url(tmp_path):
+    db = await _init_db(tmp_path)
+    try:
+        await save_deep_report(
+            db,
+            repo_url="https://github.com/acme/dev-agent",
+            repo_name="acme/dev-agent",
+            article_id=12,
+            run_id="run_1",
+            commit_sha="abc123",
+            status="completed",
+            candidate_score=95,
+            trigger_reason="recent",
+            report_json={},
+            report_markdown="",
+            evidence_json=[],
+            tech_stack_json={},
+            file_tree_summary="",
+            analysis_cost=0,
+            analysis_tokens=0,
+            error="",
+        )
+        variant_url = "https://github.com/acme/dev-agent.git/"
+
+        candidate = await _select_one(db, variant_url)
+
+        assert candidate is None
     finally:
         await db.close()
 

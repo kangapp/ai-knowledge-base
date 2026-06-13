@@ -191,7 +191,7 @@ def _coding_capabilities(raw: RawItem, analyzed: AnalyzedItem) -> set[str]:
     text = _candidate_text(raw, analyzed)
     capabilities = set()
 
-    if _contains_any(text, {"coding agent", "code agent", "software agent"}):
+    if _contains_any(text, {"coding agent", "code agent"}):
         capabilities.add("coding_agent")
     if _contains_any(
         text,
@@ -199,6 +199,7 @@ def _coding_capabilities(raw: RawItem, analyzed: AnalyzedItem) -> set[str]:
             "code understanding",
             "codebase understanding",
             "repository analysis",
+            "repository understanding",
             "repo analysis",
             "repository context",
             "repo context",
@@ -250,11 +251,11 @@ def _coding_capabilities(raw: RawItem, analyzed: AnalyzedItem) -> set[str]:
 def _readiness_hits(raw: RawItem, analyzed: AnalyzedItem) -> int:
     text = _candidate_text(raw, analyzed)
     readiness_groups = (
-        {"install", "installation", "quick start", "getting started", "安装"},
+        {"install", "installation", "quick start", "quickstart", "getting started", "安装"},
         {"cli", "command line", "ide", "editor extension", "vscode", "命令行", "插件"},
-        {"configure", "configuration", "config example", "配置", "示例"},
+        {"configure", "configuration", "config example", "example", "配置", "示例"},
         {"docker", "pypi", "npm package", "package release", "包发布"},
-        {"test", "tests", "testing", "demo", "example", "测试", "演示"},
+        {"tests passing", "test passing", "demo", "playground", "测试通过", "演示"},
     )
     return sum(1 for terms in readiness_groups if _contains_any(text, terms))
 
