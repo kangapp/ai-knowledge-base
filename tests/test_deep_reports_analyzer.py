@@ -419,6 +419,7 @@ def test_deep_report_schema_desc_matches_v2_output_contract():
         "title",
         "description",
     }
+    assert set(schema["source_evidence"][0]) == {"path", "reason"}
 
 
 def test_deep_report_config_has_enough_output_budget():
