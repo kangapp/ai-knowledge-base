@@ -56,12 +56,55 @@ def _valid_output_json() -> str:
       "title": "acme/agent-tool 源码深度报告",
       "summary": "该项目围绕开发者工作流提供 AI agent 编排能力。",
       "tech_stack": ["Python", "FastAPI"],
+      "use_cases": ["代码助手集成", "工作流自动化"],
+      "decision": {
+        "recommendation": "适合需要仓库级 AI agent 编排能力的开发团队。",
+        "reasons": ["工作流边界清晰", "核心入口明确"],
+        "best_for": ["需要仓库级上下文的开发者"],
+        "not_for": ["要求完全离线运行的团队"]
+      },
       "architecture": {
         "pattern": "分层服务",
-        "components": ["API 层", "Agent 编排层"]
+        "summary": "API 接收任务，Agent 编排层调用工具并返回结果。",
+        "nodes": [
+          {"id": "api", "label": "API", "role": "接收请求", "group": "interface"},
+          {"id": "agent", "label": "Agent", "role": "编排任务", "group": "core"},
+          {"id": "tools", "label": "Tools", "role": "执行开发工具", "group": "core"},
+          {"id": "result", "label": "Result", "role": "输出结果", "group": "interface"}
+        ],
+        "edges": [
+          {"source": "api", "target": "agent", "label": "任务"},
+          {"source": "agent", "target": "tools", "label": "调用"},
+          {"source": "tools", "target": "result", "label": "结果"}
+        ]
       },
-      "data_flow": ["请求进入 API", "进入 agent 编排", "返回结果"],
-      "use_cases": ["代码助手集成", "工作流自动化"],
+      "quick_start": {
+        "prerequisites": ["Python 3.12", "模型 API Key"],
+        "steps": [
+          {"id": "install", "title": "安装", "description": "安装项目依赖"},
+          {"id": "config", "title": "配置", "description": "设置模型密钥"},
+          {"id": "run", "title": "启动", "description": "运行 CLI"}
+        ],
+        "expected_result": "CLI 返回代码分析结果。"
+      },
+      "deployment": {
+        "prerequisites": ["可运行 Python 的主机"],
+        "steps": [
+          {"id": "prepare", "title": "准备环境", "description": "安装运行时"},
+          {"id": "deploy", "title": "部署", "description": "安装依赖并配置服务"},
+          {"id": "health", "title": "检查", "description": "验证服务可用"}
+        ],
+        "operations": ["监控模型调用失败", "定期更新依赖"]
+      },
+      "core_modules": [
+        {"name": "API", "responsibility": "接收任务", "depends_on": ["Agent"]},
+        {"name": "Agent", "responsibility": "编排工具", "depends_on": ["Tools"]}
+      ],
+      "runtime_data_flow": [
+        {"id": "input", "title": "输入", "description": "用户提交开发任务"},
+        {"id": "plan", "title": "规划", "description": "Agent 拆分任务"},
+        {"id": "output", "title": "输出", "description": "返回执行结果"}
+      ],
       "strengths": ["结构清晰", "入口明确"],
       "limitations": ["缺少更完整部署说明"],
       "actionable_takeaways": ["可先从 src/main.py 阅读入口"],
@@ -153,6 +196,7 @@ def test_parse_deep_report_output_accepts_fenced_json():
     assert output.title == "acme/agent-tool 源码深度报告"
     assert output.source_evidence[0].path == "src/main.py"
     assert output.architecture.pattern == "分层服务"
+    assert output.runtime_data_flow[0].id == "input"
 
 
 def test_parse_deep_report_output_accepts_noisy_json():
@@ -172,57 +216,22 @@ def test_parse_deep_report_output_rejects_missing_required_fields():
 
 
 @pytest.mark.parametrize(
-    "payload",
+    "missing_path",
     [
-        {
-            "title": "x",
-            "summary": "y",
-            "tech_stack": ["Python"],
-            "data_flow": ["a"],
-            "use_cases": ["b"],
-            "strengths": ["c"],
-            "limitations": ["d"],
-            "actionable_takeaways": ["e"],
-            "source_evidence": [{"path": "src/main.py", "reason": "入口"}],
-        },
-        {
-            "title": "x",
-            "summary": "y",
-            "tech_stack": ["Python"],
-            "architecture": {"pattern": "分层", "components": ["API"]},
-            "use_cases": ["b"],
-            "strengths": ["c"],
-            "limitations": ["d"],
-            "actionable_takeaways": ["e"],
-            "source_evidence": [{"path": "src/main.py", "reason": "入口"}],
-        },
-        {
-            "title": "x",
-            "summary": "y",
-            "tech_stack": ["Python"],
-            "architecture": {"pattern": "分层", "components": ["API"]},
-            "data_flow": ["a"],
-            "use_cases": ["b"],
-            "strengths": ["c"],
-            "limitations": ["d"],
-            "actionable_takeaways": ["e"],
-        },
-        {
-            "title": "x",
-            "summary": "y",
-            "tech_stack": ["Python"],
-            "architecture": {"pattern": "分层", "components": ["API"]},
-            "data_flow": ["a"],
-            "use_cases": ["b"],
-            "strengths": ["c"],
-            "limitations": ["d"],
-            "actionable_takeaways": ["e"],
-            "source_evidence": [{}],
-        },
+        ("architecture",),
+        ("runtime_data_flow",),
+        ("source_evidence",),
+        ("source_evidence", 0, "path"),
     ],
 )
-def test_parse_deep_report_output_rejects_missing_nested_required_fields(payload):
+def test_parse_deep_report_output_rejects_missing_nested_required_fields(missing_path):
     from src.deep_reports.analyzer import parse_deep_report_output
+
+    payload = _valid_output_payload()
+    target = payload
+    for key in missing_path[:-1]:
+        target = target[key]
+    target.pop(missing_path[-1])
 
     with pytest.raises(Exception):
         parse_deep_report_output(json.dumps(payload, ensure_ascii=False))
@@ -243,6 +252,33 @@ def test_parse_deep_report_output_rejects_extra_fields(mutator):
     mutator(payload)
 
     with pytest.raises(Exception):
+        parse_deep_report_output(json.dumps(payload, ensure_ascii=False))
+
+
+@pytest.mark.parametrize(
+    "mutator",
+    [
+        lambda payload: payload["architecture"]["nodes"][1].update({"id": "api"}),
+        lambda payload: payload["architecture"]["edges"][0].update({"target": "missing"}),
+        lambda payload: payload["architecture"]["edges"].__setitem__(
+            0,
+            {"source": "api", "target": "api", "label": "loop"},
+        ),
+        lambda payload: payload["quick_start"].update(
+            {"steps": payload["quick_start"]["steps"][:2]}
+        ),
+        lambda payload: payload["deployment"].update(
+            {"steps": payload["deployment"]["steps"] * 3}
+        ),
+    ],
+)
+def test_parse_deep_report_output_rejects_invalid_v2_relationships(mutator):
+    from src.deep_reports.analyzer import parse_deep_report_output
+
+    payload = _valid_output_payload()
+    mutator(payload)
+
+    with pytest.raises(ValueError):
         parse_deep_report_output(json.dumps(payload, ensure_ascii=False))
 
 
