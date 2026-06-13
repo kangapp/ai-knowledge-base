@@ -14,9 +14,46 @@ DEEP_REPORT_SCHEMA_DESC = json.dumps(
         "title": "string",
         "summary": "string",
         "tech_stack": ["string", "string"],
-        "architecture": {"pattern": "string", "components": ["string", "string"]},
-        "data_flow": ["string", "string"],
         "use_cases": ["string"],
+        "decision": {
+            "recommendation": "string",
+            "reasons": ["string"],
+            "best_for": ["string"],
+            "not_for": ["string"],
+        },
+        "architecture": {
+            "pattern": "string",
+            "summary": "string",
+            "nodes": [
+                {
+                    "id": "string",
+                    "label": "string",
+                    "role": "string",
+                    "group": "string|null",
+                }
+            ],
+            "edges": [{"source": "string", "target": "string", "label": "string"}],
+        },
+        "quick_start": {
+            "prerequisites": ["string"],
+            "steps": [{"id": "string", "title": "string", "description": "string"}],
+            "expected_result": "string",
+        },
+        "deployment": {
+            "prerequisites": ["string"],
+            "steps": [{"id": "string", "title": "string", "description": "string"}],
+            "operations": ["string"],
+        },
+        "core_modules": [
+            {
+                "name": "string",
+                "responsibility": "string",
+                "depends_on": ["string"],
+            }
+        ],
+        "runtime_data_flow": [
+            {"id": "string", "title": "string", "description": "string"}
+        ],
         "strengths": ["string"],
         "limitations": ["string"],
         "actionable_takeaways": ["string"],
@@ -106,7 +143,10 @@ async def analyze_deep_report(
                 messages=repair_messages or [
                     {
                         "role": "system",
-                        "content": f"你是源码级 GitHub 项目研究员。只输出 JSON，格式：{DEEP_REPORT_SCHEMA_DESC}",
+                        "content": (
+                            "你是面向采用决策的 GitHub 项目研究员。"
+                            f"只输出合法 JSON，格式：{DEEP_REPORT_SCHEMA_DESC}"
+                        ),
                     },
                     {"role": "user", "content": user_prompt},
                 ],

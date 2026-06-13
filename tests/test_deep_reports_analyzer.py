@@ -320,20 +320,37 @@ def test_deep_report_models_reject_empty_ids(model, payload):
 def test_prompt_template_contains_required_placeholders():
     prompt_path = REPO_ROOT / "prompts" / "deep_report.md"
     template = prompt_path.read_text(encoding="utf-8")
+    schema = json.dumps(
+        {
+            "decision": {"recommendation": "string"},
+            "architecture": {"nodes": [{"id": "string"}]},
+            "quick_start": {"steps": [{"id": "string"}]},
+            "deployment": {"steps": [{"id": "string"}]},
+        },
+        ensure_ascii=False,
+    )
 
     rendered = template.format(
         repo_name="acme/agent-tool",
         repo_url="https://github.com/acme/agent-tool",
         candidate_context="候选上下文",
         source_package="源码摘要",
-        schema='{"title":"string","architecture":{"pattern":"string","components":["string"]},"source_evidence":[{"path":"string","reason":"string"}]}',
+        schema=schema,
     )
 
     assert "acme/agent-tool" in rendered
     assert "候选上下文" in rendered
     assert "源码摘要" in rendered
-    assert '"components":["string"]' in rendered
-    assert '"reason":"string"' in rendered
+    assert "采用决策" in rendered
+    assert "快速上手" in rendered
+    assert "部署运行" in rendered
+    assert "节点数量 4-10" in rendered
+    assert "步骤数量 3-8" in rendered
+    assert "源码证据不用于前台展示" in rendered
+    assert '"recommendation": "string"' in rendered
+    assert '"nodes": [{"id": "string"}]' in rendered
+    assert '"quick_start"' in rendered
+    assert '"deployment"' in rendered
     assert "总长度不超过 5000 个中文字符" in rendered
 
 
@@ -347,7 +364,7 @@ def test_deep_report_config_has_enough_output_budget():
 
 @pytest.mark.asyncio
 async def test_analyze_deep_report_success_uses_json_mode_when_supported():
-    from src.deep_reports.analyzer import analyze_deep_report
+    from src.deep_reports.analyzer import DEEP_REPORT_SCHEMA_DESC, analyze_deep_report
 
     registry = _FakeRegistry(
         supports_json_mode=True,
@@ -367,6 +384,13 @@ async def test_analyze_deep_report_success_uses_json_mode_when_supported():
     assert cost_records[0].prompt_name == "deep_report"
     assert cost_records[0].agent == "deep_report"
     assert registry.last_kwargs["response_format"] == {"type": "json_object"}
+    system_prompt = registry.calls[0]["messages"][0]["content"]
+    assert "面向采用决策的 GitHub 项目研究员" in system_prompt
+    assert DEEP_REPORT_SCHEMA_DESC in system_prompt
+    assert '"recommendation"' in system_prompt
+    assert '"nodes"' in system_prompt
+    assert '"quick_start"' in system_prompt
+    assert '"deployment"' in system_prompt
     assert registry.health.success_calls == [("minimax", 0)]
     assert registry.health.failure_calls == []
 
@@ -438,7 +462,7 @@ async def test_analyze_deep_report_retries_after_parse_failure_and_keeps_both_co
 
 @pytest.mark.asyncio
 async def test_analyze_deep_report_uses_validation_feedback_for_repair_attempt():
-    from src.deep_reports.analyzer import analyze_deep_report
+    from src.deep_reports.analyzer import DEEP_REPORT_SCHEMA_DESC, analyze_deep_report
 
     invalid_output = '{"title":"缺少其余必填字段"}'
     registry = _FakeRegistry(
@@ -455,6 +479,12 @@ async def test_analyze_deep_report_uses_validation_feedback_for_repair_attempt()
     assert len(cost_records) == 2
     repair_messages = registry.calls[1]["messages"]
     assert "修复" in repair_messages[0]["content"]
+    assert "只输出修复后的合法 JSON" in repair_messages[0]["content"]
+    assert DEEP_REPORT_SCHEMA_DESC in repair_messages[0]["content"]
+    assert '"recommendation"' in repair_messages[0]["content"]
+    assert '"nodes"' in repair_messages[0]["content"]
+    assert '"quick_start"' in repair_messages[0]["content"]
+    assert '"deployment"' in repair_messages[0]["content"]
     assert invalid_output in repair_messages[1]["content"]
     assert "Deep report output does not match schema" in repair_messages[1]["content"]
     assert "源码摘要包" not in repair_messages[1]["content"]
