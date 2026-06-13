@@ -167,7 +167,7 @@ def _repo_info(url: str) -> tuple[str, str] | None:
 
 
 def _coding_capabilities(raw: RawItem, analyzed: AnalyzedItem) -> set[str]:
-    text = _candidate_text(raw, analyzed)
+    text = _capability_text(raw, analyzed)
     capabilities = set()
 
     if _contains_any(text, {"coding agent", "code agent"}):
@@ -260,6 +260,35 @@ def _coding_capabilities(raw: RawItem, analyzed: AnalyzedItem) -> set[str]:
         capabilities.add("developer_automation")
 
     return capabilities
+
+
+def _capability_text(raw: RawItem, analyzed: AnalyzedItem) -> str:
+    topics = _sequence_values(raw.raw_metadata.get("topics"))
+    tags = _sequence_values(analyzed.tags)
+    text = "\n".join(
+        [
+            raw.title,
+            raw.description,
+            analyzed.summary,
+            " ".join(str(tag) for tag in tags),
+            " ".join(str(topic) for topic in topics),
+        ]
+    ).lower().replace("-", " ").replace("_", " ")
+    incidental_phrases = {
+        "example",
+        "examples",
+        "documentation discusses",
+        "documentation mentions",
+        "docs discuss",
+        "docs mention",
+    }
+    sentences = re.split(r"[.?!\n]+", text)
+    capability_sentences = [
+        sentence
+        for sentence in sentences
+        if not _contains_any(sentence, incidental_phrases)
+    ]
+    return " ".join(capability_sentences)
 
 
 def _readiness_hits(raw: RawItem, analyzed: AnalyzedItem) -> int:
