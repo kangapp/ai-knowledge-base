@@ -62,6 +62,12 @@ DEEP_REPORT_SCHEMA_DESC = json.dumps(
     ensure_ascii=False,
 )
 
+DEEP_REPORT_VALIDATION_RULES = (
+    "架构节点数量 4-10；流程步骤数量 3-8；"
+    "所有 ID 必须非空且在各自列表中唯一；"
+    "边只能引用已声明节点且禁止自环；不得输出额外字段。"
+)
+
 
 def load_deep_report_prompt(registry: LLMRegistry) -> str:
     path = Path(registry.get_prompt_path("deep_report"))
@@ -104,7 +110,11 @@ def _build_repair_messages(raw_output: str, error: str) -> list[dict[str, str]]:
     return [
         {
             "role": "system",
-            "content": f"你负责修复深度报告 JSON。只输出修复后的合法 JSON，格式：{DEEP_REPORT_SCHEMA_DESC}",
+            "content": (
+                "你负责修复深度报告 JSON。只输出修复后的合法 JSON。"
+                f"校验规则：{DEEP_REPORT_VALIDATION_RULES}"
+                f"格式：{DEEP_REPORT_SCHEMA_DESC}"
+            ),
         },
         {
             "role": "user",
@@ -145,7 +155,9 @@ async def analyze_deep_report(
                         "role": "system",
                         "content": (
                             "你是面向采用决策的 GitHub 项目研究员。"
-                            f"只输出合法 JSON，格式：{DEEP_REPORT_SCHEMA_DESC}"
+                            "只输出合法 JSON。"
+                            f"校验规则：{DEEP_REPORT_VALIDATION_RULES}"
+                            f"格式：{DEEP_REPORT_SCHEMA_DESC}"
                         ),
                     },
                     {"role": "user", "content": user_prompt},
