@@ -341,12 +341,28 @@ def test_prompt_template_contains_required_placeholders():
     assert "acme/agent-tool" in rendered
     assert "候选上下文" in rendered
     assert "源码摘要" in rendered
+    assert "Coding Agent" in rendered
+    assert "代码理解" in rendered
+    assert "IDE/CLI" in rendered
+    assert "测试调试" in rendered
+    assert "代码审查" in rendered
+    assert "Skill" in rendered
+    assert "MCP" in rendered
+    assert "开发自动化" in rendered
     assert "采用决策" in rendered
     assert "快速上手" in rendered
     assert "部署运行" in rendered
     assert "节点数量 4-10" in rendered
     assert "步骤数量 3-8" in rendered
+    assert "证据不足时" in rendered
+    assert "limitations" in rendered
+    assert "边只能引用" in rendered
+    assert "已有的节点 id" in rendered
     assert "源码证据不用于前台展示" in rendered
+    assert "不得输出 schema 之外的额外字段" in rendered
+    assert "每个数组最多 8 项" in rendered
+    assert "输出语言必须是中文" in rendered
+    assert "只能输出合法 JSON" in rendered
     assert '"recommendation": "string"' in rendered
     assert '"nodes": [{"id": "string"}]' in rendered
     assert '"quick_start"' in rendered
