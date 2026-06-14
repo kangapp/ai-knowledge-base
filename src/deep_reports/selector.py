@@ -22,6 +22,137 @@ SOURCE_DETAIL_PHRASES = {
     "github_trending": "github_trending",
     "trending": "github_trending",
 }
+CAPABILITY_PHRASES = {
+    "coding_agent": {
+        "coding agent",
+        "code agent",
+    },
+    "repo_understanding": {
+        "code understanding",
+        "codebase understanding",
+        "repository analysis",
+        "repository understanding",
+        "repo analysis",
+        "repository context",
+        "repo context",
+    },
+    "developer_interface": {
+        "ide",
+        "ide extension",
+        "ide plugin",
+        "editor extension",
+        "vscode extension",
+        "vs code extension",
+        "developer cli",
+        "coding cli",
+        "code cli",
+        "cli for developer",
+        "cli for developers",
+        "cli for coding",
+    },
+    "code_quality": {
+        "test generator",
+        "test generation",
+        "testing tool",
+        "testing assistant",
+        "test tool",
+        "debugger",
+        "debugging assistant",
+        "debugging tool",
+        "code review",
+        "lint",
+        "linter",
+    },
+    "developer_mcp": {
+        "developer mcp",
+        "coding mcp",
+        "code mcp",
+        "mcp server for developer tools",
+        "mcp server exposing developer tools",
+    },
+    "coding_skill": {
+        "coding skill",
+        "developer skill",
+        "developer skills",
+        "code skill",
+        "code skills",
+    },
+    "code_generation": {
+        "code generation",
+        "code generator",
+        "code completion",
+        "code autocomplete",
+        "generates source code",
+        "modifies source code",
+        "code editing",
+        "code modification",
+        "code modifying",
+        "source code modification",
+        "source modification",
+    },
+    "developer_automation": {
+        "developer workflow",
+        "development workflow",
+        "developer automation",
+        "development automation",
+        "build automation",
+        "release automation",
+        "build and release automation",
+        "documentation automation",
+        "documentation automation for developer",
+        "documentation automation for developers",
+        "documentation automation for software developer",
+        "documentation automation for software developers",
+        "developer documentation automation",
+    },
+}
+DELIVERY_TERMS = {
+    "tool",
+    "assistant",
+    "agent",
+    "extension",
+    "plugin",
+    "server",
+    "cli",
+    "service",
+    "platform",
+    "provides",
+    "offers",
+    "enables",
+    "supports",
+    "automates",
+    "generates",
+    "modifies",
+    "reviews",
+    "debugs",
+    "analyzes",
+}
+TITLE_CAPABILITY_NAMES = {
+    "release automation",
+    "documentation automation for developers",
+    "documentation automation for software developers",
+}
+EVALUATION_POSITIONING_TERMS = {
+    "paper",
+    "model weights",
+    "dataset",
+    "benchmark",
+    "evaluation",
+    "leaderboard",
+    "testbed",
+    "comparing models",
+}
+GENERIC_INTERFACE_PHRASES = {
+    "developer cli",
+    "ide",
+    "ide extension",
+    "ide plugin",
+    "editor extension",
+    "vscode extension",
+    "vs code extension",
+}
+
+
 class DeepCandidateSelector:
     def __init__(self, db: Database):
         self.db = db
@@ -167,116 +298,24 @@ def _repo_info(url: str) -> tuple[str, str] | None:
 
 
 def _coding_capabilities(raw: RawItem, analyzed: AnalyzedItem) -> set[str]:
-    segments = _direct_capability_segments(raw, analyzed)
     capabilities = set()
+    has_specific_direct_evidence = False
+    title_segment_count = len(_text_segments([raw.title]))
+    primary_segments = _text_segments([raw.title, raw.description, analyzed.summary])
+    for index, segment in enumerate(_capability_segments(raw, analyzed)):
+        segment_capabilities, has_specific_delivery = _segment_capabilities(
+            segment,
+            is_title=index < title_segment_count,
+        )
+        capabilities.update(segment_capabilities)
+        if index < len(primary_segments):
+            has_specific_direct_evidence |= has_specific_delivery
 
-    if _segments_contain_any(segments, {"coding agent", "code agent"}):
-        capabilities.add("coding_agent")
-    if _segments_contain_any(
-        segments,
-        {
-            "code understanding",
-            "codebase understanding",
-            "repository analysis",
-            "repository understanding",
-            "repo analysis",
-            "repository context",
-            "repo context",
-        },
-    ):
-        capabilities.add("repo_understanding")
-    if _segments_contain_any(
-        segments,
-        {"ide", "editor extension", "vscode extension", "vs code extension"},
-    ):
-        capabilities.add("developer_interface")
-    if _segments_contain_any(
-        segments,
-        {
-            "developer cli",
-            "coding cli",
-            "code cli",
-            "cli for developer",
-            "cli for developers",
-            "cli for coding",
-        },
-    ):
-        capabilities.add("developer_interface")
-    if _segments_contain_any(
-        segments,
-        {
-            "test generator",
-            "test generation",
-            "testing tool",
-            "testing assistant",
-            "test tool",
-            "debugger",
-            "debugging assistant",
-            "debugging tool",
-            "code review",
-            "lint",
-            "linter",
-        },
-    ):
-        capabilities.add("code_quality")
-    if _segments_contain_any(
-        segments,
-        {
-            "developer mcp",
-            "coding mcp",
-            "code mcp",
-            "mcp server for developer tools",
-            "mcp server exposing developer tools",
-        },
-    ):
-        capabilities.add("developer_mcp")
-    if _segments_contain_any(
-        segments,
-        {
-            "coding skill",
-            "developer skill",
-            "developer skills",
-            "code skill",
-            "code skills",
-        },
-    ):
-        capabilities.add("coding_skill")
-    if _segments_contain_any(
-        segments,
-        {
-            "code generation",
-            "code generator",
-            "code completion",
-            "code autocomplete",
-            "generates source code",
-            "modifies source code",
-            "code editing",
-            "code modification",
-            "code modifying",
-            "source code modification",
-        },
-    ):
-        capabilities.add("code_generation")
-    if _segments_contain_any(
-        segments,
-        {
-            "developer workflow",
-            "development workflow",
-            "developer automation",
-            "development automation",
-            "build automation",
-            "release automation",
-            "build and release automation",
-            "documentation automation for developer",
-            "documentation automation for developers",
-            "documentation automation for software developer",
-            "documentation automation for software developers",
-            "developer documentation automation",
-        },
-    ):
-        capabilities.add("developer_automation")
-
-    if capabilities and _is_pure_evaluation_project(raw, analyzed):
+    has_evaluation_positioning = _segments_contain_any(
+        primary_segments,
+        EVALUATION_POSITIONING_TERMS,
+    )
+    if has_evaluation_positioning and not has_specific_direct_evidence:
         return set()
     return capabilities
 
@@ -300,73 +339,56 @@ def _text_segments(values: list) -> list[str]:
     return segments
 
 
-def _direct_capability_segments(raw: RawItem, analyzed: AnalyzedItem) -> list[str]:
-    return _direct_segments(_capability_segments(raw, analyzed))
+def _segment_capabilities(segment: str, *, is_title: bool) -> tuple[set[str], bool]:
+    if _is_supporting_documentation(segment, is_title=is_title):
+        return set(), False
+    if is_title and _contains_any(segment, EVALUATION_POSITIONING_TERMS):
+        return set(), False
+
+    capabilities = {
+        capability
+        for capability, phrases in CAPABILITY_PHRASES.items()
+        if _contains_any(segment, phrases)
+    }
+    has_delivery = _contains_any(segment, DELIVERY_TERMS)
+    has_implicit_delivery = bool(capabilities & {"developer_mcp", "coding_skill"})
+    has_title_name = is_title and _contains_any(segment, TITLE_CAPABILITY_NAMES)
+    if not (has_delivery or has_implicit_delivery or has_title_name):
+        return set(), False
+
+    concrete_phrases = set().union(*CAPABILITY_PHRASES.values()) - GENERIC_INTERFACE_PHRASES
+    has_specific_delivery = bool(capabilities) and _contains_any(segment, concrete_phrases)
+    return capabilities, has_specific_delivery
 
 
-def _is_documentation_report(segment: str) -> bool:
-    documentation_subject_pattern = (
-        r"^(?:the )?(?:readme|docs|documentation)\b.*"
-        r"(?<![a-z0-9])(?:includes|show|shows|provides|discusses|mentions|describes|"
-        r"covers|walkthrough)(?![a-z0-9])"
-    )
-    return re.search(documentation_subject_pattern, segment) is not None
+def _is_supporting_documentation(segment: str, *, is_title: bool) -> bool:
+    supporting_terms = {
+        "example",
+        "examples",
+        "tutorial",
+        "walkthrough",
+        "guidance",
+    }
+    if _contains_any(segment, supporting_terms):
+        return True
 
-
-def _is_pure_evaluation_project(raw: RawItem, analyzed: AnalyzedItem) -> bool:
-    primary_segments = _text_segments([raw.title, raw.description, analyzed.summary])
-    has_evaluation_positioning = _segments_contain_any(
-        primary_segments,
-        {"benchmark", "dataset", "evaluation", "leaderboard"},
-    )
-    if not has_evaluation_positioning:
+    documentation_terms = {"docs", "readme", "documentation"}
+    if not _contains_any(segment, documentation_terms):
+        return False
+    if is_title and _contains_any(segment, TITLE_CAPABILITY_NAMES):
         return False
 
-    direct_primary_segments = _direct_segments(primary_segments)
-    return not any(_declares_tool_delivery(segment) for segment in direct_primary_segments)
-
-
-def _direct_segments(segments: list[str]) -> list[str]:
-    direct_segments = []
-    for segment in segments:
-        if _is_documentation_report(segment):
-            continue
-        for clause in re.split(r"\b(?:and|with)\b", segment):
-            clause = clause.strip(" ,;:")
-            if not clause:
-                continue
-            if _contains_any(clause, {"benchmark", "dataset", "evaluation", "leaderboard"}):
-                continue
-            if _contains_any(clause, {"example", "examples"}):
-                continue
-            direct_segments.append(clause)
-    return direct_segments
-
-
-def _declares_tool_delivery(segment: str) -> bool:
-    return _contains_any(
-        segment,
-        {
-            "coding agent",
-            "code agent",
-            "ide extension",
-            "editor extension",
-            "vscode extension",
-            "vs code extension",
-            "developer cli",
-            "coding cli",
-            "code cli",
-            "developer mcp",
-            "coding mcp",
-            "code mcp",
-            "mcp tool",
-            "code generator",
-            "test generator",
-            "debugger",
-            "linter",
-            "generates source code",
-            "modifies source code",
-        },
+    documentation_automation_terms = {
+        "documentation automation",
+        "documentation automation for developer",
+        "documentation automation for developers",
+        "documentation automation for software developer",
+        "documentation automation for software developers",
+        "developer documentation automation",
+    }
+    return not (
+        _contains_any(segment, documentation_automation_terms)
+        and _contains_any(segment, DELIVERY_TERMS)
     )
 
 

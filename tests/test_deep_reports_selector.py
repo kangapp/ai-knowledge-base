@@ -90,6 +90,141 @@ def test_selector_thresholds_are_fixed_at_85():
     assert selector.MIN_CANDIDATE_SCORE == 85
 
 
+@pytest.mark.parametrize(
+    ("title", "description", "summary"),
+    [
+        (
+            "Developer CLI",
+            "Benchmark leaderboard for completion models",
+            "Compare completion models",
+        ),
+        (
+            "IDE Extension",
+            "Dataset and evaluation suite",
+            "Leaderboard for model evaluation",
+        ),
+        (
+            "Code Completion",
+            "Paper with downloadable model weights",
+            "Research model for code completion",
+        ),
+        (
+            "Code Completion",
+            "Testbed comparing models",
+            "Evaluation framework for completion models",
+        ),
+        (
+            "Calendar MCP",
+            "Calendar integration for managing events",
+            "The README mentions a coding agent",
+        ),
+        (
+            "Calendar MCP",
+            "Calendar integration for managing events",
+            "Documentation guidance for code completion",
+        ),
+        (
+            "Calendar MCP",
+            "Calendar integration for managing events",
+            "Tutorial walkthrough using a code review assistant",
+        ),
+        (
+            "Calendar MCP",
+            "Calendar integration for managing events",
+            "Examples include a developer MCP server",
+        ),
+    ],
+)
+def test_coding_capabilities_require_explicit_delivery_evidence(
+    title,
+    description,
+    summary,
+):
+    url = "https://github.com/acme/explicit-evidence"
+    raw = _raw(url, title=title, description=description, topics=[])
+    analyzed = _analyzed(url, title=title, summary=summary, tags=[])
+
+    assert selector._coding_capabilities(raw, analyzed) == set()
+
+
+@pytest.mark.parametrize(
+    ("title", "description", "summary", "expected_capability"),
+    [
+        (
+            "Completion Bench",
+            "Code completion tool with benchmark results",
+            "Install, configure, and run the demo",
+            "code_generation",
+        ),
+        (
+            "Review Bench",
+            "Code review assistant with evaluation dataset",
+            "Install, configure, and run the demo",
+            "code_quality",
+        ),
+        (
+            "Release Bench",
+            "Release automation tool with benchmark results",
+            "Install, configure, and run the demo",
+            "developer_automation",
+        ),
+        (
+            "Completion Bench",
+            "IDE plugin for code completion with benchmark results",
+            "Install, configure, and run the demo",
+            "developer_interface",
+        ),
+        (
+            "Documentation Automation",
+            "Documentation automation service for software developers",
+            "Install, configure, and run the demo",
+            "developer_automation",
+        ),
+        (
+            "Documentation Automation for Developers",
+            "Automated developer documentation",
+            "Install, configure, and run the demo",
+            "developer_automation",
+        ),
+        (
+            "Coding Agent",
+            "Autonomous coding agent",
+            "Install, configure, and run the demo",
+            "coding_agent",
+        ),
+        (
+            "Repository Understanding Tool",
+            "Understands source repositories",
+            "Install, configure, and run the demo",
+            "repo_understanding",
+        ),
+        (
+            "Developer MCP Server",
+            "MCP server for developer tools",
+            "Install, configure, and run the demo",
+            "developer_mcp",
+        ),
+        (
+            "Coding Skill",
+            "Coding skill for software developers",
+            "Install, configure, and run the demo",
+            "coding_skill",
+        ),
+    ],
+)
+def test_coding_capabilities_accept_explicit_capability_delivery(
+    title,
+    description,
+    summary,
+    expected_capability,
+):
+    url = "https://github.com/acme/explicit-delivery"
+    raw = _raw(url, title=title, description=description, topics=[])
+    analyzed = _analyzed(url, title=title, summary=summary, tags=[])
+
+    assert expected_capability in selector._coding_capabilities(raw, analyzed)
+
+
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
     ("verdict", "score"),
@@ -447,13 +582,13 @@ async def test_selector_accepts_tool_clause_alongside_evaluation_clause(tmp_path
         url = "https://github.com/acme/completion-extension"
         raw = _raw(
             url,
-            title="Code Completion Benchmark and IDE Extension",
-            description="Install and configure the package",
+            title="Completion Extension",
+            description="IDE extension for code completion with benchmark results",
             topics=[],
         )
         analyzed = _analyzed(
             url,
-            title="Code Completion Benchmark and IDE Extension",
+            title="Completion Extension",
             summary="Run the demo",
             tags=[],
         )
@@ -461,7 +596,10 @@ async def test_selector_accepts_tool_clause_alongside_evaluation_clause(tmp_path
         candidate = await _select_one(db, url, raw=raw, analyzed=analyzed)
 
         assert candidate is not None
-        assert candidate.metadata["coding_capabilities"] == ["developer_interface"]
+        assert candidate.metadata["coding_capabilities"] == [
+            "code_generation",
+            "developer_interface",
+        ]
     finally:
         await db.close()
 
@@ -600,7 +738,7 @@ async def test_stars_cannot_push_candidate_over_threshold(tmp_path):
         ),
         (
             "Repo Context Builder",
-            "Repository analysis and code understanding",
+            "Repository analysis and code understanding tool",
             "Install the package, configure it, and run the demo",
             ["repo-context"],
             ["repository-analysis"],
@@ -608,7 +746,7 @@ async def test_stars_cannot_push_candidate_over_threshold(tmp_path):
         ),
         (
             "Context Builder",
-            "Repository understanding and context builder",
+            "Repository understanding tool and context builder",
             "Install, configure, and run its demo",
             [],
             [],
@@ -629,14 +767,6 @@ async def test_stars_cannot_push_candidate_over_threshold(tmp_path):
             ["release-automation"],
             [],
             "developer_automation",
-        ),
-        (
-            "Completion Examples",
-            "Code completion with configuration examples",
-            "Install the package and run the code completion demo",
-            [],
-            [],
-            "code_generation",
         ),
         (
             "Completion Evaluation Tool",
@@ -664,7 +794,7 @@ async def test_stars_cannot_push_candidate_over_threshold(tmp_path):
         ),
         (
             "Source Modification",
-            "Source code modification for developers",
+            "Source code modification tool for developers",
             "Install, configure, and run the demo",
             [],
             [],
@@ -712,7 +842,7 @@ async def test_stars_cannot_push_candidate_over_threshold(tmp_path):
         ),
         (
             "Developer Automation",
-            "Developer automation for release workflows",
+            "Developer automation platform for release workflows",
             "Install, configure, and run the demo",
             [],
             [],
@@ -720,7 +850,7 @@ async def test_stars_cannot_push_candidate_over_threshold(tmp_path):
         ),
         (
             "Development Automation",
-            "Development automation for release workflows",
+            "Development automation service for release workflows",
             "Install, configure, and run the demo",
             [],
             [],
@@ -728,7 +858,7 @@ async def test_stars_cannot_push_candidate_over_threshold(tmp_path):
         ),
         (
             "Documentation Automation",
-            "Documentation automation for software developers",
+            "Documentation automation service for software developers",
             "Install, configure, and run the demo",
             [],
             [],
@@ -744,7 +874,7 @@ async def test_stars_cannot_push_candidate_over_threshold(tmp_path):
         ),
         (
             "Developer Documentation Automation",
-            "Developer documentation automation",
+            "Developer documentation automation service",
             "Install, configure, and run the demo",
             [],
             [],
