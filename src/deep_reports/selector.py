@@ -302,40 +302,28 @@ def _is_incidental_capability_segment(segment: str) -> bool:
     if _contains_any(segment, {"benchmark", "dataset", "evaluation", "leaderboard"}):
         return True
 
-    if _contains_any(
-        segment,
-        {
-            "release automation examples",
-            "developer automation examples",
-            "development automation examples",
-            "documentation automation examples",
-        },
-    ):
+    documentation_subject_pattern = (
+        r"(?<![a-z0-9])(?:readme|docs|documentation)(?![a-z0-9]).*"
+        r"(?<![a-z0-9])(?:includes|show|shows|provides|discusses|mentions|describes|"
+        r"covers|walkthrough)(?![a-z0-9])"
+    )
+    if re.search(documentation_subject_pattern, segment):
         return True
 
     if _contains_any(
         segment,
-        {"documentation automation", "developer documentation automation"},
+        {"example", "examples", "example of"},
     ):
-        return False
+        configuration_examples = {
+            "configuration example",
+            "configuration examples",
+            "config example",
+            "config examples",
+            "example config",
+        }
+        return not _contains_any(segment, configuration_examples)
 
-    documentation_terms = {"documentation", "docs", "readme"}
-    explanation_terms = {
-        "discusses",
-        "mentions",
-        "shows",
-        "provides",
-        "includes",
-        "describes",
-        "covers",
-        "walkthrough",
-        "example",
-        "examples",
-    }
-    return _contains_any(segment, documentation_terms) and _contains_any(
-        segment,
-        explanation_terms,
-    )
+    return False
 
 
 def _segments_contain_any(segments: list[str], terms: set[str]) -> bool:
