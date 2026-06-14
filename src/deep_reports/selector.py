@@ -167,11 +167,7 @@ def _repo_info(url: str) -> tuple[str, str] | None:
 
 
 def _coding_capabilities(raw: RawItem, analyzed: AnalyzedItem) -> set[str]:
-    segments = [
-        segment
-        for segment in _capability_segments(raw, analyzed)
-        if not _is_incidental_capability_segment(segment)
-    ]
+    segments = _direct_capability_segments(raw, analyzed)
     capabilities = set()
 
     if _segments_contain_any(segments, {"coding agent", "code agent"}):
@@ -280,6 +276,8 @@ def _coding_capabilities(raw: RawItem, analyzed: AnalyzedItem) -> set[str]:
     ):
         capabilities.add("developer_automation")
 
+    if capabilities and _is_pure_evaluation_project(raw, analyzed):
+        return set()
     return capabilities
 
 
@@ -287,6 +285,10 @@ def _capability_segments(raw: RawItem, analyzed: AnalyzedItem) -> list[str]:
     topics = _sequence_values(raw.raw_metadata.get("topics"))
     tags = _sequence_values(analyzed.tags)
     values = [raw.title, raw.description, analyzed.summary, *tags, *topics]
+    return _text_segments(values)
+
+
+def _text_segments(values: list) -> list[str]:
     segments = []
     for value in values:
         normalized = str(value).lower().replace("-", " ").replace("_", " ")
@@ -298,32 +300,74 @@ def _capability_segments(raw: RawItem, analyzed: AnalyzedItem) -> list[str]:
     return segments
 
 
-def _is_incidental_capability_segment(segment: str) -> bool:
-    if _contains_any(segment, {"benchmark", "dataset", "evaluation", "leaderboard"}):
-        return True
+def _direct_capability_segments(raw: RawItem, analyzed: AnalyzedItem) -> list[str]:
+    return _direct_segments(_capability_segments(raw, analyzed))
 
+
+def _is_documentation_report(segment: str) -> bool:
     documentation_subject_pattern = (
-        r"(?<![a-z0-9])(?:readme|docs|documentation)(?![a-z0-9]).*"
+        r"^(?:the )?(?:readme|docs|documentation)\b.*"
         r"(?<![a-z0-9])(?:includes|show|shows|provides|discusses|mentions|describes|"
         r"covers|walkthrough)(?![a-z0-9])"
     )
-    if re.search(documentation_subject_pattern, segment):
-        return True
+    return re.search(documentation_subject_pattern, segment) is not None
 
-    if _contains_any(
+
+def _is_pure_evaluation_project(raw: RawItem, analyzed: AnalyzedItem) -> bool:
+    primary_segments = _text_segments([raw.title, raw.description, analyzed.summary])
+    has_evaluation_positioning = _segments_contain_any(
+        primary_segments,
+        {"benchmark", "dataset", "evaluation", "leaderboard"},
+    )
+    if not has_evaluation_positioning:
+        return False
+
+    direct_primary_segments = _direct_segments(primary_segments)
+    return not any(_declares_tool_delivery(segment) for segment in direct_primary_segments)
+
+
+def _direct_segments(segments: list[str]) -> list[str]:
+    direct_segments = []
+    for segment in segments:
+        if _is_documentation_report(segment):
+            continue
+        for clause in re.split(r"\b(?:and|with)\b", segment):
+            clause = clause.strip(" ,;:")
+            if not clause:
+                continue
+            if _contains_any(clause, {"benchmark", "dataset", "evaluation", "leaderboard"}):
+                continue
+            if _contains_any(clause, {"example", "examples"}):
+                continue
+            direct_segments.append(clause)
+    return direct_segments
+
+
+def _declares_tool_delivery(segment: str) -> bool:
+    return _contains_any(
         segment,
-        {"example", "examples", "example of"},
-    ):
-        configuration_examples = {
-            "configuration example",
-            "configuration examples",
-            "config example",
-            "config examples",
-            "example config",
-        }
-        return not _contains_any(segment, configuration_examples)
-
-    return False
+        {
+            "coding agent",
+            "code agent",
+            "ide extension",
+            "editor extension",
+            "vscode extension",
+            "vs code extension",
+            "developer cli",
+            "coding cli",
+            "code cli",
+            "developer mcp",
+            "coding mcp",
+            "code mcp",
+            "mcp tool",
+            "code generator",
+            "test generator",
+            "debugger",
+            "linter",
+            "generates source code",
+            "modifies source code",
+        },
+    )
 
 
 def _segments_contain_any(segments: list[str], terms: set[str]) -> bool:
@@ -331,7 +375,7 @@ def _segments_contain_any(segments: list[str], terms: set[str]) -> bool:
 
 
 def _readiness_hits(raw: RawItem, analyzed: AnalyzedItem) -> int:
-    text = _candidate_text(raw, analyzed)
+    segments = _capability_segments(raw, analyzed)
     readiness_groups = (
         {"install", "installation", "quick start", "quickstart", "getting started", "安装"},
         {"cli", "command line", "ide", "editor extension", "vscode", "命令行", "插件"},
@@ -347,21 +391,7 @@ def _readiness_hits(raw: RawItem, analyzed: AnalyzedItem) -> int:
         {"docker", "pypi", "npm package", "package release", "包发布"},
         {"tests passing", "test passing", "demo", "playground", "测试通过", "演示"},
     )
-    return sum(1 for terms in readiness_groups if _contains_any(text, terms))
-
-
-def _candidate_text(raw: RawItem, analyzed: AnalyzedItem) -> str:
-    topics = _sequence_values(raw.raw_metadata.get("topics"))
-    tags = _sequence_values(analyzed.tags)
-    return " ".join(
-        [
-            raw.title,
-            raw.description,
-            analyzed.summary,
-            " ".join(str(tag) for tag in tags),
-            " ".join(str(topic) for topic in topics),
-        ]
-    ).lower().replace("-", " ").replace("_", " ")
+    return sum(1 for terms in readiness_groups if _segments_contain_any(segments, terms))
 
 
 def _contains_any(text: str, terms: set[str]) -> bool:

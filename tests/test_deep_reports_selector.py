@@ -377,6 +377,156 @@ async def test_selector_rejects_incidental_coding_mentions(
 
 
 @pytest.mark.asyncio
+async def test_selector_rejects_code_completion_project_positioned_as_evaluation(tmp_path):
+    db = await _init_db(tmp_path)
+    try:
+        url = "https://github.com/acme/code-completion-evaluation"
+        raw = _raw(
+            url,
+            title="Code Completion",
+            description="Benchmark and dataset for model evaluation",
+            topics=["evaluation"],
+        )
+        analyzed = _analyzed(
+            url,
+            title="Code Completion",
+            summary="Leaderboard for completion model evaluation",
+            tags=["benchmark", "dataset"],
+        )
+
+        candidate = await _select_one(
+            db,
+            url,
+            raw=raw,
+            analyzed=analyzed,
+            reviewed=_reviewed(url, score=95),
+        )
+
+        assert selector._coding_capabilities(raw, analyzed) == set()
+        assert candidate is None
+    finally:
+        await db.close()
+
+
+@pytest.mark.asyncio
+async def test_selector_rejects_capability_only_mentioned_in_configuration_examples(tmp_path):
+    db = await _init_db(tmp_path)
+    try:
+        url = "https://github.com/acme/calendar-mcp"
+        raw = _raw(
+            url,
+            title="Calendar MCP",
+            description="Calendar integration for managing events",
+            topics=["calendar"],
+        )
+        analyzed = _analyzed(
+            url,
+            title="Calendar MCP",
+            summary="Configuration examples include code completion for illustration",
+            tags=["mcp", "calendar"],
+        )
+
+        candidate = await _select_one(
+            db,
+            url,
+            raw=raw,
+            analyzed=analyzed,
+            reviewed=_reviewed(url, score=95),
+        )
+
+        assert selector._coding_capabilities(raw, analyzed) == set()
+        assert candidate is None
+    finally:
+        await db.close()
+
+
+@pytest.mark.asyncio
+async def test_selector_accepts_tool_clause_alongside_evaluation_clause(tmp_path):
+    db = await _init_db(tmp_path)
+    try:
+        url = "https://github.com/acme/completion-extension"
+        raw = _raw(
+            url,
+            title="Code Completion Benchmark and IDE Extension",
+            description="Install and configure the package",
+            topics=[],
+        )
+        analyzed = _analyzed(
+            url,
+            title="Code Completion Benchmark and IDE Extension",
+            summary="Run the demo",
+            tags=[],
+        )
+
+        candidate = await _select_one(db, url, raw=raw, analyzed=analyzed)
+
+        assert candidate is not None
+        assert candidate.metadata["coding_capabilities"] == ["developer_interface"]
+    finally:
+        await db.close()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("name", "description", "should_accept"),
+    [
+        (
+            "documentation-automation",
+            "Provides documentation automation for software developers",
+            True,
+        ),
+        (
+            "readme-documentation-automation",
+            "README includes developer documentation automation",
+            False,
+        ),
+    ],
+)
+async def test_selector_distinguishes_documentation_capability_from_readme_report(
+    tmp_path,
+    name,
+    description,
+    should_accept,
+):
+    db = await _init_db(tmp_path)
+    try:
+        url = f"https://github.com/acme/{name}"
+        candidate = await _select_one(
+            db,
+            url,
+            raw=_raw(url, title="Calendar MCP", description=description, topics=[]),
+            analyzed=_analyzed(
+                url,
+                title="Calendar MCP",
+                summary="Install, configure, and run the demo",
+                tags=[],
+            ),
+        )
+
+        assert (candidate is not None) is should_accept
+    finally:
+        await db.close()
+
+
+def test_readiness_signals_do_not_span_fields():
+    url = "https://github.com/acme/split-readiness"
+    raw = _raw(
+        url,
+        title="Calendar MCP",
+        description="getting",
+        topics=[],
+    )
+    analyzed = _analyzed(
+        url,
+        title="Calendar MCP",
+        summary="started",
+        tags=[],
+    )
+
+    assert selector._readiness_hits(raw, analyzed) == 0
+
+
+@pytest.mark.asyncio
 async def test_stars_cannot_push_candidate_over_threshold(tmp_path):
     db = await _init_db(tmp_path)
     try:
