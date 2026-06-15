@@ -148,6 +148,32 @@ def test_coding_capabilities_require_explicit_delivery_evidence(
 
 
 @pytest.mark.parametrize(
+    "title",
+    [
+        "IDE",
+        "Developer CLI",
+        "Code Completion",
+    ],
+)
+def test_coding_capabilities_reject_title_only_evidence(title):
+    url = "https://github.com/acme/calendar-tool"
+    raw = _raw(
+        url,
+        title=title,
+        description="Calendar integration for managing events",
+        topics=[],
+    )
+    analyzed = _analyzed(
+        url,
+        title=title,
+        summary="Provides calendar scheduling and reminders",
+        tags=[],
+    )
+
+    assert selector._coding_capabilities(raw, analyzed) == set()
+
+
+@pytest.mark.parametrize(
     "description",
     [
         "Paper introducing a code completion tool",
@@ -161,6 +187,39 @@ def test_coding_capabilities_reject_evaluation_subjects(description):
     analyzed = _analyzed(url, title="Coding Research", summary="", tags=[])
 
     assert selector._coding_capabilities(raw, analyzed) == set()
+
+
+@pytest.mark.parametrize(
+    "segment",
+    [
+        "This paper introduces a code completion tool",
+        "Paper about a code completion tool",
+        "Study of a code review assistant",
+        "Research on a coding agent",
+        "We present a benchmark for code completion tools",
+        "A new dataset from code review assistants",
+    ],
+)
+def test_evaluation_subject_detection_is_position_independent(segment):
+    assert selector._segment_capabilities(
+        segment.lower(),
+        is_title=False,
+    ) == (set(), False)
+
+
+@pytest.mark.parametrize(
+    "segment",
+    [
+        "Our README mentions code completion guidance",
+        "The docs discuss a code review assistant",
+        "Project documentation shows a coding agent example",
+    ],
+)
+def test_documentation_subject_detection_is_position_independent(segment):
+    assert selector._segment_capabilities(
+        segment.lower(),
+        is_title=False,
+    ) == (set(), False)
 
 
 @pytest.mark.parametrize(
@@ -750,6 +809,24 @@ def test_readiness_signals_do_not_span_fields():
         title="Calendar MCP",
         summary="started",
         tags=[],
+    )
+
+    assert selector._readiness_hits(raw, analyzed) == 0
+
+
+def test_readiness_signals_ignore_tags_and_topics():
+    url = "https://github.com/acme/metadata-readiness"
+    raw = _raw(
+        url,
+        title="Developer Tool",
+        description="A developer utility",
+        topics=["install", "cli", "config", "docker", "demo"],
+    )
+    analyzed = _analyzed(
+        url,
+        title="Developer Tool",
+        summary="A small developer utility",
+        tags=["installation", "command-line", "playground"],
     )
 
     assert selector._readiness_hits(raw, analyzed) == 0

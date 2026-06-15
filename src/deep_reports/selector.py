@@ -35,6 +35,7 @@ CAPABILITY_PHRASES = {
         "repo analysis",
         "repository context",
         "repo context",
+        "understands source repositories",
     },
     "developer_interface": {
         "ide",
@@ -104,6 +105,7 @@ CAPABILITY_PHRASES = {
         "documentation automation for software developer",
         "documentation automation for software developers",
         "developer documentation automation",
+        "automated developer documentation",
     },
 }
 DELIVERY_TERMS = {
@@ -116,16 +118,19 @@ DELIVERY_TERMS = {
     "cli",
     "service",
     "platform",
+    "automation",
     "provides",
     "offers",
     "enables",
     "supports",
     "automates",
+    "automated",
     "generates",
     "modifies",
     "reviews",
     "debugs",
     "analyzes",
+    "understands",
 }
 EVALUATION_POSITIONING_TERMS = {
     "paper",
@@ -284,33 +289,25 @@ def _repo_info(url: str) -> tuple[str, str] | None:
 
 
 def _coding_capabilities(raw: RawItem, analyzed: AnalyzedItem) -> set[str]:
-    capabilities = set()
+    title_capabilities = set()
+    body_capabilities = set()
     has_specific_direct_evidence = False
-    primary_segments = _text_segments([raw.title, raw.description, analyzed.summary])
-    title_segment_count = len(_text_segments([raw.title]))
-    for index, segment in enumerate(primary_segments):
+
+    for segment in _text_segments([raw.title]):
+        segment_capabilities, _ = _segment_capabilities(segment, is_title=True)
+        title_capabilities.update(segment_capabilities)
+
+    for segment in _text_segments([raw.description, analyzed.summary]):
         segment_capabilities, has_specific_delivery = _segment_capabilities(
             segment,
-            is_title=index < title_segment_count,
+            is_title=False,
         )
-        capabilities.update(segment_capabilities)
-        if index >= title_segment_count:
-            has_specific_direct_evidence |= has_specific_delivery
+        body_capabilities.update(segment_capabilities)
+        has_specific_direct_evidence |= has_specific_delivery
 
-    has_evaluation_positioning = _segments_contain_any(
-        primary_segments,
-        EVALUATION_POSITIONING_TERMS,
-    )
-    if has_evaluation_positioning and not has_specific_direct_evidence:
+    if not has_specific_direct_evidence:
         return set()
-    return capabilities
-
-
-def _capability_segments(raw: RawItem, analyzed: AnalyzedItem) -> list[str]:
-    topics = _sequence_values(raw.raw_metadata.get("topics"))
-    tags = _sequence_values(analyzed.tags)
-    values = [raw.title, raw.description, analyzed.summary, *tags, *topics]
-    return _text_segments(values)
+    return title_capabilities | body_capabilities
 
 
 def _text_segments(values: list) -> list[str]:
@@ -349,15 +346,37 @@ def _segment_capabilities(segment: str, *, is_title: bool) -> tuple[set[str], bo
 
 
 def _is_evaluation_subject(segment: str) -> bool:
-    patterns = (
-        r"^(?:a |an |the )?(?:paper|study|research)\b.*"
-        r"\b(?:introducing|presenting|describing)\b",
-        r"^(?:a |an |the )?dataset\b.*\b(?:collected|built|created|from|for)\b",
-        r"^(?:a |an |the )?(?:benchmark|evaluation|leaderboard|testbed)\b.*"
-        r"\b(?:for|of|comparing)\b",
-        r"^(?:a |an |the )?(?:model weights|model for)\b",
+    research_pattern = (
+        r"\b(?:paper|study|research)\b.*"
+        r"\b(?:introduce|introduces|introducing|present|presents|presenting|about|"
+        r"of|on|describe|describes|describing)\b"
     )
-    return any(re.search(pattern, segment) is not None for pattern in patterns)
+    if re.search(research_pattern, segment):
+        return True
+
+    presented_evaluation_pattern = (
+        r"\b(?:present|presents|presenting)\b.*"
+        r"\b(?:benchmark|evaluation|leaderboard|testbed)\b"
+    )
+    positioned_evaluation_pattern = (
+        r"\b(?:benchmark|evaluation|leaderboard|testbed)\b.*"
+        r"\b(?:for|of|comparing|presents|presenting)\b"
+    )
+    if re.search(presented_evaluation_pattern, segment) or re.search(
+        positioned_evaluation_pattern,
+        segment,
+    ):
+        return True
+
+    dataset_pattern = r"\bdataset\b.*\b(?:from|for|collected|built|created)\b"
+    prefixed_dataset_pattern = r"\b(?:collected|built|created)\b.*\bdataset\b"
+    if re.search(dataset_pattern, segment) or re.search(
+        prefixed_dataset_pattern,
+        segment,
+    ):
+        return True
+
+    return _contains_any(segment, {"model weights", "model for"})
 
 
 def _is_supporting_documentation_subject(segment: str) -> bool:
@@ -381,12 +400,12 @@ def _is_supporting_documentation_subject(segment: str) -> bool:
     if re.search(supporting_report_pattern, segment):
         return True
 
-    documentation_subject_pattern = (
-        r"^(?:a |an |the )?(?:docs|readme|documentation)\b.*"
-        r"\b(?:includes?|shows?|provides?|discusses?|mentions?|describes?|covers?|"
-        r"example|examples|tutorial|walkthrough|guidance)\b"
+    documentation_pattern = (
+        r"\b(?:docs|readme|documentation)\b.*"
+        r"\b(?:mention|mentions|discuss|discusses|show|shows|include|includes|"
+        r"describe|describes|provide|provides)\b"
     )
-    return re.search(documentation_subject_pattern, segment) is not None
+    return re.search(documentation_pattern, segment) is not None
 
 
 def _segments_contain_any(segments: list[str], terms: set[str]) -> bool:
@@ -394,7 +413,7 @@ def _segments_contain_any(segments: list[str], terms: set[str]) -> bool:
 
 
 def _readiness_hits(raw: RawItem, analyzed: AnalyzedItem) -> int:
-    segments = _capability_segments(raw, analyzed)
+    segments = _text_segments([raw.description, analyzed.summary])
     readiness_groups = (
         {"install", "installation", "quick start", "quickstart", "getting started", "安装"},
         {"cli", "command line", "ide", "editor extension", "vscode", "命令行", "插件"},
@@ -438,12 +457,6 @@ def _source_key(source_id: str, source_detail: str) -> str:
         if phrase in detail:
             return preferred_source
     return source_id
-
-
-def _sequence_values(value) -> list:
-    if isinstance(value, (list, tuple, set)):
-        return list(value)
-    return []
 
 
 def _article_id(metadata: dict) -> int | None:
