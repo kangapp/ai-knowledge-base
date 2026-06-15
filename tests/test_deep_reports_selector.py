@@ -148,6 +148,97 @@ def test_coding_capabilities_require_explicit_delivery_evidence(
 
 
 @pytest.mark.parametrize(
+    "description",
+    [
+        "Paper introducing a code completion tool",
+        "Dataset collected from a code review assistant",
+        "Benchmark for a code completion tool",
+    ],
+)
+def test_coding_capabilities_reject_evaluation_subjects(description):
+    url = "https://github.com/acme/evaluation-subject"
+    raw = _raw(url, title="Coding Research", description=description, topics=[])
+    analyzed = _analyzed(url, title="Coding Research", summary="", tags=[])
+
+    assert selector._coding_capabilities(raw, analyzed) == set()
+
+
+@pytest.mark.parametrize(
+    ("description", "expected_capability"),
+    [
+        ("Code completion tool with benchmark results", "code_generation"),
+        ("Code review assistant evaluated on a dataset", "code_quality"),
+        ("IDE plugin with benchmark results", "developer_interface"),
+    ],
+)
+def test_coding_capabilities_keep_tools_with_evaluation_details(
+    description,
+    expected_capability,
+):
+    url = "https://github.com/acme/tool-with-evaluation"
+    raw = _raw(url, title="Developer Tool", description=description, topics=[])
+    analyzed = _analyzed(url, title="Developer Tool", summary="", tags=[])
+
+    assert expected_capability in selector._coding_capabilities(raw, analyzed)
+
+
+def test_coding_capabilities_do_not_use_tags_or_topics_as_direct_evidence():
+    url = "https://github.com/acme/coding-agent-benchmark"
+    raw = _raw(
+        url,
+        title="Coding Agent",
+        description="Benchmark for comparing autonomous models",
+        topics=["coding-agent"],
+    )
+    analyzed = _analyzed(
+        url,
+        title="Coding Agent",
+        summary="Paper presenting benchmark results",
+        tags=["coding-agent"],
+    )
+
+    assert selector._coding_capabilities(raw, analyzed) == set()
+
+
+@pytest.mark.parametrize(
+    ("description", "expected_capability"),
+    [
+        ("Code completion tool with examples and templates", "code_generation"),
+        ("Coding agent with a tutorial and CLI", "coding_agent"),
+        ("Code review assistant documented in README", "code_quality"),
+    ],
+)
+def test_coding_capabilities_keep_tool_subjects_with_documentation_details(
+    description,
+    expected_capability,
+):
+    url = "https://github.com/acme/tool-with-documentation"
+    raw = _raw(url, title="Developer Tool", description=description, topics=[])
+    analyzed = _analyzed(url, title="Developer Tool", summary="", tags=[])
+
+    assert expected_capability in selector._coding_capabilities(raw, analyzed)
+
+
+@pytest.mark.parametrize(
+    "description",
+    [
+        "README includes code completion guidance",
+        "Example of code review",
+    ],
+)
+def test_coding_capabilities_reject_documentation_subjects(description):
+    url = "https://github.com/acme/documentation-subject"
+    raw = _raw(url, title="Calendar Tool", description=description, topics=[])
+    analyzed = _analyzed(url, title="Calendar Tool", summary="", tags=[])
+
+    assert selector._coding_capabilities(raw, analyzed) == set()
+
+
+def test_capability_phrase_mapping_is_the_only_capability_vocabulary():
+    assert not hasattr(selector, "TITLE_CAPABILITY_NAMES")
+
+
+@pytest.mark.parametrize(
     ("title", "description", "summary", "expected_capability"),
     [
         (

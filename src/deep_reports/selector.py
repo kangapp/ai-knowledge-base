@@ -127,13 +127,10 @@ DELIVERY_TERMS = {
     "debugs",
     "analyzes",
 }
-TITLE_CAPABILITY_NAMES = {
-    "release automation",
-    "documentation automation for developers",
-    "documentation automation for software developers",
-}
 EVALUATION_POSITIONING_TERMS = {
     "paper",
+    "study",
+    "research",
     "model weights",
     "dataset",
     "benchmark",
@@ -142,17 +139,6 @@ EVALUATION_POSITIONING_TERMS = {
     "testbed",
     "comparing models",
 }
-GENERIC_INTERFACE_PHRASES = {
-    "developer cli",
-    "ide",
-    "ide extension",
-    "ide plugin",
-    "editor extension",
-    "vscode extension",
-    "vs code extension",
-}
-
-
 class DeepCandidateSelector:
     def __init__(self, db: Database):
         self.db = db
@@ -300,15 +286,15 @@ def _repo_info(url: str) -> tuple[str, str] | None:
 def _coding_capabilities(raw: RawItem, analyzed: AnalyzedItem) -> set[str]:
     capabilities = set()
     has_specific_direct_evidence = False
-    title_segment_count = len(_text_segments([raw.title]))
     primary_segments = _text_segments([raw.title, raw.description, analyzed.summary])
-    for index, segment in enumerate(_capability_segments(raw, analyzed)):
+    title_segment_count = len(_text_segments([raw.title]))
+    for index, segment in enumerate(primary_segments):
         segment_capabilities, has_specific_delivery = _segment_capabilities(
             segment,
             is_title=index < title_segment_count,
         )
         capabilities.update(segment_capabilities)
-        if index < len(primary_segments):
+        if index >= title_segment_count:
             has_specific_direct_evidence |= has_specific_delivery
 
     has_evaluation_positioning = _segments_contain_any(
@@ -340,7 +326,9 @@ def _text_segments(values: list) -> list[str]:
 
 
 def _segment_capabilities(segment: str, *, is_title: bool) -> tuple[set[str], bool]:
-    if _is_supporting_documentation(segment, is_title=is_title):
+    if _is_evaluation_subject(segment):
+        return set(), False
+    if _is_supporting_documentation_subject(segment):
         return set(), False
     if is_title and _contains_any(segment, EVALUATION_POSITIONING_TERMS):
         return set(), False
@@ -352,44 +340,53 @@ def _segment_capabilities(segment: str, *, is_title: bool) -> tuple[set[str], bo
     }
     has_delivery = _contains_any(segment, DELIVERY_TERMS)
     has_implicit_delivery = bool(capabilities & {"developer_mcp", "coding_skill"})
-    has_title_name = is_title and _contains_any(segment, TITLE_CAPABILITY_NAMES)
+    has_title_name = is_title and bool(capabilities)
     if not (has_delivery or has_implicit_delivery or has_title_name):
         return set(), False
 
-    concrete_phrases = set().union(*CAPABILITY_PHRASES.values()) - GENERIC_INTERFACE_PHRASES
-    has_specific_delivery = bool(capabilities) and _contains_any(segment, concrete_phrases)
+    has_specific_delivery = bool(capabilities) and (has_delivery or has_implicit_delivery)
     return capabilities, has_specific_delivery
 
 
-def _is_supporting_documentation(segment: str, *, is_title: bool) -> bool:
-    supporting_terms = {
-        "example",
-        "examples",
-        "tutorial",
-        "walkthrough",
-        "guidance",
-    }
-    if _contains_any(segment, supporting_terms):
+def _is_evaluation_subject(segment: str) -> bool:
+    patterns = (
+        r"^(?:a |an |the )?(?:paper|study|research)\b.*"
+        r"\b(?:introducing|presenting|describing)\b",
+        r"^(?:a |an |the )?dataset\b.*\b(?:collected|built|created|from|for)\b",
+        r"^(?:a |an |the )?(?:benchmark|evaluation|leaderboard|testbed)\b.*"
+        r"\b(?:for|of|comparing)\b",
+        r"^(?:a |an |the )?(?:model weights|model for)\b",
+    )
+    return any(re.search(pattern, segment) is not None for pattern in patterns)
+
+
+def _is_supporting_documentation_subject(segment: str) -> bool:
+    supporting_subject_pattern = (
+        r"^(?:a |an |the )?(?:configuration )?"
+        r"(?:example|examples|tutorial|walkthrough|guidance)\b"
+    )
+    if re.search(supporting_subject_pattern, segment):
         return True
 
-    documentation_terms = {"docs", "readme", "documentation"}
-    if not _contains_any(segment, documentation_terms):
-        return False
-    if is_title and _contains_any(segment, TITLE_CAPABILITY_NAMES):
-        return False
-
-    documentation_automation_terms = {
-        "documentation automation",
-        "documentation automation for developer",
-        "documentation automation for developers",
-        "documentation automation for software developer",
-        "documentation automation for software developers",
-        "developer documentation automation",
-    }
-    return not (
-        _contains_any(segment, documentation_automation_terms)
-        and _contains_any(segment, DELIVERY_TERMS)
+    supporting_name_pattern = (
+        r"\b(?:example|examples|tutorial|walkthrough|guidance)\s*$"
     )
+    if " with " not in segment and re.search(supporting_name_pattern, segment):
+        return True
+
+    supporting_report_pattern = (
+        r"^(?:includes?|provides?|offers?|contains?|shows?)\b.*"
+        r"\b(?:example|examples|tutorial|walkthrough|guidance)\b"
+    )
+    if re.search(supporting_report_pattern, segment):
+        return True
+
+    documentation_subject_pattern = (
+        r"^(?:a |an |the )?(?:docs|readme|documentation)\b.*"
+        r"\b(?:includes?|shows?|provides?|discusses?|mentions?|describes?|covers?|"
+        r"example|examples|tutorial|walkthrough|guidance)\b"
+    )
+    return re.search(documentation_subject_pattern, segment) is not None
 
 
 def _segments_contain_any(segments: list[str], terms: set[str]) -> bool:
