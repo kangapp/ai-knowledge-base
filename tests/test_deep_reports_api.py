@@ -15,7 +15,7 @@ from src.api.routes import (
     validation_exception_handler,
 )
 from src.core.database import Database
-from src.db.operations import save_deep_report
+from src.db.operations import save_deep_report, set_public_deep_report_version
 
 
 _MIGRATIONS_DIR = Path(__file__).parent.parent / "src" / "db" / "migrations"
@@ -34,6 +34,7 @@ async def api_db(tmp_path):
         ("run_1", "completed", "test"),
     )
     await db.commit()
+    await set_public_deep_report_version(db, 2)
     try:
         yield db
     finally:
@@ -60,6 +61,7 @@ async def _save_report(
     status: str = "completed",
     candidate_score: int = 88,
     overview: str = "overview",
+    report_version: int = 2,
 ) -> int:
     return await save_deep_report(
         db,
@@ -71,7 +73,14 @@ async def _save_report(
         status=status,
         candidate_score=candidate_score,
         trigger_reason="实用性高，源码结构清晰",
-        report_json={"project_overview": overview, "summary": overview},
+        report_json={
+            "title": f"{repo_name} 深度报告",
+            "summary": overview,
+            "tech_stack": ["Python"],
+            "decision": {
+                "recommendation": "适合开发者试用。",
+            },
+        },
         report_markdown=f"# {repo_name}",
         evidence_json=[{"path": "README.md", "reason": "overview"}],
         tech_stack_json={"languages": ["Python"]},
@@ -79,6 +88,7 @@ async def _save_report(
         analysis_cost=0.012,
         analysis_tokens=2048,
         error="" if status == "completed" else "clone failed",
+        report_version=report_version,
     )
 
 
@@ -99,24 +109,27 @@ async def test_list_latest_and_detail_return_deep_reports(api_client, api_db):
     assert list_body["code"] == 0
     assert list_body["data"]["total"] == 1
     assert list_body["data"]["items"][0]["id"] == report_id
+    assert list_body["data"]["items"][0]["report_version"] == 2
     assert "report_json" not in list_body["data"]["items"][0]
     assert "report_markdown" not in list_body["data"]["items"][0]
     assert "evidence_json" not in list_body["data"]["items"][0]
     assert "file_tree_summary" not in list_body["data"]["items"][0]
     assert list_body["data"]["items"][0]["report_summary"] == "overview"
-    assert list_body["data"]["items"][0]["report_tech_stack"] == []
+    assert list_body["data"]["items"][0]["report_tech_stack"] == ["Python"]
 
     assert latest_response.status_code == 200
     latest_body = latest_response.json()
     assert latest_body["code"] == 0
     assert latest_body["data"]["id"] == report_id
     assert latest_body["data"]["status"] == "completed"
+    assert latest_body["data"]["report_version"] == 2
 
     assert detail_response.status_code == 200
     detail_body = detail_response.json()
     assert detail_body["code"] == 0
     assert detail_body["data"]["repo_name"] == "org/tool"
-    assert detail_body["data"]["report_json"]["project_overview"] == "overview"
+    assert detail_body["data"]["report_version"] == 2
+    assert detail_body["data"]["report_json"]["decision"]["recommendation"]
 
 
 def test_missing_detail_returns_404_envelope(api_client):
@@ -234,6 +247,7 @@ async def test_public_list_ignores_failed_reports_before_pagination(api_client, 
             "clone failed",
             f"2026-06-09T10:{index % 60:02d}:00+08:00",
             f"2026-06-09T10:{index % 60:02d}:00+08:00",
+            2,
         ))
 
     await api_db.execute_many(
@@ -241,8 +255,9 @@ async def test_public_list_ignores_failed_reports_before_pagination(api_client, 
         INSERT INTO deep_reports
         (repo_url, repo_name, article_id, run_id, commit_sha, status, candidate_score,
          trigger_reason, report_json, report_markdown, evidence_json, tech_stack_json,
-         file_tree_summary, analysis_cost, analysis_tokens, error, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+         file_tree_summary, analysis_cost, analysis_tokens, error, created_at, updated_at,
+         report_version)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         failed_rows,
     )
@@ -256,3 +271,35 @@ async def test_public_list_ignores_failed_reports_before_pagination(api_client, 
     assert body["data"]["total"] == 1
     assert [item["id"] for item in body["data"]["items"]] == [completed_id]
     assert all(item["status"] == "completed" for item in body["data"]["items"])
+
+
+@pytest.mark.asyncio
+async def test_public_api_hides_non_public_report_version(api_client, api_db):
+    v1_id = await _save_report(
+        api_db,
+        repo_url="https://github.com/org/versioned",
+        repo_name="org/versioned",
+        overview="legacy",
+        report_version=1,
+    )
+    v2_id = await _save_report(
+        api_db,
+        repo_url="https://github.com/org/versioned",
+        repo_name="org/versioned",
+        overview="current",
+        report_version=2,
+    )
+
+    list_response = api_client.get("/api/deep-reports")
+    latest_response = api_client.get("/api/deep-reports/latest")
+    v1_response = api_client.get(f"/api/deep-reports/{v1_id}")
+    v2_response = api_client.get(f"/api/deep-reports/{v2_id}")
+
+    items = list_response.json()["data"]["items"]
+    assert [item["id"] for item in items] == [v2_id]
+    assert items[0]["report_version"] == 2
+    assert latest_response.json()["data"]["id"] == v2_id
+    assert latest_response.json()["data"]["report_version"] == 2
+    assert v1_response.status_code == 404
+    assert v2_response.status_code == 200
+    assert v2_response.json()["data"]["report_version"] == 2

@@ -384,7 +384,7 @@
 
 ## 深度报告接口
 
-公开接口只返回 `status='completed'` 的深度报告；`failed` 记录仅用于内部排障，不参与公开列表、latest 或详情响应。
+公开接口只返回 `status='completed'` 且 `report_version` 等于 `deep_report_settings.public_version` 的深度报告；`failed` 和非公开版本仅用于内部排障或重建，不参与公开列表、latest 或详情响应。
 
 ### GET /api/deep-reports
 
@@ -399,7 +399,7 @@
 
 **口径:**
 
-- `items` 和 `total` 都只统计 completed 报告。
+- `items` 和 `total` 都只统计当前公开版本的 completed 报告。
 - 按 `updated_at DESC, id DESC` 排序后分页。
 - 列表只返回展示所需的摘要字段；完整 `report_json/report_markdown/evidence_json/file_tree_summary` 仅由 latest/detail 返回。
 
@@ -414,6 +414,7 @@
         "repo_url": "https://github.com/org/tool",
         "repo_name": "org/tool",
         "status": "completed",
+        "report_version": 2,
         "candidate_score": 88,
         "trigger_reason": "实用性高，源码结构清晰",
         "report_summary": "项目概述",
@@ -432,11 +433,11 @@
 
 ### GET /api/deep-reports/latest
 
-返回按 `updated_at DESC, id DESC` 排序的最新 completed 深度报告。没有 completed 报告时仍返回成功信封，`data` 为 `{}`。
+返回当前公开版本中按 `updated_at DESC, id DESC` 排序的最新 completed 深度报告。没有 completed 报告时仍返回成功信封，`data` 为 `{}`。
 
 ### GET /api/deep-reports/{report_id}
 
-返回指定 completed 深度报告详情。
+返回指定的当前公开版本 completed 深度报告详情。详情 `report_json` 为 V2 决策报告结构，源码证据字段仍可由 API 返回，但页面不渲染。
 
 **参数:**
 
@@ -444,7 +445,7 @@
 |------|------|------|
 | report_id | int | 深度报告 ID |
 
-**错误:** `40401` - 报告不存在，或记录存在但状态不是 completed。
+**错误:** `40401` - 报告不存在、状态不是 completed，或不属于当前公开版本。
 
 ---
 

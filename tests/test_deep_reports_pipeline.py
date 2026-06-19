@@ -9,8 +9,6 @@ from src.core.config import SourceConfig, SourcesConfig
 from src.core.database import Database
 from src.db.operations import save_deep_report
 from src.deep_reports.models import (
-    DeepReportArchitecture,
-    DeepReportEvidence,
     DeepReportOutput,
     DeepReportStageResult,
     RepoFile,
@@ -90,24 +88,66 @@ def _inspection(repo_url: str = "https://github.com/acme/dev-agent", repo_name: 
 
 
 def _report() -> DeepReportOutput:
-    return DeepReportOutput(
-        title="Dev Agent Deep Report",
-        summary="一个聚焦开发者工作流的 AI Agent 工具。",
-        tech_stack=["Python", "FastAPI", "OpenAI"],
-        architecture=DeepReportArchitecture(
-            pattern="pipeline",
-            components=["collector", "analyzer", "web"],
-        ),
-        data_flow=["collect -> analyze", "analyze -> persist"],
-        use_cases=["代码理解", "工作流自动化"],
-        strengths=["结构清晰", "实用性强"],
-        limitations=["依赖外部模型"],
-        actionable_takeaways=["适合复用其模块边界设计"],
-        source_evidence=[
-            DeepReportEvidence(path="src/main.py", reason="应用入口"),
-            DeepReportEvidence(path="pyproject.toml", reason="声明主要依赖"),
+    return DeepReportOutput.model_validate({
+        "title": "Dev Agent Deep Report",
+        "summary": "一个聚焦开发者工作流的 AI Agent 工具。",
+        "tech_stack": ["Python", "FastAPI", "OpenAI"],
+        "use_cases": ["代码理解", "工作流自动化"],
+        "decision": {
+            "recommendation": "适合需要开发工作流自动化的团队。",
+            "reasons": ["入口清晰", "模块边界明确"],
+            "best_for": ["需要仓库级上下文的开发者"],
+            "not_for": ["要求完全离线运行的团队"],
+        },
+        "architecture": {
+            "pattern": "pipeline",
+            "summary": "入口接收任务，Agent 编排工具并输出结果。",
+            "nodes": [
+                {"id": "input", "label": "Input", "role": "接收任务", "group": "interface"},
+                {"id": "agent", "label": "Agent", "role": "编排任务", "group": "core"},
+                {"id": "tools", "label": "Tools", "role": "执行工具", "group": "core"},
+                {"id": "output", "label": "Output", "role": "返回结果", "group": "interface"},
+            ],
+            "edges": [
+                {"source": "input", "target": "agent", "label": "任务"},
+                {"source": "agent", "target": "tools", "label": "调用"},
+                {"source": "tools", "target": "output", "label": "结果"},
+            ],
+        },
+        "quick_start": {
+            "prerequisites": ["Python 3.12", "模型 API Key"],
+            "steps": [
+                {"id": "install", "title": "安装", "description": "安装依赖"},
+                {"id": "config", "title": "配置", "description": "设置模型密钥"},
+                {"id": "run", "title": "启动", "description": "运行 CLI"},
+            ],
+            "expected_result": "CLI 返回代码分析结果。",
+        },
+        "deployment": {
+            "prerequisites": ["可运行 Python 的主机"],
+            "steps": [
+                {"id": "prepare", "title": "准备环境", "description": "安装运行时"},
+                {"id": "deploy", "title": "部署", "description": "配置服务"},
+                {"id": "health", "title": "检查", "description": "验证服务可用"},
+            ],
+            "operations": ["监控模型调用失败"],
+        },
+        "core_modules": [
+            {"name": "Agent", "responsibility": "编排工具", "depends_on": ["Tools"]},
         ],
-    )
+        "runtime_data_flow": [
+            {"id": "request", "title": "请求", "description": "用户提交任务"},
+            {"id": "plan", "title": "规划", "description": "Agent 拆分任务"},
+            {"id": "result", "title": "结果", "description": "返回执行结果"},
+        ],
+        "strengths": ["结构清晰", "实用性强"],
+        "limitations": ["依赖外部模型"],
+        "actionable_takeaways": ["先用 CLI 验证核心工作流"],
+        "source_evidence": [
+            {"path": "src/main.py", "reason": "应用入口"},
+            {"path": "pyproject.toml", "reason": "声明主要依赖"},
+        ],
+    })
 
 
 def _cost(
@@ -290,9 +330,12 @@ async def test_deep_report_stage_success_saves_costs_report_and_uses_to_thread(t
 
         report_row = await db.fetch_one("SELECT * FROM deep_reports WHERE id = ?", (result.report_id,))
         assert report_row["status"] == "completed"
+        assert report_row["report_version"] == 2
         assert report_row["article_id"] == 42
         assert report_row["commit_sha"] == "abc123"
-        assert json.loads(report_row["report_json"])["title"] == "Dev Agent Deep Report"
+        report_json = json.loads(report_row["report_json"])
+        assert report_json["title"] == "Dev Agent Deep Report"
+        assert report_json["decision"]["recommendation"]
         assert json.loads(report_row["evidence_json"]) == [
             {"path": "src/main.py", "reason": "应用入口"},
             {"path": "pyproject.toml", "reason": "声明主要依赖"},
@@ -305,9 +348,12 @@ async def test_deep_report_stage_success_saves_costs_report_and_uses_to_thread(t
         assert report_row["analysis_cost"] == pytest.approx(0.005)
         assert report_row["analysis_tokens"] == 290
         assert "## 概述" in report_row["report_markdown"]
+        assert "## 采用结论" in report_row["report_markdown"]
         assert "## 技术栈" in report_row["report_markdown"]
         assert "## 架构" in report_row["report_markdown"]
-        assert "## 数据流" in report_row["report_markdown"]
+        assert "## 快速上手" in report_row["report_markdown"]
+        assert "## 部署运行" in report_row["report_markdown"]
+        assert "## 运行时数据流" in report_row["report_markdown"]
         assert "## 场景" in report_row["report_markdown"]
         assert "## 优势" in report_row["report_markdown"]
         assert "## 局限" in report_row["report_markdown"]
@@ -350,6 +396,7 @@ async def test_deep_report_stage_success_saves_costs_report_and_uses_to_thread(t
         assert json.loads(persist_event["payload"]) == {
             "report_id": result.report_id,
             "candidate_score": report_row["candidate_score"],
+            "report_version": 2,
         }
     finally:
         await db.close()
@@ -393,7 +440,7 @@ async def test_deep_report_stage_persist_done_event_failure_keeps_completed_repo
         assert row["status"] == "completed"
         assert row["error"] == ""
         assert json.loads(row["report_json"])["title"] == "Dev Agent Deep Report"
-        assert "## 概述" in row["report_markdown"]
+        assert "## 采用结论" in row["report_markdown"]
     finally:
         await db.close()
 
@@ -429,6 +476,7 @@ async def test_deep_report_stage_analyze_none_still_saves_costs_and_failed_repor
         assert result.status == "failed"
         row = await db.fetch_one("SELECT * FROM deep_reports WHERE repo_url = ?", (result.repo_url,))
         assert row["status"] == "failed"
+        assert row["report_version"] == 2
         assert row["error"] == "parse_failed"
         assert row["analysis_cost"] == pytest.approx(0.003)
         assert row["analysis_tokens"] == 220

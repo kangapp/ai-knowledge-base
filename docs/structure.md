@@ -54,7 +54,8 @@ ai-knowledge-base/
 │   │   ├── inspector.py    #   shallow clone + 受限文本源码扫描
 │   │   ├── summarizer.py   #   技术栈、文件树和证据包压缩
 │   │   ├── analyzer.py     #   deep_report Agent 调用和结构化输出校验
-│   │   └── service.py      #   后置阶段编排、失败隔离和持久化
+│   │   ├── service.py      #   后置阶段编排、失败隔离和 V2 持久化
+│   │   └── rebuild.py      #   V1 批量重建、公开版本切换和失败重试 CLI
 │   │
 │   ├── db/                 # 数据访问层
 │   │   ├── operations.py   #   文章/标签/成本/pipeline/统计 SQL 操作

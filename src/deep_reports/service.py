@@ -88,15 +88,31 @@ def render_report_markdown(report: DeepReportOutput, source_package: SourcePacka
             "## 概述",
             report.summary,
             "",
+            "## 采用结论",
+            report.decision.recommendation,
+            *(f"- {item}" for item in report.decision.reasons),
+            "",
             "## 技术栈",
             *(stack_lines or ["- 无"]),
             "",
             "## 架构",
             f"- 模式: {report.architecture.pattern}",
-            *(f"- 组件: {component}" for component in report.architecture.components),
+            report.architecture.summary,
+            *(f"- {node.label}: {node.role}" for node in report.architecture.nodes),
             "",
-            "## 数据流",
-            *(f"- {item}" for item in report.data_flow),
+            "## 快速上手",
+            *(f"{index}. {step.title}: {step.description}"
+              for index, step in enumerate(report.quick_start.steps, start=1)),
+            f"- 预期结果: {report.quick_start.expected_result}",
+            "",
+            "## 部署运行",
+            *(f"{index}. {step.title}: {step.description}"
+              for index, step in enumerate(report.deployment.steps, start=1)),
+            *(f"- 运维: {item}" for item in report.deployment.operations),
+            "",
+            "## 运行时数据流",
+            *(f"{index}. {step.title}: {step.description}"
+              for index, step in enumerate(report.runtime_data_flow, start=1)),
             "",
             "## 场景",
             *(f"- {item}" for item in report.use_cases),
@@ -162,6 +178,7 @@ async def _save_failed_report(
         analysis_cost=total_cost,
         analysis_tokens=total_tokens,
         error=error,
+        report_version=2,
     )
 
 
@@ -191,7 +208,7 @@ async def _record_failed_event_safely(
             cost=total_cost,
             tokens=total_tokens,
             message=message,
-            payload={"report_id": report_id},
+            payload={"report_id": report_id, "report_version": 2},
         )
     except Exception:
         logger.exception(
@@ -225,7 +242,11 @@ async def _record_completed_event_safely(
             cost=total_cost,
             tokens=total_tokens,
             message="深度报告已保存",
-            payload={"report_id": report_id, "candidate_score": candidate.candidate_score},
+            payload={
+                "report_id": report_id,
+                "candidate_score": candidate.candidate_score,
+                "report_version": 2,
+            },
         )
     except Exception:
         logger.exception(
@@ -398,6 +419,7 @@ async def run_deep_report_stage(
             analysis_cost=total_cost,
             analysis_tokens=total_tokens,
             error="",
+            report_version=2,
         )
         await _record_completed_event_safely(
             db,

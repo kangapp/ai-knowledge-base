@@ -262,9 +262,7 @@ main { max-width: 1200px; margin: 2rem auto; padding: 0 1rem; }
 .deep-inline-link:hover { text-decoration: underline; }
 .deep-summary,
 .deep-overview,
-.deep-repo-name,
-.deep-evidence-list code,
-.deep-evidence-list span {
+.deep-repo-name {
   overflow-wrap: anywhere;
 }
 .deep-summary { color: #4b5563; margin-bottom: 0.75rem; }
@@ -322,20 +320,121 @@ main { max-width: 1200px; margin: 2rem auto; padding: 0 1rem; }
   margin-top: 0.25rem;
 }
 .deep-architecture-pattern { margin-bottom: 0.75rem; color: #374151; }
-.deep-bullets,
-.deep-evidence-list {
+.deep-section-summary { color: #4b5563; margin-bottom: 1rem; }
+.deep-bullets {
   display: grid;
   gap: 0.6rem;
   padding-left: 1.1rem;
 }
-.deep-evidence-list li { display: grid; gap: 0.2rem; }
-.deep-report-pre {
-  margin: 0;
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 0.9rem;
+.deep-recommendation {
+  color: #134e4a;
+  font-size: 1.1rem;
+  font-weight: 600;
   line-height: 1.7;
-  color: #374151;
-  overflow-wrap: anywhere;
+  margin-bottom: 0.75rem;
+}
+.deep-reason-list { margin-bottom: 1rem; }
+.deep-decision-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+}
+.deep-decision-card,
+.deep-module-card,
+.deep-note-card,
+.deep-architecture-card,
+.deep-flow-step {
+  min-width: 0;
+  border: 1px solid #d9e2ec;
+  border-radius: 8px;
+  padding: 0.9rem;
+  background: #f8fafc;
+}
+.deep-decision-card h3,
+.deep-module-card h3,
+.deep-note-card h3,
+.deep-architecture-card h3,
+.deep-flow-step h3 {
+  color: #1f2937;
+  font-size: 0.95rem;
+  margin-bottom: 0.45rem;
+}
+.deep-decision-card ul,
+.deep-note-card ul,
+.deep-operations ul {
+  display: grid;
+  gap: 0.4rem;
+  padding-left: 1rem;
+}
+.deep-decision-best { border-color: #a7f3d0; background: #ecfdf5; }
+.deep-decision-not { border-color: #fed7aa; background: #fff7ed; }
+.deep-architecture-diagram { width: 100%; overflow-x: auto; }
+.deep-architecture-diagram svg { display: block; min-width: 720px; width: 100%; }
+.deep-architecture-diagram line { stroke: #94a3b8; stroke-width: 2; }
+.deep-architecture-diagram marker path { fill: #64748b; }
+.deep-architecture-node rect { fill: #eff6ff; stroke: #93c5fd; stroke-width: 1.5; }
+.deep-architecture-node text { fill: #1e3a5f; font-size: 13px; font-weight: 700; }
+.deep-architecture-node .deep-node-role { fill: #475569; font-size: 10px; font-weight: 400; }
+.deep-edge-label { fill: #64748b; font-size: 9px; }
+.deep-architecture-cards {
+  display: none;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 0.75rem;
+}
+.deep-architecture-cards.is-fallback { display: grid; }
+.deep-architecture-card p,
+.deep-module-card p,
+.deep-flow-step p { color: #4b5563; line-height: 1.6; }
+.deep-architecture-card span,
+.deep-module-card span {
+  display: block;
+  color: #64748b;
+  font-size: 0.8rem;
+  margin-top: 0.5rem;
+}
+.deep-prerequisites,
+.deep-operations,
+.deep-flow-result {
+  color: #475569;
+  margin-bottom: 0.9rem;
+}
+.deep-prerequisites {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+.deep-flow {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 0.75rem;
+  margin-bottom: 0.9rem;
+}
+.deep-flow-step { position: relative; padding-top: 2.2rem; }
+.deep-flow-index {
+  position: absolute;
+  top: 0.75rem;
+  left: 0.85rem;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: #0f766e;
+  color: #fff;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+.deep-flow-result {
+  padding: 0.75rem;
+  border-left: 3px solid #0f766e;
+  background: #f0fdfa;
+}
+.deep-module-grid,
+.deep-notes-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 0.75rem;
 }
 
 @media (max-width: 700px) {
@@ -344,4 +443,10 @@ main { max-width: 1200px; margin: 2rem auto; padding: 0 1rem; }
   .deep-list-header,
   .deep-report-head-main { flex-direction: column; }
   .deep-score-badge { order: -1; }
+  .deep-decision-grid,
+  .deep-flow,
+  .deep-module-grid,
+  .deep-notes-grid { grid-template-columns: 1fr; }
+  .deep-architecture-diagram { display: none; }
+  .deep-architecture-cards { display: grid; grid-template-columns: 1fr; }
 }

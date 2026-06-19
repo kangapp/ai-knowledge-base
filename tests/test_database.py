@@ -1,6 +1,7 @@
 # tests/test_database.py
 import json
 from pathlib import Path
+import shutil
 import aiosqlite
 import pytest
 from src.core.database import Database
@@ -29,10 +30,20 @@ async def test_initialize_and_migrate(tmp_path):
         assert "circuit_events" in names
         assert "schema_version" in names
         assert "deep_reports" in names
+        assert "deep_report_settings" in names
 
         # 验证迁移版本
         v = await db.fetch_one("SELECT version FROM schema_version")
-        assert v["version"] == 10
+        assert v["version"] == 11
+
+        deep_report_columns = await db.fetch_all("PRAGMA table_info(deep_reports)")
+        deep_report_column_names = {row["name"] for row in deep_report_columns}
+        assert "report_version" in deep_report_column_names
+
+        setting = await db.fetch_one(
+            "SELECT public_version FROM deep_report_settings WHERE id = 1"
+        )
+        assert setting["public_version"] == 1
 
         cost_log_columns = await db.fetch_all("PRAGMA table_info(cost_logs)")
         column_names = {row["name"] for row in cost_log_columns}
@@ -52,6 +63,57 @@ async def test_initialize_and_migrate(tmp_path):
         assert "pipeline_events" in names
     finally:
         await db.close()
+
+
+@pytest.mark.asyncio
+async def test_migrate_existing_deep_reports_to_version_1(tmp_path):
+    legacy_migrations = tmp_path / "legacy_migrations"
+    legacy_migrations.mkdir()
+    for migration in _MIGRATIONS_DIR.glob("*.sql"):
+        if int(migration.name.split("_", 1)[0]) <= 10:
+            shutil.copy2(migration, legacy_migrations / migration.name)
+
+    db_path = tmp_path / "legacy.db"
+    legacy_db = Database(db_path, migrations_dir=legacy_migrations)
+    await legacy_db.initialize()
+    await legacy_db.execute(
+        """
+        INSERT INTO deep_reports
+        (repo_url, repo_name, commit_sha, status, report_json)
+        VALUES (?, ?, ?, ?, ?)
+        """,
+        (
+            "https://github.com/org/legacy",
+            "org/legacy",
+            "abc123",
+            "completed",
+            '{"summary":"legacy"}',
+        ),
+    )
+    await legacy_db.commit()
+    await legacy_db.close()
+
+    migrated_db = Database(db_path, migrations_dir=_MIGRATIONS_DIR)
+    try:
+        await migrated_db.initialize()
+
+        row = await migrated_db.fetch_one(
+            """
+            SELECT repo_url, report_version, report_json
+            FROM deep_reports
+            WHERE repo_url = ?
+            """,
+            ("https://github.com/org/legacy",),
+        )
+        setting = await migrated_db.fetch_one(
+            "SELECT public_version FROM deep_report_settings WHERE id = 1"
+        )
+
+        assert row["report_version"] == 1
+        assert json.loads(row["report_json"])["summary"] == "legacy"
+        assert setting["public_version"] == 1
+    finally:
+        await migrated_db.close()
 
 
 @pytest.mark.asyncio

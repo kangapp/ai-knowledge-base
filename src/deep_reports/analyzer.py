@@ -14,15 +14,58 @@ DEEP_REPORT_SCHEMA_DESC = json.dumps(
         "title": "string",
         "summary": "string",
         "tech_stack": ["string", "string"],
-        "architecture": {"pattern": "string", "components": ["string", "string"]},
-        "data_flow": ["string", "string"],
         "use_cases": ["string"],
+        "decision": {
+            "recommendation": "string",
+            "reasons": ["string"],
+            "best_for": ["string"],
+            "not_for": ["string"],
+        },
+        "architecture": {
+            "pattern": "string",
+            "summary": "string",
+            "nodes": [
+                {
+                    "id": "string",
+                    "label": "string",
+                    "role": "string",
+                    "group": "string|null",
+                }
+            ],
+            "edges": [{"source": "string", "target": "string", "label": "string"}],
+        },
+        "quick_start": {
+            "prerequisites": ["string"],
+            "steps": [{"id": "string", "title": "string", "description": "string"}],
+            "expected_result": "string",
+        },
+        "deployment": {
+            "prerequisites": ["string"],
+            "steps": [{"id": "string", "title": "string", "description": "string"}],
+            "operations": ["string"],
+        },
+        "core_modules": [
+            {
+                "name": "string",
+                "responsibility": "string",
+                "depends_on": ["string"],
+            }
+        ],
+        "runtime_data_flow": [
+            {"id": "string", "title": "string", "description": "string"}
+        ],
         "strengths": ["string"],
         "limitations": ["string"],
         "actionable_takeaways": ["string"],
         "source_evidence": [{"path": "string", "reason": "string"}],
     },
     ensure_ascii=False,
+)
+
+DEEP_REPORT_VALIDATION_RULES = (
+    "架构节点数量 4-10；流程步骤数量 3-8；"
+    "所有 ID 必须非空且在各自列表中唯一；"
+    "边只能引用已声明节点且禁止自环；不得输出额外字段。"
 )
 
 
@@ -67,7 +110,11 @@ def _build_repair_messages(raw_output: str, error: str) -> list[dict[str, str]]:
     return [
         {
             "role": "system",
-            "content": f"你负责修复深度报告 JSON。只输出修复后的合法 JSON，格式：{DEEP_REPORT_SCHEMA_DESC}",
+            "content": (
+                "你负责修复深度报告 JSON。只输出修复后的合法 JSON。"
+                f"校验规则：{DEEP_REPORT_VALIDATION_RULES}"
+                f"格式：{DEEP_REPORT_SCHEMA_DESC}"
+            ),
         },
         {
             "role": "user",
@@ -106,7 +153,12 @@ async def analyze_deep_report(
                 messages=repair_messages or [
                     {
                         "role": "system",
-                        "content": f"你是源码级 GitHub 项目研究员。只输出 JSON，格式：{DEEP_REPORT_SCHEMA_DESC}",
+                        "content": (
+                            "你是面向采用决策的 GitHub 项目研究员。"
+                            "只输出合法 JSON。"
+                            f"校验规则：{DEEP_REPORT_VALIDATION_RULES}"
+                            f"格式：{DEEP_REPORT_SCHEMA_DESC}"
+                        ),
                     },
                     {"role": "user", "content": user_prompt},
                 ],

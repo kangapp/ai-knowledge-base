@@ -365,20 +365,34 @@ UNIQUE(repo_url, snapshot_date)
 | error | TEXT | 失败原因；成功记录为空 |
 | created_at | TEXT DEFAULT (datetime('now', '+8 hours')) | 北京时间 |
 | updated_at | TEXT DEFAULT (datetime('now', '+8 hours')) | 北京时间 |
+| report_version | INTEGER DEFAULT 1 | 报告结构版本；V1=旧列表结构，V2=决策/架构/流程结构 |
 
-UNIQUE(repo_url, commit_sha)
+UNIQUE(repo_url, commit_sha, report_version)
 
 **索引：**
 
 - `idx_deep_reports_status_created(status, created_at DESC)`
 - `idx_deep_reports_repo_url(repo_url)`
 - `idx_deep_reports_run_id(run_id)`
+- `idx_deep_reports_public(report_version, status, updated_at DESC)`
 
 **写入与公开口径：**
 
-- 同一 `repo_url + commit_sha` 使用 upsert；已完成记录不会被后续 failed 尝试降级覆盖。
+- 同一 `repo_url + commit_sha + report_version` 使用 upsert；已完成记录不会被后续 failed 尝试降级覆盖。
 - `report_json/evidence_json/tech_stack_json` 在数据库中存 TEXT，DB operations 返回时解码为对象或数组。
-- failed 记录保留源码包、成本和错误信息用于排障；公开 API 只读取 completed 记录。
+- failed 记录保留源码包、成本和错误信息用于排障。
+- 公开 API 只读取 `deep_report_settings.public_version` 对应的 completed 记录。
+- V2 `report_json` 包含采用决策、架构节点/边、快速上手、部署运行、核心模块和运行时数据流；`evidence_json` 保留但前端不展示。
+- `report_markdown` 仅作为内部审计文本，不再承担旧报告前端回退。
+
+### deep_report_settings — 深度报告公开版本
+
+| 列 | 类型 | 说明 |
+|----|------|------|
+| id | INTEGER PK CHECK(id = 1) | 固定单行 |
+| public_version | INTEGER | 当前公开 API 可见的报告版本 |
+
+批量重建 V2 时先保持 `public_version=1`；完整批次结束后原子更新为 2 并删除全部 V1。当前数据库 schema version 为 11。
 
 ### provider_health — Provider 健康状态
 
@@ -427,7 +441,7 @@ UNIQUE(repo_url, commit_sha)
 
 | version |
 |---------|
-| 10 |
+| 11 |
 
 ## extra_data JSON 结构详解
 

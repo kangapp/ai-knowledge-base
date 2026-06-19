@@ -165,20 +165,20 @@
   - 公开列表 `/api/deep-reports?page=1&page_size=100` 由后端直接按 `status='completed'` 过滤，`total` 也是 completed 总数，并按 `updated_at DESC, id DESC` 返回；前端保留 `status='completed'` 二次过滤仅作防御
   - 公开详情页有 `id` 时请求 `/api/deep-reports/{id}`，接口只允许返回 `status='completed'`；`failed` 或不存在统一返回 `40401`
   - 无 `id` 或 query 中 `id` 非法时回退 `/api/deep-reports/latest`，同样只基于最新 completed 报告
-  - 渲染优先使用 `report_json` 的结构化字段：概述、技术栈、架构、数据流、应用场景、优势、局限、可执行建议、源码证据；数组为空时不输出空 section
-  - 兼容旧数据时回退 `report_markdown`，仅以转义后的 `<pre style="white-space: pre-wrap">` 文本展示，不做不安全 HTML 注入或 Markdown 解析；当 `source_evidence` 只有脏值如 `[null, 1, "x", {}]` 且其它结构字段为空时，必须继续走 markdown fallback
+  - V2 渲染使用采用结论、应用场景、技术栈、架构节点/边、快速上手、部署运行、核心模块、运行时数据流和采用判断；空 section 不输出
+  - V1 不再回退 `report_markdown`；重建期间 API 继续公开 V1，完成版本切换后页面只接收 `report_version=2`
   - 新增 `requestJson`、`escapeHtml`、`safeHttpUrl` 前端契约，统一处理 HTTP/envelope 错误与外链安全
-  - 前端对脏数据做最小归一化：`report_json` 非 plain object 视为 `{}`，数组字段只接受字符串项，`normalizeEvidence()` 统一过滤 `evidence` 中的 `null`/数字/字符串/空对象，详情链接 `id` 必须是严格正整数
+  - 前端对脏数据做最小归一化：`report_json` 非 plain object 视为 `{}`，数组字段只接受字符串项，架构边引用必须有效，否则降级为节点卡片；详情链接 `id` 必须是严格正整数
   - `asPositiveInt()` 规则：number 仅接受 `Number.isInteger(value) && value > 0`；string 必须 `trim()` 后匹配 `/^[1-9]\d*$/` 并通过 `Number.isSafeInteger`，因此拒绝 `12abc`、`1e2`、`12<script>`、`01`
 - [x] 补齐 Deep Reports 正式文档（Task 9）
   - `docs/api.md` 记录 completed-only 列表、latest 空对象和 failed/not-found 详情 404 契约
-  - `docs/data-model.md` 记录 `deep_reports` 字段、索引、唯一约束、写入口径和 schema v10
+  - `docs/data-model.md` 记录 `deep_reports` 字段、版本索引、唯一约束、公开版本设置和 schema v11
   - `docs/architecture.md` 记录 Reviewer/入库后的后置阶段、源码扫描边界、失败隔离和静态页面
   - `docs/codemap.md`、`docs/structure.md` 补齐模块职责、测试入口和常见改动入口
 - [x] Deep Reports 最终验收（Task 10）
   - 非 integration/e2e 测试 185 项通过，Prompt 回归 7 项通过
   - 临时数据库和输出目录完成静态站构建，列表/详情 API 与页面联调通过
-  - 桌面端和 390px 移动端完成结构化报告、旧数据回退、异常状态和超长连续文本检查
+  - 桌面端和 390px 移动端完成 V2 决策报告、SVG/卡片架构、异常状态和横向溢出检查
   - 无候选时深度阶段返回 skipped，不影响主 pipeline
   - 深度报告完整提交范围通过 `git diff --check`，工作区无未提交文件
 - [x] 部署后自动重建静态站
@@ -195,6 +195,15 @@
   - 每个关键源码文件进入 LLM 前最多保留 2,000 字符，降低大型仓库输入成本
   - Prompt 要求报告总长度不超过 5,000 中文字符、数组最多 8 项
   - `deep_report.params.max_tokens` 从 4,096 提升到 8,192，避免完整 JSON 在尾部被截断
+- [x] Deep Reports 详情 V2
+  - 报告升级为采用决策、架构节点/边、快速上手、部署运行、核心模块和运行时数据流的固定 Schema
+  - 候选仅允许 approved，Reviewer 与候选分均至少 85；要求明确 Coding 工具交付证据，stars 不计分
+  - 纯论文、模型权重、数据集、benchmark、泛知识库和聊天项目不进入深度报告
+  - schema v11 增加 `report_version` 和 `deep_report_settings.public_version`，支持 V1/V2 重建期并存
+  - 新增 `python -m src.deep_reports.rebuild`，支持 dry-run、数量/成本限制、单仓库重试；完整批次原子切换 V2 并删除 V1
+  - 详情页按采用结论 → 场景 → 技术栈 → 架构图 → 快速上手 → 部署运行 → 核心模块/数据流 → 采用判断展示
+  - 源码证据继续约束 LLM，但不在 DOM 展示；桌面使用 SVG，390px 移动端使用节点卡片且无横向溢出
+  - 深度报告定向测试 187 项通过，桌面/移动端和无效架构边降级完成浏览器验证
 - [ ] 统计服务层继续收口
   - 将 `quality/runtime/consumption` SQL 从 `src/db/operations.py` 逐步迁到更聚焦的统计服务文件
   - 每迁一个接口补一个契约测试
@@ -230,11 +239,13 @@
 - 已通过：`.venv/bin/python -m pytest tests/test_deep_reports_pipeline.py::test_deep_report_stage_skips_when_no_candidate -q`
 - 已通过：`.venv/bin/python -m pytest -m "not integration and not e2e" -q`（188 passed）
 - 已通过：`.venv/bin/python -m pytest -m "not integration and not e2e" -q`（190 passed）
+- 已通过：`uv run pytest tests/test_deep_reports_analyzer.py tests/test_deep_reports_selector.py tests/test_deep_reports_db.py tests/test_deep_reports_pipeline.py tests/test_deep_reports_rebuild.py tests/test_deep_reports_api.py tests/test_dashboard_frontend_contract.py tests/test_prompt_regression.py -q`（187 passed）
+- 已通过：`uv run pytest -m "not integration and not e2e"`（324 passed）
 
 说明：
 - 当前 shell 中 `uv` 不可用，使用项目 `.venv/bin/python` 执行测试。
 - 深度报告页面已完成浏览器级验证：
   - 桌面端列表仅展示 completed 报告，候选分 0 正常显示，failed 报告不公开
-  - 结构化详情完整展示 8 个报告区块，旧数据安全回退为转义后的原始文本
+  - V2 详情完整展示采用结论、场景、架构、快速上手、部署运行和技术细节，V1 不进入页面渲染
   - 非法 id 回退 latest，failed/not-found id 展示统一错误状态
-  - 390px 移动端列表与详情无横向溢出，长标题、标签和源码路径正常换行
+  - 390px 移动端列表与详情无横向溢出，架构 SVG 自动替换为节点卡片

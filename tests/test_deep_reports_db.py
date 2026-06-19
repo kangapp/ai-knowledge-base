@@ -3,10 +3,14 @@ import pytest
 
 from src.core.database import Database
 from src.db.operations import (
+    get_completed_deep_report,
     get_deep_report,
     get_latest_deep_report,
+    get_public_deep_report_version,
+    list_completed_deep_reports,
     list_deep_reports,
     save_deep_report,
+    set_public_deep_report_version,
 )
 
 _MIGRATIONS_DIR = Path(__file__).parent.parent / "src" / "db" / "migrations"
@@ -24,6 +28,7 @@ async def _init_db(tmp_path) -> Database:
         ("run_1", "completed", "test"),
     )
     await db.commit()
+    await set_public_deep_report_version(db, 2)
     return db
 
 
@@ -315,5 +320,115 @@ async def test_latest_deep_report_uses_updated_at_for_completed_reports(tmp_path
         assert updated_id == older_updated_id
         assert latest["id"] == older_updated_id
         assert latest["report_json"]["project_overview"] == "updated completed"
+    finally:
+        await db.close()
+
+
+@pytest.mark.asyncio
+async def test_same_repo_commit_can_store_v1_and_v2(tmp_path):
+    db = await _init_db(tmp_path)
+    try:
+        common = {
+            "repo_url": "https://github.com/org/versioned-tool",
+            "repo_name": "org/versioned-tool",
+            "article_id": 12,
+            "run_id": "run_1",
+            "commit_sha": "same123",
+            "status": "completed",
+            "candidate_score": 90,
+            "trigger_reason": "versioned",
+            "report_markdown": "# versioned",
+            "evidence_json": [],
+            "tech_stack_json": {},
+            "file_tree_summary": "",
+            "analysis_cost": 0.01,
+            "analysis_tokens": 1000,
+            "error": "",
+        }
+
+        v1_id = await save_deep_report(
+            db,
+            report_json={"summary": "v1"},
+            report_version=1,
+            **common,
+        )
+        v2_id = await save_deep_report(
+            db,
+            report_json={"summary": "v2"},
+            report_version=2,
+            **common,
+        )
+
+        assert v1_id != v2_id
+        rows = await db.fetch_all(
+            """
+            SELECT id, report_version
+            FROM deep_reports
+            WHERE repo_url = ? AND commit_sha = ?
+            ORDER BY report_version
+            """,
+            (common["repo_url"], common["commit_sha"]),
+        )
+        assert [(row["id"], row["report_version"]) for row in rows] == [
+            (v1_id, 1),
+            (v2_id, 2),
+        ]
+    finally:
+        await db.close()
+
+
+@pytest.mark.asyncio
+async def test_public_queries_follow_configured_report_version(tmp_path):
+    db = await _init_db(tmp_path)
+    try:
+        common = {
+            "repo_url": "https://github.com/org/public-tool",
+            "repo_name": "org/public-tool",
+            "article_id": 12,
+            "run_id": "run_1",
+            "commit_sha": "public123",
+            "status": "completed",
+            "candidate_score": 90,
+            "trigger_reason": "public version",
+            "report_markdown": "# public",
+            "evidence_json": [],
+            "tech_stack_json": {},
+            "file_tree_summary": "",
+            "analysis_cost": 0.01,
+            "analysis_tokens": 1000,
+            "error": "",
+        }
+        v1_id = await save_deep_report(
+            db,
+            report_json={"summary": "v1"},
+            report_version=1,
+            **common,
+        )
+        v2_id = await save_deep_report(
+            db,
+            report_json={"summary": "v2"},
+            report_version=2,
+            **common,
+        )
+
+        await set_public_deep_report_version(db, 1)
+        assert await get_public_deep_report_version(db) == 1
+        v1_list = await list_completed_deep_reports(db)
+        assert v1_list["total"] == 1
+        assert v1_list["items"][0]["id"] == v1_id
+        assert v1_list["items"][0]["report_version"] == 1
+        assert (await get_latest_deep_report(db))["id"] == v1_id
+        assert (await get_completed_deep_report(db, v1_id))["id"] == v1_id
+        assert await get_completed_deep_report(db, v2_id) is None
+
+        await set_public_deep_report_version(db, 2)
+        assert await get_public_deep_report_version(db) == 2
+        v2_list = await list_completed_deep_reports(db)
+        assert v2_list["total"] == 1
+        assert v2_list["items"][0]["id"] == v2_id
+        assert v2_list["items"][0]["report_version"] == 2
+        assert (await get_latest_deep_report(db))["id"] == v2_id
+        assert (await get_completed_deep_report(db, v2_id))["id"] == v2_id
+        assert await get_completed_deep_report(db, v1_id) is None
     finally:
         await db.close()
