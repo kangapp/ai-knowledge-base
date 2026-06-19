@@ -24,20 +24,28 @@ VPS (1C2G)
 ## CI/CD 流程
 
 ```
-GitHub Actions (push main):
+GitHub Actions (push master):
   pytest -m "not integration and not e2e" (仅单元测试，LLM mock，<30s)
-    → docker build
-      → docker save → scp → docker load
-        → docker compose up -d
-          → 容器内轮询 /api/health
+    → 构建并推送 commit SHA + latest 双标签镜像
+      → VPS 记录当前 pipeline 镜像作为回滚版本
+        → 拉取本次 commit SHA 镜像
+          → docker compose up -d --wait
             → POST /api/pipeline/build 强制重建静态站
+              → 验证 VPS 内部和公网健康接口、关键页面
 ```
 
 - 集成测试（真实 API+LLM）手动跑：`pytest -m integration`
 - E2E（全 mock 完整流程）部署前本地跑：`pytest -m e2e`
-- 部署任务仅在 pipeline 健康后构建静态站；健康检查、构建请求或关键静态页面检查失败时，deploy job 直接失败。
+- push 到 `master` 自动部署；Actions 的 `workflow_dispatch` 可指定 Git ref，重新构建该 ref 并部署其真实 commit SHA。
+- 正式部署只使用 `ghcr.io/kangapp/ai-knowledge-base:<commit-sha>`；`latest` 仅作为人工调试兼容标签。
+- `docker-compose.yml` 通过 `PIPELINE_IMAGE` 接收目标镜像，未传入时才回退 `latest`，便于 VPS 首次初始化。
+- 部署任务串行排队，避免两个 SSH 部署同时修改 Compose 状态；不取消进行中的部署，避免在容器替换中途终止。
+- 部署任务仅在 pipeline 健康后构建静态站；健康检查、构建请求、关键静态页面或公网验收失败时，恢复部署前镜像和静态输出，deploy job 仍保持失败以便追查。
 - pipeline 镜像必须包含 `curl`（健康/构建请求）和 `git`（Deep Reports 临时 clone GitHub 仓库）。
-- SSH 部署连接超时为 30 秒，远程命令上限为 25 分钟；`docker compose pull` 单次最多 8 分钟并重试 3 次，避免 GHCR 短时网络抖动直接耗尽整个部署窗口。
+- Dockerfile 先安装稳定系统依赖，再复制业务源码；普通代码发布只生成较小的源码层，减少 VPS 从 GHCR 拉取的数据量。
+- SSH 建连上限为 30 秒，远程命令上限为 10 分钟；只拉取 pipeline 镜像，单次最多 3 分钟并重试 2 次，持续网络故障会快速失败。
+- GitHub 仓库 Secret `PUBLIC_BASE_URL` 保存公网根地址，例如 `http://8.134.176.187:8090`；部署最后验证 `/api/health`、`/deep.html` 和 `/deep-report.html`。
+- Actions 与镜像内 uv 使用固定主版本/精确版本，降低运行时升级导致的不可复现风险。
 
 ## VPS 初始化（5 步）
 
@@ -46,6 +54,12 @@ GitHub Actions (push main):
 3. 对着 `.env.example` 创建 `.env` 填入密钥
 4. `docker compose up -d`
 5. 验证：`curl https://<domain>/api/health`
+
+## 手动部署与回滚
+
+在 GitHub Actions 的 `Deploy` 工作流选择 **Run workflow**，输入分支、Tag 或 commit SHA。工作流会解析为完整 commit SHA，重新运行测试、构建对应镜像并部署。
+
+自动回滚只覆盖本次部署造成的容器与静态输出变更，不回滚数据库迁移或其他持久化数据。部署前的 pipeline 镜像会临时标记为 `rollback-<run-id>`，静态输出复制到本次 run 专属目录；新版本完成健康检查、静态构建和公网验收后删除临时备份，失败时恢复旧镜像、旧静态输出并再次等待健康。
 
 ## 数据库迁移
 
@@ -76,7 +90,9 @@ GitHub Actions (push main):
 - **调度重叠**：采集任务按 cron 分组注册并使用北京时间；若上一轮仍未完成，新任务记录 `pipeline.queued` 后等待进程内锁，上一轮结束后继续执行，不再跳过整组。
 - **连续零采集**：先查 `/api/sources/stats` 的 `health_status/last_error/last_run_at`。`failed` 是请求失败，`success_zero` 是请求成功但关键词零命中，`dedup_only` 是本轮全部重复，`analysis_failed` 是已采集但分析阶段失败。
 - **RSS 地址失效**：优先切换到来源官方 Feed；不存在稳定官方 Feed 时在 `config/sources.yaml` 设为 `enabled: false`，不要用不稳定代理伪装成可用源。
-- **部署精确在 10 分钟失败**：检查 `ssh-action` 的 `command_timeout`。连接 `timeout` 只控制 SSH 建连，不能替代远程命令上限；镜像拉取应有独立超时和重试。
+- **部署在 6-10 分钟内失败**：查看 `2/6 Pull immutable image` 阶段。GHCR 拉取单次 3 分钟、最多 2 次；网络持续过慢时快速失败，不继续占用 runner。
+- **部署后自动回滚**：查看 `Deployment failed; collecting diagnostics` 和 `Restoring previous pipeline image`。CI 仍显示失败是预期行为，线上应继续运行旧镜像。
+- **回滚也失败**：按日志中的镜像 ID 登录 VPS，执行 `PIPELINE_IMAGE=<旧镜像标签> docker compose up -d --wait --wait-timeout 90`，并检查数据库迁移是否需要单独恢复。
 
 ## 日志与排查
 

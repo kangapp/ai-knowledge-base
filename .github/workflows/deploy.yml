@@ -2,12 +2,39 @@ name: Deploy
 on:
   push:
     branches: [master]
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: Git ref to build and deploy
+        required: true
+        default: master
+
+concurrency:
+  group: production-deploy
+  cancel-in-progress: false
+
 jobs:
+  resolve:
+    runs-on: ubuntu-latest
+    outputs:
+      image_sha: ${{ steps.commit.outputs.sha }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.ref || github.sha }}
+      - id: commit
+        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
   test:
+    needs: resolve
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v5
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.resolve.outputs.image_sha }}
+      - uses: astral-sh/setup-uv@v8
+        with:
+          version: "0.11.22"
       - run: uv sync --frozen
       - run: uv run --with pytest,pytest-asyncio,pytest-httpx pytest -m "not integration and not e2e"
         env:
@@ -16,14 +43,16 @@ jobs:
           OPENAI_API_KEY: sk-test-ci
 
   build-image:
-    needs: test
+    needs: [resolve, test]
     runs-on: ubuntu-latest
     permissions:
       contents: read
       packages: write
     steps:
-      - uses: actions/checkout@v4
-      - uses: docker/setup-buildx-action@v3
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.resolve.outputs.image_sha }}
+      - uses: docker/setup-buildx-action@v4
       - uses: docker/login-action@v4
         with:
           registry: ghcr.io
@@ -32,56 +61,139 @@ jobs:
       - name: Log in to GitHub Container Registry
         run: echo "ghcr.io/${{ github.repository_owner }}/ai-knowledge-base:latest"
       - name: Build and push
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: .
           push: true
-          tags: ghcr.io/${{ github.repository_owner }}/ai-knowledge-base:latest
+          tags: |
+            ghcr.io/${{ github.repository_owner }}/ai-knowledge-base:${{ needs.resolve.outputs.image_sha }}
+            ghcr.io/${{ github.repository_owner }}/ai-knowledge-base:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
   deploy:
-    needs: build-image
+    needs: [resolve, build-image]
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/master'
+    environment: production
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.resolve.outputs.image_sha }}
       - name: Deploy to VPS
-        uses: appleboy/ssh-action@v1
+        uses: appleboy/ssh-action@v1.2.5
+        env:
+          DEPLOY_IMAGE: ghcr.io/${{ github.repository_owner }}/ai-knowledge-base:${{ needs.resolve.outputs.image_sha }}
+          PUBLIC_BASE_URL: ${{ secrets.PUBLIC_BASE_URL }}
+          ROLLBACK_SUFFIX: ${{ github.run_id }}
         with:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.VPS_SSH_KEY }}
           timeout: 30s
-          command_timeout: 25m
+          command_timeout: 10m
+          envs: DEPLOY_IMAGE,PUBLIC_BASE_URL,ROLLBACK_SUFFIX
           script: |
-            set -e
+            set -Eeuo pipefail
             cd /opt/ai-knowledge-base
+
+            phase() {
+              printf '\n[%s] %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$1"
+            }
+
+            previous_container_id="$(docker compose ps -q pipeline 2>/dev/null || true)"
+            previous_image_id=""
+            rollback_image=""
+            output_backup=""
+            if [ -n "$previous_container_id" ]; then
+              previous_image_id="$(docker inspect --format '{{.Image}}' "$previous_container_id")"
+              rollback_image="ghcr.io/kangapp/ai-knowledge-base:rollback-${ROLLBACK_SUFFIX}"
+              docker image tag "$previous_image_id" "$rollback_image"
+            fi
+
+            rollback() {
+              exit_code=$?
+              trap - ERR
+              phase "Deployment failed; collecting diagnostics"
+              docker compose ps || true
+              docker compose logs --tail=100 pipeline || true
+
+              if [ -n "$rollback_image" ]; then
+                phase "Restoring previous pipeline image"
+                export PIPELINE_IMAGE="$rollback_image"
+                if docker compose up -d --wait --wait-timeout 90 \
+                  && docker compose exec -T pipeline curl -fsS http://localhost:8000/api/health; then
+                  echo "Rollback completed successfully"
+                else
+                  echo "Rollback failed; manual intervention is required"
+                  docker compose ps || true
+                  docker compose logs --tail=100 pipeline || true
+                fi
+              else
+                echo "No previous pipeline container was available for rollback"
+              fi
+
+              if [ -n "$output_backup" ] && [ -d "$output_backup" ]; then
+                phase "Restoring previous static output"
+                rm -rf output
+                mv "$output_backup" output
+              fi
+              exit "$exit_code"
+            }
+            trap rollback ERR
+
+            phase "1/6 Sync repository"
             git fetch origin master
             git reset --hard origin/master
-            for pull_attempt in 1 2 3; do
-              if timeout 8m docker compose pull; then
+
+            phase "2/6 Pull immutable image ${DEPLOY_IMAGE}"
+            export PIPELINE_IMAGE="$DEPLOY_IMAGE"
+            for pull_attempt in 1 2; do
+              if timeout 3m docker compose pull pipeline; then
                 break
               fi
-              if [ "$pull_attempt" -eq 3 ]; then
-                echo "docker compose pull failed after 3 attempts"
-                exit 1
+              if [ "$pull_attempt" -eq 2 ]; then
+                echo "docker compose pull failed after 2 attempts"
+                false
               fi
               echo "docker compose pull attempt $pull_attempt failed, retrying"
               sleep 10
             done
-            docker compose up -d
-            for attempt in $(seq 1 30); do
-              if docker compose exec -T pipeline curl -fsS http://localhost:8000/api/health; then
-                break
-              fi
-              if [ "$attempt" -eq 30 ]; then
-                docker compose logs --tail=100 pipeline
-                exit 1
-              fi
-              sleep 2
-            done
+
+            phase "3/6 Start containers and wait for health"
+            docker compose up -d --wait --wait-timeout 90
+            docker compose exec -T pipeline curl -fsS http://localhost:8000/api/health
+
+            phase "4/6 Build static site"
+            output_backup=".deploy-output-backup-${ROLLBACK_SUFFIX}"
+            rm -rf "$output_backup"
+            if [ -d output ]; then
+              cp -a output "$output_backup"
+            else
+              mkdir -p "$output_backup"
+            fi
             docker compose exec -T pipeline curl -fsS -X POST http://localhost:8000/api/pipeline/build
+
+            phase "5/6 Verify generated pages"
             test -f output/deep.html
             test -f output/deep-report.html
+            curl -fsS http://localhost:8090/deep.html >/dev/null
+            curl -fsS http://localhost:8090/deep-report.html >/dev/null
+
+            phase "6/6 Verify public endpoint"
+            if [ -n "$PUBLIC_BASE_URL" ]; then
+              curl -fsS "${PUBLIC_BASE_URL%/}/api/health"
+              curl -fsS "${PUBLIC_BASE_URL%/}/deep.html" >/dev/null
+              curl -fsS "${PUBLIC_BASE_URL%/}/deep-report.html" >/dev/null
+            else
+              echo "PUBLIC_BASE_URL is not configured; skipping external verification"
+            fi
+
             docker compose ps
+            docker inspect --format 'pipeline image={{.Config.Image}} id={{.Image}}' \
+              "$(docker compose ps -q pipeline)"
+
+            trap - ERR
+            if [ -n "$rollback_image" ]; then
+              docker image rm "$rollback_image" >/dev/null 2>&1 || true
+            fi
+            rm -rf "$output_backup"

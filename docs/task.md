@@ -1,8 +1,19 @@
 # 当前任务拆解
 
-更新时间：2026-06-10
+更新时间：2026-06-19
 
 ## P0 已完成
+
+- [x] 加固 CI/CD 可追溯部署与失败回滚
+  - Docker 镜像同时发布 commit SHA 与 `latest` 标签，正式部署只使用完整 SHA
+  - workflow_dispatch 支持指定 Git ref，测试、构建、部署使用同一个解析后的提交
+  - VPS 部署前保存旧容器镜像与静态输出；拉取、启动、健康检查、静态构建或公网验收失败时自动恢复
+  - `docker compose pull pipeline` 单次 3 分钟、最多 2 次，SSH 远程命令上限收紧为 10 分钟
+  - Compose 使用 `--wait --wait-timeout 90`，部署日志拆为 6 个阶段并在失败时输出状态和最近日志
+  - production 部署使用 concurrency 串行排队，避免并发修改 VPS
+  - 配置 `PUBLIC_BASE_URL` 仓库 Secret，验证公网健康接口和 Deep Reports 关键页面
+  - Actions 升级到 Node.js 24 运行时版本，Dockerfile 固定 uv `0.11.22`
+  - Dockerfile 将 `curl/git` 系统依赖层前移，源码变更不再重复生成大体积 apt 层
 
 - [x] 修复部署远程命令超时
   - 定位 deploy job 精确命中 ssh-action 默认 10 分钟命令上限
