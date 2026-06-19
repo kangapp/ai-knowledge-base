@@ -1,6 +1,24 @@
 # 代码地图
 
-更新时间：2026-06-10
+更新时间：2026-06-19
+
+## CI/CD 与部署
+
+- `.github/workflows/deploy.yml`
+  - push `master` 自动部署，`workflow_dispatch` 支持指定 Git ref。
+  - `resolve` job 将 ref 固定为完整 commit SHA，test、build-image、deploy 三阶段复用同一 SHA。
+  - 镜像发布 SHA 与 `latest` 双标签，VPS 仅部署 SHA 标签；失败时恢复部署前的容器镜像。
+  - production concurrency 串行化部署，避免并发 SSH 操作同一 Compose 项目。
+  - 常见改动入口：测试命令、镜像标签、拉取超时、健康检查、静态页和公网验收。
+
+- `docker-compose.yml`
+  - pipeline 镜像由 `PIPELINE_IMAGE` 显式注入；只在本地或首次初始化未传值时回退 `latest`。
+
+- `Dockerfile`
+  - 生产镜像依赖固定版本 uv，并安装 Deep Reports 所需的 `curl` 和 `git`。
+
+- `tests/test_deploy_workflow.py`
+  - 部署工作流静态契约测试：SHA 镜像、快速失败、健康等待、自动回滚、手动 ref 和并发策略。
 
 ## API 入口
 

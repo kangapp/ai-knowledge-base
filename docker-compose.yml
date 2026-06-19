@@ -1,6 +1,6 @@
 services:
   pipeline:
-    image: ghcr.io/kangapp/ai-knowledge-base:latest
+    image: ${PIPELINE_IMAGE:-ghcr.io/kangapp/ai-knowledge-base:latest}
     env_file: .env
     volumes:
       - ./data:/app/data
