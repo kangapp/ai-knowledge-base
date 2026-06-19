@@ -376,6 +376,81 @@ async def set_public_deep_report_version(db: Database, version: int) -> None:
     await db.commit()
 
 
+async def list_deep_reports_for_rebuild(
+    db: Database,
+    *,
+    repo_url: str | None = None,
+    limit: int | None = None,
+) -> list[dict]:
+    params: list = []
+    if repo_url:
+        sql = """
+            SELECT * FROM deep_reports
+            WHERE repo_url = ?
+              AND (
+                  (report_version = 1 AND status = 'completed')
+                  OR (report_version = 2 AND status = 'failed')
+              )
+            ORDER BY report_version DESC, id DESC
+            LIMIT 1
+        """
+        params.append(repo_url)
+    else:
+        sql = """
+            SELECT * FROM deep_reports
+            WHERE report_version = 1 AND status = 'completed'
+            ORDER BY id
+        """
+        if limit is not None:
+            sql += " LIMIT ?"
+            params.append(limit)
+
+    rows = await db.fetch_all(sql, tuple(params))
+    return [_deep_report_row(row) for row in rows]
+
+
+async def delete_deep_reports_by_version(db: Database, version: int) -> None:
+    await db.execute(
+        "DELETE FROM deep_reports WHERE report_version = ?",
+        (version,),
+    )
+    await db.commit()
+
+
+async def delete_failed_deep_reports_for_repo(
+    db: Database,
+    repo_url: str,
+    *,
+    keep_report_id: int,
+) -> None:
+    await db.execute(
+        """
+        DELETE FROM deep_reports
+        WHERE repo_url = ?
+          AND report_version = 2
+          AND status = 'failed'
+          AND id != ?
+        """,
+        (repo_url, keep_report_id),
+    )
+    await db.commit()
+
+
+async def switch_public_deep_reports_to_v2(db: Database) -> None:
+    await db._conn.execute("BEGIN")
+    try:
+        await db._conn.execute(
+            "UPDATE deep_report_settings SET public_version = 2 WHERE id = 1"
+        )
+        await db._conn.execute(
+            "DELETE FROM deep_reports WHERE report_version = 1"
+        )
+        await db._conn.commit()
+    except Exception:
+        await db._conn.rollback()
+        raise
+
+
 async def list_deep_reports(db: Database, page: int = 1, page_size: int = 20) -> dict:
     page = max(page, 1)
     page_size = max(page_size, 1)
