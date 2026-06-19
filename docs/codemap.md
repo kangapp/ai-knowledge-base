@@ -71,12 +71,12 @@
 ## Deep Reports
 
 - `src/deep_reports/models.py`
-  - 候选、仓库扫描结果、源码包、结构化报告和阶段结果模型。
-  - 常见改动入口：LLM 报告 schema、源码证据字段、阶段返回契约。
+  - 候选、仓库扫描结果、源码包、V2 决策报告和阶段结果模型。
+  - 常见改动入口：采用决策、架构图节点/边、快速上手/部署流程、源码证据和阶段返回契约。
 
 - `src/deep_reports/selector.py`
-  - 从本轮 approved/retry GitHub 项目中选择最多 1 个候选，执行来源偏好、实用性、Reviewer 分数和 stars 综合评分，并跳过 7 天内已有 completed 报告的仓库。
-  - 常见改动入口：触发阈值、候选评分、重复分析窗口。
+  - 从本轮 approved GitHub 项目中选择最多 1 个候选；Reviewer 和候选分均至少 85，并要求正文中存在明确 Coding 工具能力和交付证据。
+  - 常见改动入口：Coding 能力词表、评测/文档提及排除、readiness 评分和 7 天重复分析窗口。
 
 - `src/deep_reports/inspector.py`
   - 临时 shallow clone，过滤依赖/构建目录、二进制和超限文件，读取 README、manifest、入口文件、关键源码与 commit SHA；不执行仓库代码。
@@ -92,7 +92,11 @@
 
 - `src/deep_reports/service.py`
   - 编排 selector → inspector → summarizer → analyzer → persistence，并记录 `deep.*` pipeline events。
-  - 常见改动入口：主 pipeline 接入、失败隔离、成本/报告持久化、Markdown 兼容输出。
+  - 常见改动入口：主 pipeline 接入、失败隔离、V2 成本/报告持久化和内部 Markdown 审计文本。
+
+- `src/deep_reports/rebuild.py`
+  - 批量读取 V1 报告，重新 clone/分析为 V2，支持 dry-run、数量/成本限制、单仓库重试，并在完整批次结束后原子切换公开版本和删除 V1。
+  - 常见改动入口：重建筛选、预算停止条件、失败仓库重试和静态站重建。
 
 ## Pipeline
 
@@ -156,8 +160,8 @@
   - 常见改动入口：页面结构、加载/空/错误状态容器。
 
 - `src/site/static/js/deep-reports.js`
-  - 深度报告列表/详情请求、脏数据归一化、安全转义和结构化区块渲染。
-  - 常见改动入口：报告字段展示、latest 回退、外链和旧 Markdown 数据兼容。
+  - 深度报告列表/详情请求、安全转义、V2 决策漏斗、SVG 架构图和流程卡片渲染；移动端架构自动降级为节点卡片。
+  - 常见改动入口：采用结论、架构/流程布局、latest 回退和外链安全。
 
 - `src/site/static/js/app.js`
   - 首页文章列表筛选、来源/标签/日期过滤。
@@ -199,7 +203,10 @@
   - 候选评分/去重窗口和源码扫描安全边界。
 
 - `tests/test_deep_reports_analyzer.py` / `tests/test_deep_reports_pipeline.py`
-  - Prompt/结构化输出、成本记录、阶段编排和主 pipeline 失败隔离。
+  - V2 Prompt/结构化输出、图关系校验、成本记录、阶段编排和主 pipeline 失败隔离。
+
+- `tests/test_deep_reports_rebuild.py`
+  - dry-run、完整切换、部分失败、单仓库重试、数量限制和成本上限。
 
 ## 文档入口
 
