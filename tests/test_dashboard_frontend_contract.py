@@ -110,10 +110,11 @@ def test_deep_report_templates_script_builder_and_nav_exist():
     assert "/api/deep-reports/${safeId}" in script
 
 
-def test_deep_report_script_contracts_for_filter_escape_structured_render_and_safe_fallback():
+def test_deep_report_script_contracts_for_v2_rendering_and_safety():
     script = (ROOT / "src/site/static/js/deep-reports.js").read_text()
     styles = (ROOT / "src/site/static/css/style.css").read_text()
     escape_html_block = script.split("function escapeHtml(value) {", 1)[1].split("function safeHttpUrl", 1)[0]
+    structured_block = script.split("function renderStructuredReport(item) {", 1)[1].split("function renderList(data)", 1)[0]
 
     assert "function requestJson" in script
     assert "response.ok" in script
@@ -125,7 +126,13 @@ def test_deep_report_script_contracts_for_filter_escape_structured_render_and_sa
     assert "function asObject" in script
     assert "function asStringList" in script
     assert "function asPositiveInt" in script
-    assert "function normalizeEvidence" in script
+    assert "function normalizeFlow" in script
+    assert "function normalizeArchitecture" in script
+    assert "function renderDecision" in script
+    assert "function renderArchitectureDiagram" in script
+    assert "function renderFlow" in script
+    assert "function renderCoreModules" in script
+    assert "function renderAdoptionNotes" in script
     assert ".replace(/&/g, '&amp;')" in script
     assert ".replace(/</g, '&lt;')" in script
     assert ".replace(/>/g, '&gt;')" in script
@@ -138,13 +145,19 @@ def test_deep_report_script_contracts_for_filter_escape_structured_render_and_sa
     assert "asObject(item).report_json" in script or "const report = asObject(item.report_json)" in script
     assert "report.summary" in script
     assert "report.tech_stack" in script
+    assert "report.decision" in script
     assert "report.architecture" in script
-    assert "report.data_flow" in script
+    assert "report.quick_start" in script
+    assert "report.deployment" in script
+    assert "report.core_modules" in script
+    assert "report.runtime_data_flow" in script
     assert "report.use_cases" in script
     assert "report.strengths" in script
     assert "report.limitations" in script
     assert "report.actionable_takeaways" in script
-    assert "report.source_evidence" in script
+    assert "source_evidence" not in structured_block
+    assert "report_version" in script
+    assert "报告正在升级，请稍后查看" in script
 
     assert "function safeHttpUrl" in script
     assert "new URL(" in script
@@ -157,17 +170,19 @@ def test_deep_report_script_contracts_for_filter_escape_structured_render_and_sa
     assert "/^[1-9]\\d*$/" in script
     assert "Number.isInteger(value) && value > 0" in script
     assert 'href="/deep-report.html?id=${safeId}"' in script or "detailHref(item.id)" in script
-    assert "const evidence = asObject(item)" in script or "asObject(evidence)" in script
-    assert "const evidenceItems = normalizeEvidence(items)" in script
-    assert "normalizeEvidence(report.source_evidence).length" in script
     assert "const safeId = asPositiveInt(id)" in script
     assert "await requestJson('/api/deep-reports/latest')" in script
 
-    assert "<pre" in script
-    assert "white-space: pre-wrap" in script
-    deep_report_pre_block = styles.split(".deep-report-pre {", 1)[1].split("}", 1)[0]
-    assert "overflow-wrap: anywhere" in deep_report_pre_block
-    assert "escapeHtml(item.report_markdown" in script or "escapeHtml(reportMarkdown" in script
+    assert "<pre" not in structured_block
     assert "innerHTML = item.report_markdown" not in script
     assert "innerHTML = report.report_markdown" not in script
-    assert ".replace(/\\n/g, '<br>')" not in script
+    assert ".deep-decision-grid" in styles
+    assert ".deep-architecture-diagram" in styles
+    assert ".deep-architecture-cards" in styles
+    assert ".deep-flow" in styles
+    assert ".deep-flow-step" in styles
+    assert ".deep-module-grid" in styles
+    assert "@media (max-width: 700px)" in styles
+    mobile_styles = styles.split("@media (max-width: 700px)", 1)[1]
+    assert ".deep-architecture-diagram { display: none; }" in mobile_styles
+    assert ".deep-architecture-cards { display: grid;" in mobile_styles

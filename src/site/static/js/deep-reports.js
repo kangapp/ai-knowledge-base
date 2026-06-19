@@ -41,20 +41,78 @@
         return Number.isSafeInteger(parsed) ? parsed : 0;
     }
 
-    function normalizeEvidence(value) {
-        if (!Array.isArray(value)) {
-            return [];
-        }
+    function normalizeFlow(value) {
+        const flow = asObject(value);
+        const seenIds = new Set();
+        const steps = Array.isArray(flow.steps)
+            ? flow.steps
+                .map(asObject)
+                .map(step => ({
+                    id: asString(step.id),
+                    title: asString(step.title),
+                    description: asString(step.description),
+                }))
+                .filter(step => {
+                    if (!step.id || !step.title || seenIds.has(step.id)) {
+                        return false;
+                    }
+                    seenIds.add(step.id);
+                    return true;
+                })
+            : [];
 
-        return value
-            .map(item => {
-                const evidence = asObject(item);
-                return {
-                    path: asString(evidence.path),
-                    reason: asString(evidence.reason),
-                };
-            })
-            .filter(item => item.path || item.reason);
+        return {
+            prerequisites: asStringList(flow.prerequisites),
+            steps,
+            expectedResult: asString(flow.expected_result),
+            operations: asStringList(flow.operations),
+        };
+    }
+
+    function normalizeArchitecture(value) {
+        const architecture = asObject(value);
+        const seenIds = new Set();
+        const nodes = Array.isArray(architecture.nodes)
+            ? architecture.nodes
+                .map(asObject)
+                .map(node => ({
+                    id: asString(node.id),
+                    label: asString(node.label),
+                    role: asString(node.role),
+                    group: asString(node.group),
+                }))
+                .filter(node => {
+                    if (!node.id || !node.label || seenIds.has(node.id)) {
+                        return false;
+                    }
+                    seenIds.add(node.id);
+                    return true;
+                })
+            : [];
+        const nodeIds = new Set(nodes.map(node => node.id));
+        const rawEdges = Array.isArray(architecture.edges)
+            ? architecture.edges.map(asObject).map(edge => ({
+                    source: asString(edge.source),
+                    target: asString(edge.target),
+                    label: asString(edge.label),
+                }))
+            : [];
+        const edges = rawEdges.filter(edge => (
+            edge.source &&
+            edge.target &&
+            edge.source !== edge.target &&
+            nodeIds.has(edge.source) &&
+            nodeIds.has(edge.target)
+        ));
+
+        return {
+            pattern: asString(architecture.pattern),
+            summary: asString(architecture.summary),
+            nodes,
+            edges,
+            isValid: nodes.length === (Array.isArray(architecture.nodes) ? architecture.nodes.length : 0) &&
+                edges.length === rawEdges.length,
+        };
     }
 
     function escapeHtml(value) {
@@ -206,44 +264,211 @@
         `;
     }
 
-    function renderEvidenceItems(items) {
-        const evidenceItems = normalizeEvidence(items);
-        if (!evidenceItems.length) {
+    function renderDecision(value) {
+        const decision = asObject(value);
+        const recommendation = asString(decision.recommendation);
+        const reasons = asStringList(decision.reasons);
+        const bestFor = asStringList(decision.best_for);
+        const notFor = asStringList(decision.not_for);
+        if (!recommendation && !reasons.length && !bestFor.length && !notFor.length) {
             return '';
         }
 
         return `
-            <section class="deep-band">
-                <h2>源码证据</h2>
-                <ul class="deep-evidence-list">
-                    ${evidenceItems.map(item => `
-                        <li>
-                            <code>${escapeHtml(item.path)}</code>
-                            <span>${escapeHtml(item.reason)}</span>
-                        </li>
-                    `).join('')}
-                </ul>
+            <section class="deep-band deep-decision">
+                <h2>采用结论</h2>
+                ${recommendation ? `<p class="deep-recommendation">${escapeHtml(recommendation)}</p>` : ''}
+                ${reasons.length ? `
+                    <ul class="deep-bullets deep-reason-list">
+                        ${reasons.map(item => `<li>${escapeHtml(item)}</li>`).join('')}
+                    </ul>
+                ` : ''}
+                <div class="deep-decision-grid">
+                    ${bestFor.length ? `
+                        <div class="deep-decision-card deep-decision-best">
+                            <h3>适合</h3>
+                            <ul>${bestFor.map(item => `<li>${escapeHtml(item)}</li>`).join('')}</ul>
+                        </div>
+                    ` : ''}
+                    ${notFor.length ? `
+                        <div class="deep-decision-card deep-decision-not">
+                            <h3>不适合</h3>
+                            <ul>${notFor.map(item => `<li>${escapeHtml(item)}</li>`).join('')}</ul>
+                        </div>
+                    ` : ''}
+                </div>
             </section>
         `;
     }
 
-    function renderArchitecture(report) {
-        const architecture = asObject(report.architecture);
-        const pattern = asString(architecture.pattern);
-        const components = asStringList(architecture.components);
-        if (!pattern && !components.length) {
+    function renderArchitectureDiagram(value) {
+        const architecture = normalizeArchitecture(value);
+        if (!architecture.pattern && !architecture.summary && !architecture.nodes.length) {
+            return '';
+        }
+
+        const nodeWidth = 150;
+        const nodeHeight = 72;
+        const gap = 40;
+        const padding = 30;
+        const width = Math.max(720, padding * 2 + architecture.nodes.length * nodeWidth + Math.max(architecture.nodes.length - 1, 0) * gap);
+        const height = 150;
+        const positions = new Map();
+        architecture.nodes.forEach((node, index) => {
+            positions.set(node.id, {
+                x: padding + index * (nodeWidth + gap),
+                y: 38,
+            });
+        });
+        const edgeSvg = architecture.edges.map(edge => {
+            const source = positions.get(edge.source);
+            const target = positions.get(edge.target);
+            if (!source || !target) {
+                return '';
+            }
+            const x1 = source.x + nodeWidth;
+            const y1 = source.y + nodeHeight / 2;
+            const x2 = target.x;
+            const y2 = target.y + nodeHeight / 2;
+            const labelX = (x1 + x2) / 2;
+            return `
+                <line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" marker-end="url(#deep-arrow)"></line>
+                ${edge.label ? `<text class="deep-edge-label" x="${labelX}" y="${y1 - 8}" text-anchor="middle">${escapeHtml(edge.label)}</text>` : ''}
+            `;
+        }).join('');
+        const nodeSvg = architecture.nodes.map(node => {
+            const position = positions.get(node.id);
+            return `
+                <g class="deep-architecture-node">
+                    <rect x="${position.x}" y="${position.y}" width="${nodeWidth}" height="${nodeHeight}" rx="8"></rect>
+                    <text x="${position.x + nodeWidth / 2}" y="${position.y + 28}" text-anchor="middle">${escapeHtml(node.label)}</text>
+                    <text class="deep-node-role" x="${position.x + nodeWidth / 2}" y="${position.y + 50}" text-anchor="middle">${escapeHtml(node.role)}</text>
+                </g>
+            `;
+        }).join('');
+        const cards = architecture.nodes.map(node => `
+            <article class="deep-architecture-card">
+                <h3>${escapeHtml(node.label)}</h3>
+                <p>${escapeHtml(node.role)}</p>
+                ${node.group ? `<span>${escapeHtml(node.group)}</span>` : ''}
+            </article>
+        `).join('');
+        const canRenderDiagram = architecture.nodes.length >= 4 && architecture.isValid;
+        const diagram = canRenderDiagram ? `
+            <div class="deep-architecture-diagram" aria-label="系统架构图">
+                <svg viewBox="0 0 ${width} ${height}" role="img">
+                    <defs>
+                        <marker id="deep-arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+                            <path d="M0,0 L8,4 L0,8 Z"></path>
+                        </marker>
+                    </defs>
+                    ${edgeSvg}
+                    ${nodeSvg}
+                </svg>
+            </div>
+        ` : '';
+
+        return `
+            <section class="deep-band">
+                <h2>系统架构</h2>
+                ${architecture.pattern ? `<p class="deep-architecture-pattern">模式：${escapeHtml(architecture.pattern)}</p>` : ''}
+                ${architecture.summary ? `<p class="deep-section-summary">${escapeHtml(architecture.summary)}</p>` : ''}
+                ${diagram}
+                ${cards ? `<div class="deep-architecture-cards${canRenderDiagram ? '' : ' is-fallback'}">${cards}</div>` : ''}
+            </section>
+        `;
+    }
+
+    function renderFlow(title, value) {
+        const flow = normalizeFlow(value);
+        if (!flow.steps.length && !flow.prerequisites.length && !flow.expectedResult && !flow.operations.length) {
             return '';
         }
 
         return `
             <section class="deep-band">
-                <h2>架构</h2>
-                ${pattern ? `<p class="deep-architecture-pattern">模式：${escapeHtml(pattern)}</p>` : ''}
-                ${components.length ? `
-                    <ul class="deep-bullets">
-                        ${components.map(item => `<li>${escapeHtml(item)}</li>`).join('')}
-                    </ul>
+                <h2>${escapeHtml(title)}</h2>
+                ${flow.prerequisites.length ? `
+                    <div class="deep-prerequisites">
+                        <strong>前置条件</strong>
+                        <span>${flow.prerequisites.map(escapeHtml).join(' · ')}</span>
+                    </div>
                 ` : ''}
+                ${flow.steps.length ? `
+                    <div class="deep-flow">
+                        ${flow.steps.map((step, index) => `
+                            <article class="deep-flow-step">
+                                <span class="deep-flow-index">${index + 1}</span>
+                                <h3>${escapeHtml(step.title)}</h3>
+                                ${step.description ? `<p>${escapeHtml(step.description)}</p>` : ''}
+                            </article>
+                        `).join('')}
+                    </div>
+                ` : ''}
+                ${flow.expectedResult ? `<p class="deep-flow-result"><strong>预期结果：</strong>${escapeHtml(flow.expectedResult)}</p>` : ''}
+                ${flow.operations.length ? `
+                    <div class="deep-operations">
+                        <strong>持续运行</strong>
+                        <ul>${flow.operations.map(item => `<li>${escapeHtml(item)}</li>`).join('')}</ul>
+                    </div>
+                ` : ''}
+            </section>
+        `;
+    }
+
+    function renderCoreModules(value) {
+        if (!Array.isArray(value)) {
+            return '';
+        }
+        const modules = value
+            .map(asObject)
+            .map(module => ({
+                name: asString(module.name),
+                responsibility: asString(module.responsibility),
+                dependsOn: asStringList(module.depends_on),
+            }))
+            .filter(module => module.name || module.responsibility);
+        if (!modules.length) {
+            return '';
+        }
+
+        return `
+            <section class="deep-band">
+                <h2>核心模块</h2>
+                <div class="deep-module-grid">
+                    ${modules.map(module => `
+                        <article class="deep-module-card">
+                            <h3>${escapeHtml(module.name)}</h3>
+                            <p>${escapeHtml(module.responsibility)}</p>
+                            ${module.dependsOn.length ? `<span>依赖：${module.dependsOn.map(escapeHtml).join('、')}</span>` : ''}
+                        </article>
+                    `).join('')}
+                </div>
+            </section>
+        `;
+    }
+
+    function renderAdoptionNotes(strengths, limitations, takeaways) {
+        const sections = [
+            ['优势', asStringList(strengths)],
+            ['限制', asStringList(limitations)],
+            ['采用建议', asStringList(takeaways)],
+        ].filter(([_title, items]) => items.length);
+        if (!sections.length) {
+            return '';
+        }
+
+        return `
+            <section class="deep-band">
+                <h2>采用判断</h2>
+                <div class="deep-notes-grid">
+                    ${sections.map(([title, items]) => `
+                        <article class="deep-note-card">
+                            <h3>${escapeHtml(title)}</h3>
+                            <ul>${items.map(item => `<li>${escapeHtml(item)}</li>`).join('')}</ul>
+                        </article>
+                    `).join('')}
+                </div>
             </section>
         `;
     }
@@ -272,6 +497,8 @@
                 </div>
                 ${summary ? `<p class="deep-overview">${escapeHtml(summary)}</p>` : ''}
             </section>
+            ${renderDecision(report.decision)}
+            ${listSection('应用场景', report.use_cases)}
             ${stack.length ? `
                 <section class="deep-band">
                     <h2>技术栈</h2>
@@ -280,56 +507,12 @@
                     </div>
                 </section>
             ` : ''}
-            ${renderArchitecture(report)}
-            ${listSection('数据流', report.data_flow)}
-            ${listSection('应用场景', report.use_cases)}
-            ${listSection('优势', report.strengths)}
-            ${listSection('局限', report.limitations)}
-            ${listSection('可执行建议', report.actionable_takeaways)}
-            ${renderEvidenceItems(report.source_evidence)}
-        `;
-    }
-
-    function hasStructuredReport(item) {
-        const report = asObject(item.report_json);
-        const architecture = asObject(report.architecture);
-        return Boolean(
-            asString(report.summary) ||
-            asStringList(report.tech_stack).length ||
-            asString(architecture.pattern) ||
-            asStringList(architecture.components).length ||
-            asStringList(report.data_flow).length ||
-            asStringList(report.use_cases).length ||
-            asStringList(report.strengths).length ||
-            asStringList(report.limitations).length ||
-            asStringList(report.actionable_takeaways).length ||
-            normalizeEvidence(report.source_evidence).length
-        );
-    }
-
-    function renderMarkdownFallback(item) {
-        const reportMarkdown = asString(item.report_markdown) || '暂无可展示的报告内容。';
-        const repoLink = safeExternalLink(item.repo_url, 'GitHub 仓库', 'deep-inline-link');
-
-        return `
-            <section class="deep-band deep-report-head">
-                <div class="deep-report-head-main">
-                    <div>
-                        <div class="deep-kicker">候选分 ${escapeHtml(item.candidate_score || 0)}</div>
-                        <h1>${escapeHtml(asString(item.repo_name) || '深度报告')}</h1>
-                    </div>
-                    <div class="deep-score-badge" aria-label="候选分">${escapeHtml(item.candidate_score || 0)}</div>
-                </div>
-                <div class="meta deep-meta">
-                    <span>更新时间 ${formatDate(item.updated_at || item.created_at)}</span>
-                    <span>Commit ${shortSha(item.commit_sha)}</span>
-                    ${repoLink ? `<span>${repoLink}</span>` : ''}
-                </div>
-            </section>
-            <section class="deep-band">
-                <h2>原始报告</h2>
-                <pre class="deep-report-pre" style="white-space: pre-wrap;">${escapeHtml(reportMarkdown)}</pre>
-            </section>
+            ${renderArchitectureDiagram(report.architecture)}
+            ${renderFlow('快速上手', report.quick_start)}
+            ${renderFlow('部署运行', report.deployment)}
+            ${renderCoreModules(report.core_modules)}
+            ${renderFlow('运行时数据流', { steps: report.runtime_data_flow })}
+            ${renderAdoptionNotes(report.strengths, report.limitations, report.actionable_takeaways)}
         `;
     }
 
@@ -362,10 +545,12 @@
             renderStatus(container, 'empty-text', '暂无可展示的深度报告。');
             return;
         }
+        if (safeItem.report_version !== 2) {
+            renderStatus(container, 'empty-text', '报告正在升级，请稍后查看。');
+            return;
+        }
 
-        container.innerHTML = hasStructuredReport(safeItem)
-            ? renderStructuredReport(safeItem)
-            : renderMarkdownFallback(safeItem);
+        container.innerHTML = renderStructuredReport(safeItem);
     }
 
     async function initListPage() {
