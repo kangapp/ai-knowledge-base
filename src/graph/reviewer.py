@@ -302,7 +302,8 @@ async def _review_one_item(
                         prompt_name="reviewer",
                         prompt_version="current",
                     ))
-                registry.health.record_failure(provider, str(e))
+                if cost_record is None:
+                    registry.health.record_failure(provider, str(e))
                 if attempt == 1:
                     logger.warning("reviewer.parse_failed", extra={
                         "url": item.ref_url, "error": str(e),

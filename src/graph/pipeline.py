@@ -163,6 +163,15 @@ class _AnalyzerNode:
         analyzed_urls = {item.ref_url for item in items}
         for item in routed:
             source_id = item.raw_metadata.get("source_id") or item.source_detail or item.source
+            item_costs = [cost for cost in costs if cost.ref_url == item.url]
+            latest_failure = next(
+                (
+                    cost
+                    for cost in reversed(item_costs)
+                    if cost.status != "success"
+                ),
+                None,
+            )
             await record_pipeline_event(
                 db,
                 run_id=state.run_id,
@@ -176,18 +185,37 @@ class _AnalyzerNode:
                 ref_url=item.url,
                 title=item.title,
                 agent=self._routed_key.replace("routed_", "") + "_analyzer",
-                message="分析完成" if item.url in analyzed_urls else "分析失败",
+                provider=latest_failure.provider if latest_failure else "",
+                model=latest_failure.model if latest_failure else "",
+                message=(
+                    "分析完成"
+                    if item.url in analyzed_urls
+                    else (
+                        latest_failure.error
+                        if latest_failure and latest_failure.error
+                        else "分析失败"
+                    )
+                ),
+                payload=(
+                    {"failure_status": latest_failure.status}
+                    if latest_failure
+                    else {}
+                ),
             )
         for cost in costs:
-            if cost.status != "parse_failed":
+            if cost.status == "success":
                 continue
             source_item = source_map.get(cost.ref_url)
             await record_pipeline_event(
                 db,
                 run_id=state.run_id,
                 phase="analyze",
-                event="analyzer.parse_failed",
-                level="warning",
+                event=f"analyzer.{cost.status}",
+                level=(
+                    "warning"
+                    if cost.status == "parse_failed"
+                    else "error"
+                ),
                 status="failed",
                 source_id=cost.source_id,
                 source=cost.source,
@@ -201,7 +229,7 @@ class _AnalyzerNode:
                 latency_ms=cost.latency_ms,
                 cost=cost.cost,
                 tokens=cost.tokens_in + cost.tokens_out,
-                message=cost.error or "Analyzer JSON 解析失败",
+                message=cost.error or f"Analyzer {cost.status}",
             )
         if _analyzer_count == 1:
             total_cost = sum(c.cost for c in costs) if costs else 0

@@ -80,8 +80,9 @@ Reviewer 结果和文章持久化完成后，`run_deep_report_stage()` 作为图
 - **配置三层**：`llm.yaml`（Provider 注册 + 模型价格）→ `agents.yaml`（SubAgent 绑定 primary/fallback[] + 参数）→ `.env`（密钥）
 - **飞书认证**：`FeishuAuth` 类内存缓存 `tenant_access_token` + 过期时间，有效期 <3min 自动刷新；token 频率由 2h 有效期决定而非采集频率
 - **健康检查**：被动探测（调用失败记录）+ 主动探测（定时最小请求）
-- **Provider 熔断**：per-provider 独立，连续 3 次失败 → circuit open → 指数退避试探（60s/120s/240s/480s cap 600s）→ half_open 试探成功恢复；`LLMRegistry.get_client()` 自动遍历 primary → fallback[]
-- **预算熔断**：全局软熔断（80% 月预算 → 降级切便宜模型）/ 硬熔断（100% → 停止服务），与 Provider 熔断独立运作
+- **Provider 熔断**：per-provider 独立，仅网络、超时等请求失败计入；连续 3 次失败 → circuit open → 指数退避试探（60s/120s/240s/480s cap 600s）→ half_open 试探成功恢复。JSON/Pydantic 解析失败属于输出质量问题，不打开 Provider 熔断。
+- **预算熔断**：`monthly / 30` 得到北京时间日预算。每次 pipeline 开始从 `cost_logs` 对账当天真实费用，内存跟踪器也会在北京时间跨日自动清零。达到 80% 时仅在配置了 fallback 时切换便宜模型；无 fallback 继续 primary。达到 100% 时停止新的 LLM 请求。
+- **全量分析失败**：有新条目但 Analyzer 产出为 0 时，pipeline 标记 `failed`，逐条写入 `provider_unavailable/request_failed/parse_failed` 原因，不再以 completed 掩盖故障。
 - **Cost Monitor**：`TrackedClient` wrapper 在 `chat.completions.create()` 层记账，非 LangGraph 节点
 
 ## 前端渲染策略

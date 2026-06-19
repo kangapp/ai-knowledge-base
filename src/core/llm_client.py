@@ -34,11 +34,8 @@ class LLMRegistry:
 
         chain = [agent.model.primary] + agent.model.fallback
 
-        if self.budget.is_soft_exceeded():
+        if self.budget.is_soft_exceeded() and agent.model.fallback:
             chain = agent.model.fallback  # 软熔断：只用 fallback
-
-        if not chain:
-            raise AllProvidersUnavailable(f"No available provider for '{agent_name}' (soft limit, no fallback)")
 
         for ref in chain:
             if self.health.circuit_is_open(ref.provider):

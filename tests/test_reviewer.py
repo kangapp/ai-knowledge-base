@@ -323,6 +323,7 @@ async def test_reviewer_node_records_cost_when_parse_fails():
     mock_response.usage = MagicMock(prompt_tokens=1000, completion_tokens=500)
     mock_client.chat.completions.create = AsyncMock(return_value=mock_response)
     registry._clients["minimax"] = mock_client
+    registry.health.record_failure = MagicMock()
 
     state = PipelineState(analyzed_items=[
         AnalyzedItem(ref_url="https://example.com/1", title="bad", summary="bad", tags=["AI"], language="zh")
@@ -333,6 +334,7 @@ async def test_reviewer_node_records_cost_when_parse_fails():
     assert len(result["cost_records"]) == 2
     assert result["cost_records"][0].ref_url == "https://example.com/1"
     assert sum(record.cost for record in result["cost_records"]) > 0
+    registry.health.record_failure.assert_not_called()
 
 
 @pytest.mark.asyncio

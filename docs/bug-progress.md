@@ -859,3 +859,29 @@ Unable to resolve action `astral-sh/setup-uv@v8`, unable to find version `v8`
 - 部署契约测试拒绝再次使用不存在的 `@v8` 浮动标签
 
 **经验**：升级 GitHub Action 时必须检查目标 git tag 是否真实存在，不能只根据 Releases 页面推断浮动主版本标签。
+
+---
+
+## Bug 42: 预算计数器未跨日重置导致全来源持续分析失败
+
+**时间**：2026-06-20
+
+**影响**：从 2026-06-12 12:02 到 2026-06-20 06:00，共 86 次 cron、904 次分析失败记录，涉及约 205 个不同 URL。Collector 和 Router 正常，但 Analyzer 请求数、成本和 Token 均为 0。
+
+**直接原因**：
+
+1. `BudgetTracker` 把月预算除以 30 作为日预算，但 `_daily_spend` 只在进程内累计。
+2. `reset_daily()` 没有调用点，费用跨北京时间日期持续累加。
+3. 达到 80% soft limit 后，`get_client()` 只保留 fallback；所有 Agent 的 fallback 都为空，因此 primary 被提前停用。
+4. Analyzer 捕获 `get_client()` 异常后直接跳过，没有成本记录或具体事件，pipeline 仍被标记 completed。
+
+**修复**：
+
+- BudgetTracker 自动识别北京时间跨日并重置。
+- 每次 pipeline 开始从 `cost_logs` 对账当天真实费用，防止容器重启绕过预算。
+- soft limit 只在 fallback 非空时切换；无 fallback 继续 primary，hard limit 才停止。
+- `provider_unavailable` 写入 cost log、pipeline event、collection item 和健康页错误。
+- 有新条目但 Analyzer 产出为 0 时，pipeline 标记 failed。
+- JSON/Pydantic 解析错误不再计入 Provider circuit breaker。
+
+**经验**：预算、熔断和输出解析是三种不同失败域，必须分别计数；任何批量阶段的“0 成功”都不能被记录为成功运行。

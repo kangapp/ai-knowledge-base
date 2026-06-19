@@ -46,12 +46,14 @@ def test_fallback_on_unhealthy(llm_cfg, agents_cfg):
     with pytest.raises(AllProvidersUnavailable):
         registry.get_client("github_analyzer")
 
-def test_soft_limit_skips_primary(llm_cfg, agents_cfg):
-    """软熔断 (80%) → 无 fallback 时抛出异常"""
+def test_soft_limit_keeps_primary_when_no_fallback(llm_cfg, agents_cfg):
+    """软限制用于切换便宜 fallback；没有 fallback 时继续 primary。"""
     registry = LLMRegistry(llm_cfg, agents_cfg)
     registry.budget._daily_spend["__global__"] = registry.budget.daily_limit * 0.85
-    with pytest.raises(AllProvidersUnavailable):
-        registry.get_client("github_analyzer")
+    _, provider, model_id, _ = registry.get_client("github_analyzer")
+
+    assert provider == "minimax"
+    assert model_id == "MiniMax-M3"
 
 def test_hard_limit_raises(llm_cfg, agents_cfg):
     """硬熔断 (100%) → 全部不可用"""
