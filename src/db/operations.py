@@ -200,6 +200,21 @@ async def save_cost_log(db: Database, run_id: str, record: CostRecord):
     await db.commit()
 
 
+async def get_today_llm_spend(db: Database) -> tuple[float, dict[str, float]]:
+    rows = await db.fetch_all("""
+        SELECT provider, COALESCE(SUM(cost), 0) AS cost
+        FROM cost_logs
+        WHERE date(created_at) = ?
+        GROUP BY provider
+    """, (today_bj(),))
+    provider_spend = {
+        row["provider"]: float(row["cost"] or 0)
+        for row in rows
+        if row["provider"]
+    }
+    return sum(provider_spend.values()), provider_spend
+
+
 async def record_collection_item(
     db: Database,
     *,

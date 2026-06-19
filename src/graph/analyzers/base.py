@@ -51,6 +51,26 @@ async def analyze_items(
             client, provider, model_id, params = registry.get_client(agent_name)
         except Exception as e:
             logger.warning("analyzer.get_client_failed", extra={"agent": agent_name, "url": item.url, "error": str(e)})
+            costs.append(CostRecord(
+                agent=agent_name,
+                provider="",
+                model="",
+                tokens_in=0,
+                tokens_out=0,
+                cost=0.0,
+                ref_url=item.url,
+                source=item.source,
+                source_detail=item.source_detail,
+                source_id=item.raw_metadata.get(
+                    "source_id",
+                    item.source_detail or item.source,
+                ),
+                status="provider_unavailable",
+                error=str(e),
+                latency_ms=0,
+                prompt_name=agent_name,
+                prompt_version="current",
+            ))
             continue
 
         user_prompt = prompt_template.format(
@@ -150,7 +170,8 @@ async def analyze_items(
                         prompt_version="current",
                     ))
                 # parse 失败，仍需记录熔断统计（cost 已在上方 try 块记录）
-                registry.health.record_failure(provider, str(e))
+                if cost_record is None:
+                    registry.health.record_failure(provider, str(e))
                 if attempt == 1:
                     logger.warning("analyzer.parse_failed", extra={
                         "agent": agent_name, "url": item.url, "error": str(e),

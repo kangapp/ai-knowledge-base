@@ -348,6 +348,60 @@ async def test_source_stats_returns_configured_sources_without_health_history(
 
 
 @pytest.mark.asyncio
+async def test_source_stats_exposes_latest_analyzer_failure_reason(
+    api_client,
+    api_db,
+    monkeypatch,
+):
+    await api_db.execute(
+        """
+        INSERT INTO pipeline_runs (id, started_at, status, trigger)
+        VALUES ('run_analysis_failed', '2026-05-31T09:00:00', 'failed', 'cron')
+        """
+    )
+    await api_db.execute(
+        """
+        INSERT INTO pipeline_source_runs
+        (run_id, source_id, source, source_detail, collected, new_items, dedup_skipped,
+         analyzed, analysis_failed, approved, retry, discarded, inserted, failed, cost, tokens)
+        VALUES ('run_analysis_failed', 'rss_test', 'rss', 'RSS Test', 3, 3, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0)
+        """
+    )
+    await api_db.execute(
+        """
+        INSERT INTO pipeline_events
+        (run_id, ts, phase, event, level, status, source_id, message)
+        VALUES
+        ('run_analysis_failed', '2026-05-31T09:00:01', 'analyze',
+         'analyzer.provider_unavailable', 'error', 'failed', 'rss_test',
+         'No available provider for rss_analyzer')
+        """
+    )
+    await api_db.commit()
+    monkeypatch.setattr(
+        "src.api.sources.SourceManager.load",
+        lambda: [
+            SourceConfig(
+                id="rss_test",
+                name="RSS Test",
+                type="rss",
+                enabled=True,
+                priority=2,
+                cron="0 9 * * *",
+                max_items=5,
+                config={"url": "https://example.com/feed.xml"},
+            )
+        ],
+    )
+    monkeypatch.setattr("src.api.sources._today", lambda: "2026-05-31")
+
+    source = api_client.get("/api/sources/stats?period=day").json()["data"]["sources"][0]
+
+    assert source["health_status"] == "analysis_failed"
+    assert source["last_error"] == "No available provider for rss_analyzer"
+
+
+@pytest.mark.asyncio
 async def test_dashboard_summary_returns_first_screen_contract(api_client, api_db):
     await _insert_article(api_db, title="A", url="https://example.com/a", source="rss")
     await api_db.execute(

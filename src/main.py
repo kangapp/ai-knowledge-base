@@ -31,7 +31,7 @@ from .db.operations import (
     save_cost_log, batch_check_existing_urls, backup_database,
     batch_save_github_snapshots, get_trending_repo_urls,
     record_collection_item, upsert_pipeline_source_run,
-    record_pipeline_event,
+    record_pipeline_event, get_today_llm_spend,
 )
 from .site.builder import SiteBuilder, DebouncedBuilder
 
@@ -376,6 +376,21 @@ async def _record_source_summaries(
     await db.commit()
 
 
+async def _sync_registry_budget(db: Database, registry) -> None:
+    budget = getattr(registry, "budget", None)
+    if budget is None:
+        return
+    total, provider_spend = await get_today_llm_spend(db)
+    budget.set_daily_spend(total, provider_spend)
+    logger.info(
+        "budget.synced",
+        extra={
+            "daily_spend": round(total, 6),
+            "provider_spend": provider_spend,
+        },
+    )
+
+
 async def run_pipeline(trigger: str = "cron", source_filter: str | list[str] | tuple[str, ...] | set[str] | None = None):
     """source_filter 为 None 时采集所有源；否则采集指定 source.id 或一组 source.id。"""
     global _registry, _db, _builder, _graph
@@ -388,6 +403,7 @@ async def run_pipeline(trigger: str = "cron", source_filter: str | list[str] | t
         if _registry is None or _db is None or _graph is None:
             logger.error("pipeline.not_initialized")
             return
+        await _sync_registry_budget(_db, _registry)
 
         run_id = run_id_bj()
         await start_pipeline_run(_db, run_id, trigger)
@@ -745,6 +761,34 @@ async def run_pipeline(trigger: str = "cron", source_filter: str | list[str] | t
                 record.source, record.source_detail, record.source_id = cost_source_map[record.ref_url]
             await save_cost_log(_db, run_id, record)
 
+        analyzed_urls = {item.ref_url for item in all_analyzed}
+        failure_by_url = {
+            record.ref_url: record
+            for record in all_costs
+            if record.status != "success"
+        }
+        for item in new_items:
+            if item.url in analyzed_urls:
+                continue
+            source_id, source, source_detail = _source_identity(item)
+            failure = failure_by_url.get(item.url)
+            await record_collection_item(
+                _db,
+                run_id=run_id,
+                url=item.url,
+                title=item.title,
+                source=source,
+                source_id=source_id,
+                source_detail=source_detail,
+                status="analysis_failed",
+                reason=(
+                    failure.error
+                    if failure and failure.error
+                    else "Analyzer 未产出结果"
+                ),
+                raw_metadata=item.raw_metadata,
+            )
+
         await _record_source_summaries(
             _db,
             run_id=run_id,
@@ -757,19 +801,40 @@ async def run_pipeline(trigger: str = "cron", source_filter: str | list[str] | t
             error_log=error_log,
         )
 
-        try:
-            deep_report_result = await run_deep_report_stage(
-                db=_db,
-                registry=_registry,
-                run_id=run_id,
-                raw_items=new_items,
-                analyzed_items=all_analyzed,
-                reviewed_items=all_reviewed,
-                article_ids=article_ids,
+        analysis_failed = bool(new_items and not all_analyzed)
+        pipeline_errors = list(error_log)
+        if analysis_failed:
+            failure_messages = sorted({
+                record.error
+                for record in all_costs
+                if record.error
+            })
+            pipeline_errors.append({
+                "stage": "analyze",
+                "error": (
+                    failure_messages[0]
+                    if failure_messages
+                    else "所有新条目分析失败"
+                ),
+            })
+            deep_report_result = DeepReportStageResult(
+                status="skipped",
+                message="all analyzers failed",
             )
-        except Exception as exc:
-            logger.exception("deep_report.stage_unexpected_failure", extra={"run_id": run_id})
-            deep_report_result = DeepReportStageResult(status="failed", message=str(exc))
+        else:
+            try:
+                deep_report_result = await run_deep_report_stage(
+                    db=_db,
+                    registry=_registry,
+                    run_id=run_id,
+                    raw_items=new_items,
+                    analyzed_items=all_analyzed,
+                    reviewed_items=all_reviewed,
+                    article_ids=article_ids,
+                )
+            except Exception as exc:
+                logger.exception("deep_report.stage_unexpected_failure", extra={"run_id": run_id})
+                deep_report_result = DeepReportStageResult(status="failed", message=str(exc))
 
         summary = json.dumps({
             "collected": {"total": len(raw_items), "new": len(new_items)},
@@ -777,23 +842,24 @@ async def run_pipeline(trigger: str = "cron", source_filter: str | list[str] | t
             "approved": passed_count,
             "retry": retry_count,
             "discarded": discarded_count,
-            "errors": error_log,
+            "errors": pipeline_errors,
             "deep_report": {
                 "status": deep_report_result.status,
                 "report_id": deep_report_result.report_id,
                 "repo_url": deep_report_result.repo_url,
             },
         })
-        await end_pipeline_run(_db, run_id, "completed", summary)
+        run_status = "failed" if analysis_failed else "completed"
+        await end_pipeline_run(_db, run_id, run_status, summary)
         await record_pipeline_event(
             _db,
             run_id=run_id,
             phase="pipeline",
-            event="pipeline.done",
-            level="success",
-            status="completed",
+            event="pipeline.failed" if analysis_failed else "pipeline.done",
+            level="error" if analysis_failed else "success",
+            status=run_status,
             cost=sum(c.cost for c in all_costs),
-            message="流水线完成",
+            message="所有新条目分析失败" if analysis_failed else "流水线完成",
             payload={
                 "approved": passed_count,
                 "retry": retry_count,
@@ -807,7 +873,11 @@ async def run_pipeline(trigger: str = "cron", source_filter: str | list[str] | t
             "retry": retry_count,
             "discarded": discarded_count,
             "cost": sum(c.cost for c in all_costs),
+            "status": run_status,
         })
+
+        if analysis_failed:
+            return
 
         # ====== 图外：备份 + 站点构建 ======
         await backup_database(_db, str(BACKUP_DIR))

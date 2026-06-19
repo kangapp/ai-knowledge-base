@@ -2,6 +2,18 @@ import json
 import pytest
 from unittest.mock import AsyncMock, MagicMock
 from src.graph.state import RawItem, AnalyzedItem
+from src.graph.analyzers.base import analyze_items
+from src.core.config import (
+    AgentConfig,
+    AgentsConfig,
+    BudgetConfig,
+    LLMConfig,
+    ModelBinding,
+    ModelInfo,
+    ModelRef,
+    ProviderConfig,
+)
+from src.core.llm_client import LLMRegistry
 from tests.fixtures.llm_responses import GITHUB_ANALYZE_RESPONSE
 
 @pytest.mark.asyncio
@@ -120,3 +132,78 @@ async def test_analyze_items_records_cost_when_parse_fails():
     assert costs[0].ref_url == "https://github.com/org/repo"
     assert costs[0].source_id == "github_trending"
     assert sum(record.cost for record in costs) > 0
+
+
+@pytest.mark.asyncio
+async def test_get_client_failure_is_returned_as_provider_unavailable_cost_record():
+    registry = MagicMock()
+    registry.get_client.side_effect = RuntimeError(
+        "No available provider for 'github_analyzer'"
+    )
+    item = RawItem(
+        url="https://github.com/org/repo",
+        title="repo",
+        source="github",
+        source_detail="org/repo",
+        raw_metadata={"source_id": "github_trending"},
+    )
+
+    analyzed, costs = await analyze_items(
+        [item],
+        "github_analyzer",
+        registry,
+        "标题: {title}\n{schema}",
+    )
+
+    assert analyzed == []
+    assert len(costs) == 1
+    assert costs[0].status == "provider_unavailable"
+    assert costs[0].error == "No available provider for 'github_analyzer'"
+    assert costs[0].source_id == "github_trending"
+
+
+@pytest.mark.asyncio
+async def test_parse_failure_does_not_mark_provider_unhealthy():
+    llm_cfg = LLMConfig(providers={
+        "minimax": ProviderConfig(
+            base_url="https://api.minimax.chat/v1",
+            api_key="sk-test",
+            models=[
+                ModelInfo(
+                    id="MiniMax-M3",
+                    price_per_1k_in=0.0003,
+                    price_per_1k_out=0.0012,
+                    max_tokens=8192,
+                )
+            ],
+        )
+    })
+    agents_cfg = AgentsConfig(
+        agents={
+            "github_analyzer": AgentConfig(
+                model=ModelBinding(
+                    primary=ModelRef(provider="minimax", model="MiniMax-M3"),
+                    fallback=[],
+                ),
+                params={"temperature": 0.3, "max_tokens": 2048},
+            )
+        },
+        budget=BudgetConfig(monthly=10.0),
+    )
+    registry = LLMRegistry(llm_cfg, agents_cfg)
+    mock_client = AsyncMock()
+    mock_response = AsyncMock()
+    mock_response.choices = [MagicMock(message=MagicMock(content="not json"))]
+    mock_response.usage = MagicMock(prompt_tokens=10, completion_tokens=5)
+    mock_client.chat.completions.create = AsyncMock(return_value=mock_response)
+    registry._clients["minimax"] = mock_client
+    registry.health.record_failure = MagicMock()
+
+    await analyze_items(
+        [RawItem(url="https://github.com/org/repo", title="repo", source="github")],
+        "github_analyzer",
+        registry,
+        "标题: {title}\n{schema}",
+    )
+
+    registry.health.record_failure.assert_not_called()

@@ -1,3 +1,9 @@
+import pytest
+from pathlib import Path
+
+from src.core.budget import BudgetTracker
+from src.core.config import BudgetConfig
+from src.core.database import Database
 from src.graph.state import CostRecord, RawItem, ReviewedItem, AnalyzedItem
 from src import main
 
@@ -200,3 +206,31 @@ def test_merge_retry_review_result_accepts_review_only_result():
     )
 
     assert reviewed == [updated]
+
+
+@pytest.mark.asyncio
+async def test_sync_registry_budget_uses_today_database_cost(tmp_path):
+    migrations_dir = Path(__file__).parent.parent / "src" / "db" / "migrations"
+    db = Database(tmp_path / "budget_sync.db", migrations_dir=migrations_dir)
+    await db.initialize()
+    await db.execute(
+        """
+        INSERT INTO cost_logs
+        (agent, provider, model, tokens_in, tokens_out, cost, created_at)
+        VALUES
+        ('rss_analyzer', 'minimax', 'MiniMax-M3', 10, 5, 0.12,
+         datetime('now', '+8 hours'))
+        """
+    )
+    await db.commit()
+
+    class Registry:
+        budget = BudgetTracker(BudgetConfig(monthly=10.0))
+
+    try:
+        await main._sync_registry_budget(db, Registry())
+
+        assert Registry.budget.current_daily() == pytest.approx(0.12)
+        assert Registry.budget.provider_daily("minimax") == pytest.approx(0.12)
+    finally:
+        await db.close()

@@ -131,6 +131,34 @@ async def _get_latest_source_errors(db: Database) -> dict[str, str]:
     }
 
 
+async def _get_latest_analysis_errors(db: Database) -> dict[str, str]:
+    rows = await db.fetch_all("""
+        WITH ranked AS (
+            SELECT
+                source_id,
+                message,
+                ROW_NUMBER() OVER (
+                    PARTITION BY source_id
+                    ORDER BY ts DESC, id DESC
+                ) AS row_number
+            FROM pipeline_events
+            WHERE source_id != ''
+              AND event IN (
+                  'analyzer.provider_unavailable',
+                  'analyzer.request_failed',
+                  'analyzer.parse_failed'
+              )
+        )
+        SELECT source_id, message
+        FROM ranked
+        WHERE row_number = 1
+    """)
+    return {
+        row["source_id"]: row["message"] or "Analyzer 执行失败"
+        for row in rows
+    }
+
+
 def _derive_health_status(source: SourceConfig, latest: dict | None) -> str:
     if not source.enabled:
         return "disabled"
@@ -185,6 +213,7 @@ async def get_source_stats(period: str = "week"):
         source_run_metrics = await _get_source_run_metrics(db, start_date)
         latest_source_runs = await _get_latest_source_runs(db)
         latest_source_errors = await _get_latest_source_errors(db)
+        latest_analysis_errors = await _get_latest_analysis_errors(db)
         health_map = {h["source_id"]: h for h in health_data}
 
         stats = []
@@ -247,7 +276,11 @@ async def get_source_stats(period: str = "week"):
                 "last_error": (
                     latest_source_errors.get(source.id, "数据源请求失败")
                     if health_status == "failed"
-                    else None
+                    else (
+                        latest_analysis_errors.get(source.id, "Analyzer 执行失败")
+                        if health_status == "analysis_failed"
+                        else None
+                    )
                 ),
                 "last_collected": latest.get("collected", 0) if latest else 0,
                 "last_new_items": latest.get("new_items", 0) if latest else 0,

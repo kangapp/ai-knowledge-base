@@ -49,6 +49,7 @@
   - 数据源列表、数据源健康统计、启用/停用/删除、清理 source health、候选源列表。
   - 优先复用 `src/api/routes.py` 注入的全局 DB，测试或单独调用时 fallback 到 `data/kb.db`。
   - `/api/sources/stats` 返回全部配置源，并从最近 `pipeline_source_runs` 与 `pipeline_events` 推导请求失败、零命中、全重复、分析失败、未调度和禁用状态。
+  - Collector 错误来自 `collector.source_error`；Analyzer 错误来自 `analyzer.provider_unavailable/request_failed/parse_failed`，健康表展示最新真实原因。
   - 健康统计响应中 `id` 是存储主键，`name` 是前端展示简称；常见状态入口为 `_derive_health_status()`。
 
 - `src/api/config.py`
@@ -80,6 +81,11 @@
   - YAML 配置加载和 Pydantic 模型。
   - 新增配置字段时先改这里，再改对应 YAML 和文档。
   - MiniMax 当前默认模型在 `config/llm.yaml` 注册为 `MiniMax-M3`，各 Agent 在 `config/agents.yaml` 绑定。
+
+- `src/core/budget.py` / `src/core/llm_client.py`
+  - 日预算由月预算除以 30；按北京时间自动跨日重置。
+  - pipeline 开始时由 `src/main.py::_sync_registry_budget()` 使用 DB 当日费用覆盖内存快照，避免重启绕过预算。
+  - soft limit 仅在 fallback 非空时切换；hard limit 才停止所有新请求。
 
 - `src/core/time.py`
   - 项目业务时间统一入口，当前使用北京时间（Asia/Shanghai / UTC+8）。
@@ -130,6 +136,7 @@
   - 图外入库前按 `ref_url` 汇总 Analyzer + Reviewer 成本，写入文章级 `analysis_cost/analysis_tokens`，并为 Reviewer 成本补齐来源快照。
   - Pipeline 会写入 `collection_items`、`pipeline_source_runs` 和 `pipeline_events`，用于追踪采集、去重、分析、审核、入库的 source 级漏斗和 item 级事件。
   - Retry 轮复用已有 `AnalyzedItem` 直接重审 Reviewer，不再重新进入 Analyzer；入口为 `_prepare_retry_review_items()`。
+  - 有新条目但 Analyzer 全部失败时写入失败 item/cost/source funnel，并将 pipeline 标记 failed；不会继续 Deep Report 或站点构建。
 
 - `src/graph/pipeline.py`
   - LangGraph DAG 编排、phase log 记录、Analyzer/Reviewer item 级事件记录。

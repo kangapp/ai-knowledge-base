@@ -4,6 +4,15 @@
 
 ## P0 已完成
 
+- [x] 修复预算状态导致全来源持续分析失败
+  - 定位 2026-06-12 12:02 起 86 次 cron、904 次分析失败，实际约 205 个不同 URL 未进入 LLM
+  - BudgetTracker 按北京时间自动跨日重置，每次 pipeline 从 `cost_logs` 对账当天实际费用
+  - soft limit 仅在存在 fallback 时切换模型，无 fallback 不再提前停用 primary；hard limit 保持强制停止
+  - Analyzer 客户端不可用写入 `provider_unavailable` 成本记录、item 状态和 pipeline event
+  - 有新条目但 Analyzer 全部失败时，pipeline 标记 failed 并跳过 Deep Report 和站点构建
+  - 健康 API 展示最新 Analyzer 真实错误，不再只有笼统“分析失败”
+  - JSON/Pydantic 解析失败不再计入 Provider 熔断
+
 - [x] 加固 CI/CD 可追溯部署与失败回滚
   - Docker 镜像同时发布 commit SHA 与 `latest` 标签，正式部署只使用完整 SHA
   - workflow_dispatch 支持指定 Git ref，测试、构建、部署使用同一个解析后的提交

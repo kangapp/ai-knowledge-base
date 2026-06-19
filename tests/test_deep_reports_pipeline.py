@@ -863,3 +863,97 @@ async def test_main_pipeline_passes_retry_article_id_to_deep_report_stage(tmp_pa
         assert run_row["status"] == "completed"
     finally:
         await db.close()
+
+
+@pytest.mark.asyncio
+async def test_main_pipeline_marks_run_failed_when_all_analysis_fails(
+    tmp_path,
+    monkeypatch,
+):
+    db = Database(
+        tmp_path / "pipeline_all_analysis_failed.db",
+        migrations_dir=_MIGRATIONS_DIR,
+    )
+    await db.initialize()
+    raw = _raw("https://github.com/acme/unavailable-agent")
+    failure = CostRecord(
+        agent="github_analyzer",
+        provider="",
+        model="",
+        tokens_in=0,
+        tokens_out=0,
+        cost=0,
+        ref_url=raw.url,
+        source="github",
+        source_detail=raw.source_detail,
+        source_id="github_ai_devtools",
+        status="provider_unavailable",
+        error="Budget hard limit reached",
+    )
+
+    class StubGraph:
+        async def ainvoke(self, _state):
+            return {
+                "analyzed_items": [],
+                "reviewed_items": [],
+                "cost_records": [failure],
+            }
+
+    source_cfg = SourceConfig(
+        id="github_ai_devtools",
+        name="GitHub AI Devtools",
+        type="github",
+        enabled=True,
+        priority=1,
+        cron="0 9 * * *",
+        max_items=10,
+        config={},
+    )
+
+    async def fake_collect_all(_db, _sources):
+        return [raw], []
+
+    deep_stage = AsyncMock()
+    monkeypatch.setattr(main, "_db", db)
+    monkeypatch.setattr(main, "_registry", object())
+    monkeypatch.setattr(main, "_graph", StubGraph())
+    monkeypatch.setattr(main, "_builder", None)
+    monkeypatch.setattr(main, "_pipeline_lock", None)
+    monkeypatch.setattr(
+        main,
+        "load_sources_config",
+        lambda _path: SourcesConfig(sources=[source_cfg]),
+    )
+    monkeypatch.setattr(main, "collect_all", fake_collect_all)
+    monkeypatch.setattr(
+        main,
+        "batch_check_existing_urls",
+        AsyncMock(return_value=set()),
+    )
+    monkeypatch.setattr(main, "batch_save_github_snapshots", AsyncMock())
+    monkeypatch.setattr(main, "run_deep_report_stage", deep_stage)
+
+    try:
+        await main.run_pipeline(trigger="manual")
+
+        run = await db.fetch_one(
+            "SELECT status, summary FROM pipeline_runs ORDER BY rowid DESC LIMIT 1"
+        )
+        item = await db.fetch_one(
+            "SELECT status, reason FROM collection_items WHERE url = ?",
+            (raw.url,),
+        )
+        cost = await db.fetch_one(
+            "SELECT status, error FROM cost_logs WHERE ref_url = ?",
+            (raw.url,),
+        )
+
+        assert run["status"] == "failed"
+        assert "Budget hard limit reached" in run["summary"]
+        assert item["status"] == "analysis_failed"
+        assert item["reason"] == "Budget hard limit reached"
+        assert cost["status"] == "provider_unavailable"
+        assert cost["error"] == "Budget hard limit reached"
+        deep_stage.assert_not_awaited()
+    finally:
+        await db.close()
