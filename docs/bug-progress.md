@@ -836,3 +836,26 @@ if m:
 5. 网络请求失败仍保留原完整分析重试逻辑。
 
 **相关文件**: `src/deep_reports/analyzer.py`, `src/deep_reports/summarizer.py`, `config/agents.yaml`, `prompts/deep_report.md`, `tests/test_deep_reports_analyzer.py`, `tests/test_repo_inspector.py`
+---
+
+## Bug 41: setup-uv Action 主版本引用不存在
+
+**时间**：2026-06-20
+
+**现象**：部署工作流在 `test` job 的 `Set up job` 阶段 3 秒内失败，后续镜像构建和 VPS 部署全部跳过。
+
+**错误**：
+
+```text
+Unable to resolve action `astral-sh/setup-uv@v8`, unable to find version `v8`
+```
+
+**根因**：`astral-sh/setup-uv` 最新 Release 是 `v8.2.0`，但仓库没有浮动的 `v8` tag。把 Release 主版本误写成 Action 引用后，GitHub Runner 无法下载 Action。
+
+**修复**：
+
+- 将工作流引用固定为实际存在的 `astral-sh/setup-uv@v8.2.0`
+- 保持 `with.version: "0.11.22"`，它控制容器内安装的 uv 工具版本，与 Action 自身版本是两个独立概念
+- 部署契约测试拒绝再次使用不存在的 `@v8` 浮动标签
+
+**经验**：升级 GitHub Action 时必须检查目标 git tag 是否真实存在，不能只根据 Releases 页面推断浮动主版本标签。

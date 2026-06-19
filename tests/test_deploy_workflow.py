@@ -66,6 +66,13 @@ def test_deploy_supports_manual_ref_and_serializes_deployments():
     assert "cancel-in-progress: false" in workflow
 
 
+def test_deploy_pins_resolvable_action_versions():
+    workflow = (ROOT / ".github/workflows/deploy.yml").read_text()
+
+    assert "astral-sh/setup-uv@v8.2.0" in workflow
+    assert "astral-sh/setup-uv@v8\n" not in workflow
+
+
 def test_pipeline_image_installs_repo_inspector_runtime_dependencies():
     dockerfile = (ROOT / "Dockerfile").read_text()
 
