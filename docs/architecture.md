@@ -89,7 +89,7 @@ Reviewer 结果和文章持久化完成后，`run_deep_report_stage()` 作为图
 
 | 页面 | 策略 | 数据来源 |
 |------|------|---------|
-| 首页 | Jinja2 构建时预渲染 30 天首屏 HTML + JS 后台加载 `data.json` 无缝扩展全量；筛选（来源/标签/日期/评分）纯客户端过滤 | `data.json`（列表字段，不含 summary） |
+| 首页 | Jinja2 构建时预渲染最近 100 条 + JS 后台加载 `data.json` 无缝扩展全量；卡片优先展示 Analyzer 中文 summary，缺失时回退原始 description；筛选（来源/标签/日期/评分）纯客户端过滤 | `data.json`（列表 summary + 原始 description 搜索字段） |
 | 详情页 | `article.html` + JS 读 URL param → `fetch /api/articles/{id}` 渲染完整 summary | `/api/articles/{id}` 实时 SQL |
 | 仪表盘 | Jinja2 内联 `stats.json` 渲染 KPI 卡片 + Chart.js 画来源饼图 + 每日花费折线 | `stats.json`（KPI+分布+趋势，<10KB） |
 | DAG 运行页 | 5 秒轮询 `/api/pipeline/dag?detail=full`，展示阶段、source 漏斗、活跃 item、事件流 | `pipeline_runs` + `pipeline_phase_logs` + `pipeline_events` + `pipeline_source_runs` |

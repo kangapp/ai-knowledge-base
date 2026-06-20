@@ -47,10 +47,12 @@ class SiteBuilder:
         all_articles = await search_articles(self.db, "", days=3650, limit=100000)
         stats = await get_stats(self.db, days=30)
 
-        # 首页 — Jinja2 预渲染最近 30 天（description 已清理）
+        # 首页 — 优先展示 Analyzer 中文摘要，缺失时回退原始 description
         recent = [a for a in all_articles[:100]]  # 实际按 collected_at 排序取前 100
         for a in recent:
-            a["description"] = clean_text(a.get("description", "") or "", 200)
+            description = clean_text(a.get("description", "") or "", 200)
+            a["description"] = description
+            a["summary"] = clean_text(a.get("summary", "") or description, 200)
         index_html = self.env.get_template("index.html").render(
             articles=recent, stats=stats, updated=now_bj_iso()
         )
@@ -60,13 +62,14 @@ class SiteBuilder:
         dash_html = self.env.get_template("dashboard.html").render(stats=stats)
         (tmp_dir / "dashboard.html").write_text(dash_html, encoding="utf-8")
 
-        # data.json — 列表字段不含 summary，description 截断到 200 字符（详情页走 API）
+        # data.json — summary 用于列表展示，description 保留给原文关键词搜索
         json_articles = []
         for a in all_articles:
-            desc = a.get("description", "") or ""
+            description = clean_text(a.get("description", "") or "", 200)
             json_articles.append({
                 "id": a["id"], "title": a["title"], "url": a["url"],
-                "description": clean_text(desc, 200),
+                "summary": clean_text(a.get("summary", "") or description, 200),
+                "description": description,
                 "source": a["source"], "source_detail": a.get("source_detail", ""),
                 "relevance_score": a["relevance_score"],
                 "tags": a.get("tags", []),

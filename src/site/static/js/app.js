@@ -62,7 +62,7 @@
                     ${tagsHtml ? `<div class="tags">${tagsHtml}</div>` : ''}
                 </div>
                 <h3><a href="/article.html?id=${a.id}">${escapeHtml(a.title)}</a></h3>
-                <p>${escapeHtml(a.description || '')}</p>
+                <p>${escapeHtml(a.summary || a.description || '')}</p>
                 <div class="meta">
                     <span>${a.source_detail || a.source}</span>
                     <span>${a.collected_at ? a.collected_at.slice(0, 10) : ''}</span>
@@ -99,6 +99,7 @@
             const q = state.query.toLowerCase();
             articles = articles.filter(a =>
                 a.title.toLowerCase().includes(q) ||
+                (a.summary || '').toLowerCase().includes(q) ||
                 (a.description || '').toLowerCase().includes(q)
             );
         }
@@ -214,4 +215,3 @@
         if (document.getElementById('stats-overview')) initDashboard();
     });
 })();
-

@@ -34,7 +34,7 @@
             {% endif %}
         </div>
         <h3><a href="/article.html?id={{ article.id }}">{{ article.title }}</a></h3>
-        <p>{{ article.description }}</p>
+        <p>{{ article.summary }}</p>
         <div class="meta">
             <span>{{ article.source_detail or article.source }}</span>
             <span>{{ article.collected_at[:10] }}</span>
