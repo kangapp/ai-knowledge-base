@@ -110,6 +110,39 @@ def test_deep_report_templates_script_builder_and_nav_exist():
     assert "/api/deep-reports/${safeId}" in script
 
 
+def test_dag_page_uses_three_layer_runtime_view():
+    html = (ROOT / "src/site/templates/dag.html").read_text()
+    script = (ROOT / "src/site/static/js/dag.js").read_text()
+    styles = (ROOT / "src/site/static/css/style.css").read_text()
+
+    for element_id in (
+        "dag-run-select",
+        "pipeline-status-card",
+        "publication-status-card",
+        "dag-summary-metrics",
+        "processing-stages",
+        "review-rounds",
+        "postprocess-stages",
+        "source-funnels",
+        "active-items",
+        "dag-events",
+    ):
+        assert f'id="{element_id}"' in html
+
+    assert "/static/js/dag.js" in html
+    assert "dag-progress" not in html
+    assert "setInterval(fetchDag, 5000)" in script
+    assert "processing_stages" in script
+    assert "review_rounds" in script
+    assert "postprocess" in script
+    assert "recent_runs" in script
+    assert "run_id=${encodeURIComponent" in script
+    assert ".dag-layer" in styles
+    assert ".dag-status-card" in styles
+    assert ".dag-stage-grid" in styles
+    assert ".dag-postprocess-grid" in styles
+
+
 def test_deep_report_script_contracts_for_v2_rendering_and_safety():
     script = (ROOT / "src/site/static/js/deep-reports.js").read_text()
     styles = (ROOT / "src/site/static/css/style.css").read_text()

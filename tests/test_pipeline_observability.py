@@ -5,6 +5,7 @@ from src.core.budget import BudgetTracker
 from src.core.config import BudgetConfig, SourceConfig
 from src.core.database import Database
 from src.graph.state import CostRecord, RawItem, ReviewedItem, AnalyzedItem
+from src.graph.pipeline import record_phase_end, record_phase_start
 from src import main
 
 
@@ -253,6 +254,121 @@ def test_merge_retry_review_result_accepts_review_only_result():
     )
 
     assert reviewed == [updated]
+
+
+@pytest.mark.asyncio
+async def test_phase_end_treats_skipped_and_superseded_as_non_errors(tmp_path):
+    migrations_dir = Path(__file__).parent.parent / "src" / "db" / "migrations"
+    db = Database(tmp_path / "phase_status.db", migrations_dir=migrations_dir)
+    await db.initialize()
+    try:
+        await db.execute(
+            """
+            INSERT INTO pipeline_runs (id, started_at, status, trigger)
+            VALUES ('run_phase', datetime('now', '+8 hours'), 'running', 'test')
+            """
+        )
+        for phase, status in (("deep_report", "skipped"), ("build", "superseded")):
+            await record_phase_start(db, "run_phase", phase)
+            await record_phase_end(db, "run_phase", phase, status, "normal branch")
+
+        events = await db.fetch_all(
+            """
+            SELECT phase, level, status FROM pipeline_events
+            WHERE run_id='run_phase' AND event LIKE '%.end'
+            ORDER BY id
+            """
+        )
+
+        assert [dict(row) for row in events] == [
+            {"phase": "deep_report", "level": "info", "status": "skipped"},
+            {"phase": "build", "level": "info", "status": "superseded"},
+        ]
+    finally:
+        await db.close()
+
+
+@pytest.mark.asyncio
+async def test_build_status_callback_updates_single_phase_lifecycle(tmp_path, monkeypatch):
+    migrations_dir = Path(__file__).parent.parent / "src" / "db" / "migrations"
+    db = Database(tmp_path / "build_status.db", migrations_dir=migrations_dir)
+    await db.initialize()
+    monkeypatch.setattr(main, "_db", db)
+    try:
+        await db.execute(
+            """
+            INSERT INTO pipeline_runs (id, started_at, status, trigger)
+            VALUES ('run_build', datetime('now', '+8 hours'), 'completed', 'test')
+            """
+        )
+
+        for status in ("queued", "running", "completed"):
+            await main._record_build_status("run_build", status, status)
+
+        phase = await db.fetch_one(
+            """
+            SELECT phase, status, started_at, ended_at, details
+            FROM pipeline_phase_logs WHERE run_id='run_build' AND phase='build'
+            """
+        )
+        events = await db.fetch_all(
+            """
+            SELECT event, status FROM pipeline_events
+            WHERE run_id='run_build' AND phase='build' ORDER BY id
+            """
+        )
+
+        assert dict(phase) == {
+            "phase": "build",
+            "status": "done",
+            "started_at": phase["started_at"],
+            "ended_at": phase["ended_at"],
+            "details": "completed",
+        }
+        assert phase["started_at"]
+        assert phase["ended_at"]
+        assert [dict(row) for row in events] == [
+            {"event": "site.build_queued", "status": "queued"},
+            {"event": "site.build_running", "status": "running"},
+            {"event": "site.build_completed", "status": "completed"},
+        ]
+    finally:
+        monkeypatch.setattr(main, "_db", None)
+        await db.close()
+
+
+@pytest.mark.asyncio
+async def test_record_skipped_phases_creates_explicit_terminal_states(tmp_path):
+    migrations_dir = Path(__file__).parent.parent / "src" / "db" / "migrations"
+    db = Database(tmp_path / "skipped_phases.db", migrations_dir=migrations_dir)
+    await db.initialize()
+    try:
+        await db.execute(
+            """
+            INSERT INTO pipeline_runs (id, started_at, status, trigger)
+            VALUES ('run_skip', datetime('now', '+8 hours'), 'running', 'test')
+            """
+        )
+
+        await main._record_skipped_phases(
+            db,
+            "run_skip",
+            ("route", "analyze", "review", "persist", "deep_report", "backup", "build"),
+            "无新条目",
+        )
+
+        rows = await db.fetch_all(
+            """
+            SELECT phase, status, details FROM pipeline_phase_logs
+            WHERE run_id='run_skip' ORDER BY id
+            """
+        )
+        assert [dict(row) for row in rows] == [
+            {"phase": phase, "status": "skipped", "details": "无新条目"}
+            for phase in ("route", "analyze", "review", "persist", "deep_report", "backup", "build")
+        ]
+    finally:
+        await db.close()
 
 
 @pytest.mark.asyncio

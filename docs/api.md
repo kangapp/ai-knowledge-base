@@ -525,7 +525,13 @@
 
 ### GET /api/pipeline/dag
 
-查看 DAG 状态。默认返回最近一次 run；可传 `run_id` 查看历史 run。接口同时保留旧的 `phases/logs` 字段，并返回细粒度事件流和 source 漏斗。
+查看 DAG 状态。默认返回最近一次 run；可传 `run_id` 查看历史 run。接口同时保留原始 `phases/events/source_funnels/active_items` 排障字段，并返回三层页面聚合数据：
+
+- `summary`：数据流水线与网站发布双状态，以及采集、新增、分析、入库、丢弃、失败、成本、Token。
+- `processing_stages`：采集与去重、来源路由、并行分析、审核与重审、结果落库。
+- `review_rounds`：初审及每轮重审的通过、重试、丢弃数量。
+- `postprocess`：深度报告、数据库备份、静态站构建。
+- `recent_runs`：最近 12 次运行，供页面切换。
 
 **参数:**
 
@@ -543,6 +549,24 @@
     "run_id_bj": "run_20260524_090000",
     "status": "completed",
     "current_phase": null,
+    "summary": {
+      "pipeline_status": "completed",
+      "publication_status": "completed",
+      "collected": 26,
+      "new_items": 16,
+      "analyzed": 16,
+      "inserted": 5,
+      "discarded": 11,
+      "failed": 0
+    },
+    "processing_stages": [...],
+    "review_rounds": [...],
+    "postprocess": {
+      "deep_report": {"status": "skipped"},
+      "backup": {"status": "completed"},
+      "build": {"status": "completed"}
+    },
+    "recent_runs": [...],
     "progress": {
       "total_units": 40,
       "completed_units": 40,
@@ -582,6 +606,8 @@
   "message": "ok"
 }
 ```
+
+网站发布状态独立于 `pipeline_runs.status`：`queued` 等待去抖，`running` 正在构建，`completed` 已发布，`failed` 构建失败，`superseded` 被后续流水线合并，`skipped` 本轮无需构建。
 
 ---
 

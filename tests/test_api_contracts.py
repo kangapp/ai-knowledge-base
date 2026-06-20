@@ -681,3 +681,128 @@ async def test_pipeline_dag_returns_fine_grained_events_and_progress(api_client,
     assert data["source_funnels"][0]["analyzed"] == 1
     assert data["events"][-1]["event"] == "analyzer.item_start"
     assert data["active_items"][0]["ref_url"] == "https://github.com/org/repo"
+    assert data["summary"]["pipeline_status"] == "running"
+    assert data["processing_stages"][2]["id"] == "analyze"
+    assert data["processing_stages"][2]["status"] == "running"
+    assert data["postprocess"]["build"]["status"] == "waiting"
+    assert data["recent_runs"][0]["id"] == "run_dag"
+
+
+@pytest.mark.asyncio
+async def test_pipeline_dag_aggregates_processing_review_and_postprocess(api_client, api_db):
+    await api_db.execute(
+        """
+        INSERT INTO pipeline_runs (id, started_at, ended_at, status, trigger, summary)
+        VALUES (
+            'run_complete', '2026-06-20T18:00:00', '2026-06-20T18:05:30',
+            'completed', 'cron',
+            '{"collected":{"total":26,"new":16},"analyzed":16,"approved":5,"retry":0,"discarded":11,"errors":[],"deep_report":{"status":"skipped"}}'
+        )
+        """
+    )
+    phases = [
+        ("collect", "done", "2026-06-20T18:00:00", "2026-06-20T18:00:08", 8000, "collected 26 items"),
+        ("route", "done", "2026-06-20T18:00:08", "2026-06-20T18:00:09", 1000, "total:16"),
+        ("analyze", "done", "2026-06-20T18:00:09", "2026-06-20T18:01:53", 104000, "succeeded:16"),
+        ("aggregate", "done", "2026-06-20T18:01:53", "2026-06-20T18:01:53", 200, "total:16"),
+        ("review", "done", "2026-06-20T18:01:53", "2026-06-20T18:04:08", 135000, "approved:5, retry:5, discarded:6"),
+        ("review", "done", "2026-06-20T18:04:08", "2026-06-20T18:05:29", 81000, "approved:0, retry:3, discarded:2, mode:review_only"),
+        ("review", "done", "2026-06-20T18:05:29", "2026-06-20T18:05:30", 1000, "approved:0, retry:0, discarded:3, mode:review_only"),
+        ("persist", "done", "2026-06-20T18:05:30", "2026-06-20T18:05:30", 300, "inserted:5, discarded:11"),
+        ("deep_report", "skipped", "2026-06-20T18:05:30", "2026-06-20T18:05:30", 100, "无符合候选"),
+        ("backup", "done", "2026-06-20T18:05:30", "2026-06-20T18:05:31", 800, "数据库备份完成"),
+        ("build", "superseded", None, "2026-06-20T18:06:00", None, "被后续流水线合并"),
+    ]
+    for phase in phases:
+        await api_db.execute(
+            """
+            INSERT INTO pipeline_phase_logs
+            (run_id, phase, status, started_at, ended_at, duration_ms, details)
+            VALUES ('run_complete', ?, ?, ?, ?, ?, ?)
+            """,
+            phase,
+        )
+    await api_db.execute(
+        """
+        INSERT INTO pipeline_source_runs
+        (run_id, source_id, source, source_detail, collected, new_items, dedup_skipped,
+         analyzed, analysis_failed, approved, retry, discarded, inserted, failed, cost, tokens)
+        VALUES ('run_complete', 'github_hot', 'github', 'GitHub Hot',
+                26, 16, 10, 16, 0, 5, 0, 11, 5, 0, 0.041, 12000)
+        """
+    )
+    await api_db.execute(
+        """
+        INSERT INTO pipeline_events
+        (run_id, ts, phase, event, level, status, message)
+        VALUES
+        ('run_complete', '2026-06-20T18:05:30', 'build', 'site.build_queued', 'info', 'queued', '等待构建'),
+        ('run_complete', '2026-06-20T18:06:00', 'build', 'site.build_superseded', 'info', 'superseded', '被后续流水线合并')
+        """
+    )
+    await api_db.commit()
+
+    data = api_client.get("/api/pipeline/dag?run_id=run_complete&detail=full").json()["data"]
+
+    assert data["summary"] == {
+        "pipeline_status": "completed",
+        "publication_status": "superseded",
+        "trigger": "cron",
+        "started_at": "2026-06-20T18:00:00",
+        "ended_at": "2026-06-20T18:05:30",
+        "collected": 26,
+        "new_items": 16,
+        "analyzed": 16,
+        "inserted": 5,
+        "discarded": 11,
+        "failed": 0,
+        "cost": 0.041,
+        "tokens": 12000,
+    }
+    assert [stage["id"] for stage in data["processing_stages"]] == [
+        "collect",
+        "route",
+        "analyze",
+        "review",
+        "persist",
+    ]
+    assert all(stage["status"] == "completed" for stage in data["processing_stages"])
+    assert [round_["label"] for round_ in data["review_rounds"]] == ["初审", "重审 1", "重审 2"]
+    assert data["review_rounds"][1]["retry"] == 3
+    assert data["postprocess"]["deep_report"]["status"] == "skipped"
+    assert data["postprocess"]["backup"]["status"] == "completed"
+    assert data["postprocess"]["build"]["status"] == "superseded"
+
+
+@pytest.mark.asyncio
+async def test_pipeline_dag_uses_run_summary_and_marks_legacy_gaps_untracked(api_client, api_db):
+    await api_db.execute(
+        """
+        INSERT INTO pipeline_runs (id, started_at, ended_at, status, trigger, summary)
+        VALUES (
+            'run_legacy', '2026-05-30T10:00:00', '2026-05-30T10:18:29',
+            'completed', 'cron',
+            '{"collected":{"total":8,"new":8},"analyzed":8,"approved":5,"retry":0,"discarded":3,"errors":[]}'
+        )
+        """
+    )
+    await api_db.execute(
+        """
+        INSERT INTO pipeline_phase_logs
+        (run_id, phase, status, started_at, ended_at, duration_ms, details)
+        VALUES
+        ('run_legacy', 'collect', 'done', '2026-05-30T10:00:00', '2026-05-30T10:00:08', 8000, 'collected 8 items'),
+        ('run_legacy', 'review', 'done', '2026-05-30T10:10:00', '2026-05-30T10:18:00', 480000, 'approved:5, retry:0, discarded:3')
+        """
+    )
+    await api_db.commit()
+
+    data = api_client.get("/api/pipeline/dag?run_id=run_legacy").json()["data"]
+
+    assert data["summary"]["collected"] == 8
+    assert data["summary"]["new_items"] == 8
+    assert data["summary"]["analyzed"] == 8
+    assert data["summary"]["inserted"] == 5
+    assert data["summary"]["discarded"] == 3
+    assert data["processing_stages"][-1]["status"] == "completed"
+    assert data["postprocess"]["build"]["status"] == "untracked"

@@ -1,25 +1,66 @@
 {% extends "base.html" %}
-{% block title %}Pipeline DAG 状态{% endblock %}
+{% block title %}Pipeline 运行状态{% endblock %}
 {% block content %}
 <div class="dag-page">
-    <header class="page-header">
-        <h1>Pipeline DAG 状态</h1>
+    <header class="dag-page-header">
+        <div>
+            <h1>Pipeline 运行状态</h1>
+            <p>数据处理与网站发布采用独立生命周期。</p>
+        </div>
+        <label class="dag-run-picker">
+            <span>查看运行</span>
+            <select id="dag-run-select"><option value="">最新运行</option></select>
+        </label>
     </header>
 
-    <div class="dag-status-bar">
-        <div class="status-dot" id="status-dot"></div>
-        <div>
-            <div class="status-text" id="status-text">加载中...</div>
-            <div class="phase-text" id="phase-text"></div>
+    <section class="dag-layer" aria-labelledby="dag-summary-title">
+        <div class="dag-layer-heading">
+            <div>
+                <span class="dag-layer-index">01</span>
+                <h2 id="dag-summary-title">运行摘要</h2>
+            </div>
+            <span id="dag-run-time" class="muted">加载中…</span>
         </div>
-        <div class="dag-progress">
-            <div class="dag-progress-meta" id="progress-meta">-</div>
-            <div class="dag-progress-track"><div class="dag-progress-fill" id="progress-fill"></div></div>
+        <div class="dag-status-grid">
+            <article id="pipeline-status-card" class="dag-status-card">
+                <span>数据流水线</span>
+                <strong id="pipeline-status">加载中…</strong>
+                <small id="pipeline-trigger"></small>
+            </article>
+            <article id="publication-status-card" class="dag-status-card">
+                <span>网站发布</span>
+                <strong id="publication-status">加载中…</strong>
+                <small id="publication-detail"></small>
+            </article>
         </div>
-        <div class="run-info" id="run-info"></div>
-    </div>
+        <div id="dag-summary-metrics" class="dag-summary-metrics"></div>
+    </section>
 
-    <div class="pipeline-flow" id="pipeline-flow"></div>
+    <section class="dag-layer" aria-labelledby="processing-title">
+        <div class="dag-layer-heading">
+            <div>
+                <span class="dag-layer-index">02</span>
+                <h2 id="processing-title">核心处理</h2>
+            </div>
+            <span class="muted">采集 → 分析 → 审核 → 入库</span>
+        </div>
+        <div id="processing-stages" class="dag-stage-grid"></div>
+        <div class="dag-review-panel">
+            <h3>审核轮次</h3>
+            <div id="review-rounds" class="dag-review-rounds"></div>
+        </div>
+    </section>
+
+    <section class="dag-layer" aria-labelledby="postprocess-title">
+        <div class="dag-layer-heading">
+            <div>
+                <span class="dag-layer-index">03</span>
+                <h2 id="postprocess-title">发布与后处理</h2>
+            </div>
+            <span class="muted">主流水线完成后可继续执行</span>
+        </div>
+        <div id="postprocess-stages" class="dag-postprocess-grid"></div>
+    </section>
 
     <div class="dag-grid">
         <section class="dag-panel">
@@ -27,174 +68,19 @@
             <div class="source-funnels" id="source-funnels"></div>
         </section>
         <section class="dag-panel">
-            <h2>活跃任务</h2>
+            <h2>当前活跃任务</h2>
             <div class="active-items" id="active-items"></div>
         </section>
     </div>
 
-    <section class="dag-panel">
-        <h2>事件流</h2>
-        <div class="logs" id="logs">
-            <div class="log-entry"><span class="log-time">-</span><span class="log-msg">加载中...</span></div>
+    <details class="dag-events-panel">
+        <summary>原始事件流</summary>
+        <div class="logs" id="dag-events">
+            <div class="log-entry"><span class="log-time">-</span><span class="log-msg">加载中…</span></div>
         </div>
-    </section>
+    </details>
 </div>
-
-<script>
-const PHASES = [
-    ['collect', '采集'],
-    ['route', '路由'],
-    ['analyze', '分析'],
-    ['aggregate', '汇总'],
-    ['review', '审核'],
-    ['persist', '入库'],
-    ['build', '构建']
-];
-
-function escapeHtml(value) {
-    return String(value || '').replace(/[&<>"']/g, ch => ({
-        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
-    }[ch]));
-}
-
-function formatTime(isoStr) {
-    if (!isoStr) return '-';
-    const text = String(isoStr);
-    return text.length >= 19 ? text.slice(5, 19).replace('T', ' ') : text;
-}
-
-function formatDuration(ms) {
-    if (!ms) return '-';
-    return `${Math.round(ms / 1000)}s`;
-}
-
-async function fetchDag() {
-    try {
-        const res = await fetch('/api/pipeline/dag?detail=full');
-        const json = await res.json();
-        if (json.code !== 0) throw new Error(json.message);
-        updateDag(json.data);
-    } catch (error) {
-        document.getElementById('status-text').textContent = '加载失败';
-        document.getElementById('phase-text').textContent = error.message || '';
-    }
-}
-
-function updateDag(data) {
-    renderStatus(data);
-    renderFlow(data.phases || []);
-    renderSourceFunnels(data.source_funnels || []);
-    renderActiveItems(data.active_items || []);
-    renderEvents(data.events || []);
-}
-
-function renderStatus(data) {
-    const statusDot = document.getElementById('status-dot');
-    const statusText = document.getElementById('status-text');
-    const phaseText = document.getElementById('phase-text');
-    const runInfo = document.getElementById('run-info');
-    const progressMeta = document.getElementById('progress-meta');
-    const progressFill = document.getElementById('progress-fill');
-
-    statusDot.className = `status-dot ${data.status || 'idle'}`;
-    const statusMap = { running: '运行中', completed: '已完成', failed: '失败', idle: '空闲' };
-    statusText.textContent = statusMap[data.status] || data.status || '空闲';
-    phaseText.textContent = data.current_phase ? `当前阶段：${phaseName(data.current_phase)}` : '';
-    const progress = data.progress || { percent: 0, completed_units: 0, total_units: 0 };
-    progressMeta.textContent = `${progress.percent || 0}% · ${progress.completed_units || 0}/${progress.total_units || 0}`;
-    progressFill.style.width = `${progress.percent || 0}%`;
-    runInfo.innerHTML = data.run_id
-        ? `<div>${escapeHtml(data.run_id_bj || data.run_id)}</div><div class="run-time">${formatTime(data.phases?.[0]?.started_at)}</div>`
-        : '';
-}
-
-function renderFlow(phases) {
-    const phaseMap = {};
-    phases.forEach(phase => { phaseMap[phase.phase] = phase; });
-    document.getElementById('pipeline-flow').innerHTML = PHASES.map(([key, label], index) => {
-        const phase = phaseMap[key];
-        const state = phase ? (phase.status === 'done' ? 'done' : phase.status === 'running' ? 'active' : 'waiting') : 'waiting';
-        const time = phase ? (phase.status === 'running' ? '进行中' : formatDuration(phase.duration_ms)) : '-';
-        const details = phase?.details ? `<div class="stage-detail">${escapeHtml(phase.details)}</div>` : '';
-        return `
-            <div class="stage ${state}" data-phase="${key}">
-                <div class="stage-box">
-                    <div class="stage-name">${label}</div>
-                    <div class="stage-time">${time}</div>
-                    ${details}
-                </div>
-            </div>
-            ${index < PHASES.length - 1 ? '<div class="arrow">→</div>' : ''}
-        `;
-    }).join('');
-}
-
-function renderSourceFunnels(rows) {
-    const container = document.getElementById('source-funnels');
-    if (!rows.length) {
-        container.innerHTML = '<div class="empty-text">暂无数据源漏斗</div>';
-        return;
-    }
-    container.innerHTML = rows.map(row => `
-        <div class="source-funnel">
-            <div class="source-funnel-head">
-                <strong>${escapeHtml(row.source_detail || row.source_id)}</strong>
-                <span>${escapeHtml(row.source_id)}</span>
-            </div>
-            <div class="funnel-metrics">
-                <span>采集 ${row.collected || 0}</span>
-                <span>新增 ${row.new_items || 0}</span>
-                <span>分析 ${row.analyzed || 0}</span>
-                <span>入库 ${row.inserted || 0}</span>
-                <span>过滤 ${(row.retry || 0) + (row.discarded || 0)}</span>
-                <span>失败 ${row.failed || 0}</span>
-            </div>
-        </div>
-    `).join('');
-}
-
-function renderActiveItems(items) {
-    const container = document.getElementById('active-items');
-    if (!items.length) {
-        container.innerHTML = '<div class="empty-text">暂无活跃任务</div>';
-        return;
-    }
-    container.innerHTML = items.map(item => `
-        <div class="active-item">
-            <div><strong>${escapeHtml(item.title || item.ref_url)}</strong></div>
-            <div class="muted">${escapeHtml(item.agent || item.phase)} · ${escapeHtml(item.source_id)} · ${formatTime(item.started_at)}</div>
-            <div class="muted">${escapeHtml(item.ref_url)}</div>
-        </div>
-    `).join('');
-}
-
-function renderEvents(events) {
-    const logsEl = document.getElementById('logs');
-    if (!events.length) {
-        logsEl.innerHTML = '<div class="log-entry"><span class="log-time">-</span><span class="log-msg">暂无事件</span></div>';
-        return;
-    }
-    logsEl.innerHTML = events.slice(-160).reverse().map(event => `
-        <div class="log-entry ${event.level || 'info'}">
-            <span class="log-time">${formatTime(event.ts)}</span>
-            <span class="log-msg">
-                <b>${escapeHtml(event.event)}</b>
-                ${escapeHtml(event.message || '')}
-                ${event.source_id ? `<em>${escapeHtml(event.source_id)}</em>` : ''}
-                ${event.ref_url ? `<small>${escapeHtml(event.ref_url)}</small>` : ''}
-            </span>
-        </div>
-    `).join('');
-}
-
-function phaseName(key) {
-    const found = PHASES.find(([id]) => id === key);
-    return found ? found[1] : key;
-}
-
-document.addEventListener('DOMContentLoaded', () => {
-    fetchDag();
-    setInterval(fetchDag, 5000);
-});
-</script>
+{% endblock %}
+{% block scripts %}
+<script defer src="/static/js/dag.js"></script>
 {% endblock %}

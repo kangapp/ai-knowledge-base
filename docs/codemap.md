@@ -34,7 +34,7 @@
 
 - `src/api/routes.py`
   - 基础 API：文章列表/详情、搜索、基础统计、健康检查、成本 summary、pipeline 手动触发、pipeline DAG。
-  - `/api/pipeline/dag` 聚合 `pipeline_runs`、`pipeline_phase_logs`、`pipeline_events`、`pipeline_source_runs`，用于 DAG 页面展示阶段、source 漏斗、活跃 item 和事件流。
+  - `/api/pipeline/dag` 聚合 `pipeline_runs`、`pipeline_phase_logs`、`pipeline_events`、`pipeline_source_runs`，输出运行摘要、核心处理阶段、审核轮次、发布后处理、最近运行、source 漏斗、活跃 item 和事件流。
   - 常见改动入口：文章接口字段、分页参数、pipeline DAG 状态展示。
 
 - `src/api/stats.py`
@@ -173,6 +173,7 @@
 - `src/site/builder.py`
   - 静态站生成、临时目录原子替换、dashboard 模板渲染。
   - 首页使用 `list_summary`（120 字），`data.json` 保留最长 200 字 summary 供筛选和动态列表展示。
+  - `DebouncedBuilder` 绑定触发 run id，记录构建 queued/running/completed/failed；后续 run 合并旧任务时记录 superseded。
 
 - `src/site/templates/index.html` / `src/site/templates/article.html`
   - 首页文章卡片、详情抽屉静态结构和可分享的独立详情页挂载点。
@@ -182,9 +183,9 @@
   - 仪表盘 DOM 结构。
   - 后续重构时保持模板只描述结构，不塞复杂逻辑。
 
-- `src/site/templates/dag.html`
-  - Pipeline DAG 运行页。
-  - 常见改动入口：阶段布局、source 漏斗、活跃 item、事件流日志展示。
+- `src/site/templates/dag.html` / `src/site/static/js/dag.js`
+  - Pipeline 三层运行视图：运行摘要、核心处理、发布与后处理。
+  - 区分数据流水线和网站发布状态；审核 retry 在节点内部按轮次展示；支持最近运行切换和原始事件折叠排障。
 
 - `src/site/templates/deep.html` / `src/site/templates/deep-report.html`
   - 深度报告列表和详情静态外壳，由浏览器端请求公开 API。

@@ -82,6 +82,76 @@ _graph = None  # LangGraph 编译图
 _pipeline_lock: asyncio.Lock | None = None
 
 
+async def _record_build_status(run_id: str, status: str, details: str):
+    if _db is None or not run_id:
+        return
+
+    now = now_bj_iso()
+    if status == "queued":
+        await _db.execute(
+            """
+            INSERT INTO pipeline_phase_logs (run_id, phase, status, details)
+            VALUES (?, 'build', 'queued', ?)
+            """,
+            (run_id, details),
+        )
+    elif status == "running":
+        await _db.execute(
+            """
+            UPDATE pipeline_phase_logs
+            SET status='running', started_at=?, details=?
+            WHERE id = (
+                SELECT id FROM pipeline_phase_logs
+                WHERE run_id=? AND phase='build'
+                ORDER BY id DESC LIMIT 1
+            )
+            """,
+            (now, details, run_id),
+        )
+    else:
+        phase_status = "done" if status == "completed" else status
+        await _db.execute(
+            """
+            UPDATE pipeline_phase_logs
+            SET status=?, ended_at=?, details=?
+            WHERE id = (
+                SELECT id FROM pipeline_phase_logs
+                WHERE run_id=? AND phase='build'
+                ORDER BY id DESC LIMIT 1
+            )
+            """,
+            (phase_status, now, details, run_id),
+        )
+    await _db.commit()
+
+    await record_pipeline_event(
+        _db,
+        run_id=run_id,
+        phase="build",
+        event=f"site.build_{status}",
+        level=(
+            "success"
+            if status == "completed"
+            else "error"
+            if status == "failed"
+            else "info"
+        ),
+        status=status,
+        message=details,
+    )
+
+
+async def _record_skipped_phases(
+    db: Database,
+    run_id: str,
+    phases: tuple[str, ...],
+    reason: str,
+):
+    for phase in phases:
+        await record_phase_start(db, run_id, phase)
+        await record_phase_end(db, run_id, phase, "skipped", reason)
+
+
 def _filter_sources(sources, source_filter: str | list[str] | tuple[str, ...] | set[str] | None):
     if source_filter is None:
         return sources
@@ -479,6 +549,12 @@ async def run_pipeline(trigger: str = "cron", source_filter: str | list[str] | t
                 error_log=error_log,
                 active_sources=active_sources,
             )
+            await _record_skipped_phases(
+                _db,
+                run_id,
+                ("route", "analyze", "aggregate", "review", "persist", "deep_report", "backup", "build"),
+                "采集失败，无可处理条目",
+            )
             summary = json.dumps({"collected": 0, "errors": error_log})
             await end_pipeline_run(_db, run_id, "failed", summary)
             return
@@ -528,6 +604,12 @@ async def run_pipeline(trigger: str = "cron", source_filter: str | list[str] | t
                 inserted_urls=set(),
                 error_log=error_log,
                 active_sources=active_sources,
+            )
+            await _record_skipped_phases(
+                _db,
+                run_id,
+                ("route", "analyze", "aggregate", "review", "persist", "deep_report", "backup", "build"),
+                "无新条目",
             )
             summary = json.dumps({"collected": {"total": len(raw_items), "new": 0}, "message": "all items already exist"})
             await end_pipeline_run(_db, run_id, "completed", summary)
@@ -618,6 +700,7 @@ async def run_pipeline(trigger: str = "cron", source_filter: str | list[str] | t
         })
 
         # ====== 图外：入库（需要 DB 连接） ======
+        await record_phase_start(_db, run_id, "persist")
         passed_count = 0
         retry_count = 0
         discarded_count = 0
@@ -809,9 +892,20 @@ async def run_pipeline(trigger: str = "cron", source_filter: str | list[str] | t
             error_log=error_log,
             active_sources=active_sources,
         )
+        await record_phase_end(
+            _db,
+            run_id,
+            "persist",
+            "done",
+            (
+                f"inserted:{len(inserted_urls)}, retry:{retry_count}, "
+                f"discarded:{discarded_count}, analysis_failed:{len(new_items) - len(all_analyzed)}"
+            ),
+        )
 
         analysis_failed = bool(new_items and not all_analyzed)
         pipeline_errors = list(error_log)
+        await record_phase_start(_db, run_id, "deep_report")
         if analysis_failed:
             failure_messages = sorted({
                 record.error
@@ -844,6 +938,19 @@ async def run_pipeline(trigger: str = "cron", source_filter: str | list[str] | t
             except Exception as exc:
                 logger.exception("deep_report.stage_unexpected_failure", extra={"run_id": run_id})
                 deep_report_result = DeepReportStageResult(status="failed", message=str(exc))
+        await record_phase_end(
+            _db,
+            run_id,
+            "deep_report",
+            (
+                "done"
+                if deep_report_result.status == "completed"
+                else "failed"
+                if deep_report_result.status == "failed"
+                else "skipped"
+            ),
+            deep_report_result.message or deep_report_result.status,
+        )
 
         summary = json.dumps({
             "collected": {"total": len(raw_items), "new": len(new_items)},
@@ -886,20 +993,31 @@ async def run_pipeline(trigger: str = "cron", source_filter: str | list[str] | t
         })
 
         if analysis_failed:
+            await _record_skipped_phases(
+                _db,
+                run_id,
+                ("backup", "build"),
+                "分析阶段失败",
+            )
             return
 
         # ====== 图外：备份 + 站点构建 ======
-        await backup_database(_db, str(BACKUP_DIR))
+        await record_phase_start(_db, run_id, "backup")
+        try:
+            await backup_database(_db, str(BACKUP_DIR))
+        except Exception as exc:
+            await record_phase_end(_db, run_id, "backup", "failed", str(exc))
+            raise
+        await record_phase_end(_db, run_id, "backup", "done", "数据库备份完成")
         if _builder:
-            await record_pipeline_event(
+            await _builder.schedule(run_id)
+        else:
+            await _record_skipped_phases(
                 _db,
-                run_id=run_id,
-                phase="build",
-                event="site.build_queued",
-                status="queued",
-                message="静态站构建已排队",
+                run_id,
+                ("build",),
+                "Builder 未初始化",
             )
-            await _builder.schedule()
 
     except Exception as e:
         logger.error("pipeline.failed", extra={"error": str(e)})
@@ -941,7 +1059,11 @@ async def lifespan(app: FastAPI):
     set_run_pipeline(run_pipeline)
     template_dir = BASE_DIR / "src" / "site" / "templates"
     site_builder = SiteBuilder(_db, OUTPUT_DIR, template_dir)
-    _builder = DebouncedBuilder(site_builder, debounce_seconds=300)
+    _builder = DebouncedBuilder(
+        site_builder,
+        debounce_seconds=300,
+        on_status=_record_build_status,
+    )
     set_builder(_builder)
 
     # APScheduler

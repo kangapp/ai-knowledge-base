@@ -80,7 +80,13 @@ async def record_phase_end(db, run_id: str, phase: str, status: str, details: st
         run_id=run_id,
         phase=phase,
         event=f"{phase}.end",
-        level="success" if status == "done" else "error",
+        level=(
+            "success"
+            if status == "done"
+            else "info"
+            if status in {"skipped", "superseded"}
+            else "error"
+        ),
         status=status,
         latency_ms=duration_ms,
         message=f"{phase} 完成" if status == "done" else f"{phase} {status}",

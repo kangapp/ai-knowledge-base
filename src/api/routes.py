@@ -1,4 +1,5 @@
 import json
+import re
 
 from fastapi import APIRouter, Query, HTTPException
 from ..core.database import Database
@@ -153,6 +154,24 @@ async def get_pipeline_dag(run_id: str = Query(default=""), detail: str = Query(
     source_funnels = [dict(row) for row in source_rows]
     active_items = _active_items_from_events(events_list)
     progress = _build_dag_progress(last_run["status"], phases, source_funnels, events_list)
+    phase_list = [dict(p) for p in phases]
+    recent_rows = await _db.fetch_all(
+        """
+        SELECT id, status, trigger, started_at, ended_at
+        FROM pipeline_runs ORDER BY started_at DESC LIMIT 12
+        """
+    )
+    recent_runs = [dict(row) for row in recent_rows]
+    postprocess = _build_postprocess(last_run["status"], phase_list, events_list)
+    summary = _build_dag_summary(last_run, source_funnels, postprocess)
+    processing_stages = _build_processing_stages(
+        last_run["status"],
+        phase_list,
+        source_funnels,
+        events_list,
+        summary,
+    )
+    review_rounds = _build_review_rounds(phase_list)
 
     # Generate logs from phase transitions
     logs = []
@@ -189,13 +208,212 @@ async def get_pipeline_dag(run_id: str = Query(default=""), detail: str = Query(
         "run_id_bj": run_id,
         "status": last_run["status"],
         "current_phase": phases[-1]["phase"] if phases and phases[-1]["status"] == "running" else None,
-        "phases": [dict(p) for p in phases],
+        "phases": phase_list,
         "progress": progress,
+        "summary": summary,
+        "processing_stages": processing_stages,
+        "review_rounds": review_rounds,
+        "postprocess": postprocess,
+        "recent_runs": recent_runs,
         "events": events_list,
         "source_funnels": source_funnels,
         "active_items": active_items,
         "logs": logs,
     })
+
+
+def _normalize_phase_status(status: str) -> str:
+    return {
+        "done": "completed",
+        "completed": "completed",
+        "running": "running",
+        "queued": "queued",
+        "failed": "failed",
+        "skipped": "skipped",
+        "superseded": "superseded",
+    }.get(status or "", status or "waiting")
+
+
+def _stage_from_phases(
+    stage_id: str,
+    label: str,
+    phase_names: set[str],
+    run_status: str,
+    phases: list[dict],
+) -> dict:
+    rows = [phase for phase in phases if phase["phase"] in phase_names]
+    if not rows:
+        status = "waiting" if run_status == "running" else "skipped"
+        return {
+            "id": stage_id,
+            "label": label,
+            "status": status,
+            "duration_ms": None,
+            "details": "",
+        }
+
+    statuses = {_normalize_phase_status(row["status"]) for row in rows}
+    if "failed" in statuses:
+        status = "failed"
+    elif "running" in statuses:
+        status = "running"
+    elif statuses <= {"completed", "skipped", "superseded"}:
+        status = "completed" if "completed" in statuses else rows[-1]["status"]
+        status = _normalize_phase_status(status)
+    else:
+        status = _normalize_phase_status(rows[-1]["status"])
+    return {
+        "id": stage_id,
+        "label": label,
+        "status": status,
+        "duration_ms": sum(row["duration_ms"] or 0 for row in rows) or None,
+        "details": rows[-1].get("details") or "",
+    }
+
+
+def _build_processing_stages(
+    run_status: str,
+    phases: list[dict],
+    source_funnels: list[dict],
+    events: list[dict],
+    summary: dict,
+) -> list[dict]:
+    definitions = [
+        ("collect", "采集与去重", {"collect"}),
+        ("route", "来源路由", {"route"}),
+        ("analyze", "并行分析", {"analyze", "aggregate"}),
+        ("review", "审核与重审", {"review"}),
+        ("persist", "结果落库", {"persist"}),
+    ]
+    stages = [
+        _stage_from_phases(stage_id, label, names, run_status, phases)
+        for stage_id, label, names in definitions
+    ]
+    persist_events = [event for event in events if event.get("phase") == "persist"]
+    persist_stage = stages[-1]
+    if persist_stage["status"] == "skipped" and persist_events:
+        persist_stage["status"] = "completed"
+        persist_stage["details"] = f"处理 {len(persist_events)} 条结果"
+    elif persist_stage["status"] in {"skipped", "untracked"} and (
+        summary["new_items"] or summary["inserted"] or summary["discarded"]
+    ):
+        persist_stage["status"] = "completed"
+        persist_stage["details"] = (
+            f"入库 {summary['inserted']}，丢弃 {summary['discarded']}"
+        )
+
+    analyze_stage = stages[2]
+    analyze_stage["sources"] = [
+        {
+            "source_id": row.get("source_id", ""),
+            "label": row.get("source_detail") or row.get("source_id", ""),
+            "analyzed": row.get("analyzed", 0) or 0,
+            "failed": row.get("analysis_failed", 0) or 0,
+        }
+        for row in source_funnels
+        if (row.get("new_items", 0) or 0) > 0
+    ]
+    return stages
+
+
+def _detail_metric(details: str, name: str) -> int:
+    match = re.search(rf"(?:^|,\s*){re.escape(name)}:(\d+)", details or "")
+    return int(match.group(1)) if match else 0
+
+
+def _build_review_rounds(phases: list[dict]) -> list[dict]:
+    rounds = []
+    for index, phase in enumerate(row for row in phases if row["phase"] == "review"):
+        details = phase.get("details") or ""
+        rounds.append({
+            "index": index,
+            "label": "初审" if index == 0 else f"重审 {index}",
+            "status": _normalize_phase_status(phase.get("status", "")),
+            "duration_ms": phase.get("duration_ms"),
+            "approved": _detail_metric(details, "approved"),
+            "retry": _detail_metric(details, "retry"),
+            "discarded": _detail_metric(details, "discarded"),
+        })
+    return rounds
+
+
+def _postprocess_item(
+    phase_name: str,
+    label: str,
+    run_status: str,
+    phases: list[dict],
+    events: list[dict],
+) -> dict:
+    rows = [phase for phase in phases if phase["phase"] == phase_name]
+    related_events = [event for event in events if event.get("phase") == phase_name]
+    if rows:
+        row = rows[-1]
+        status = _normalize_phase_status(row.get("status", ""))
+        details = row.get("details") or ""
+        duration_ms = row.get("duration_ms")
+    elif related_events:
+        event = related_events[-1]
+        status = _normalize_phase_status(event.get("status", ""))
+        details = event.get("message") or ""
+        duration_ms = event.get("latency_ms")
+    else:
+        status = "waiting" if run_status == "running" else "untracked"
+        details = ""
+        duration_ms = None
+    return {
+        "id": phase_name,
+        "label": label,
+        "status": status,
+        "duration_ms": duration_ms,
+        "details": details,
+    }
+
+
+def _build_postprocess(run_status: str, phases: list[dict], events: list[dict]) -> dict:
+    return {
+        "deep_report": _postprocess_item(
+            "deep_report", "深度报告", run_status, phases, events
+        ),
+        "backup": _postprocess_item(
+            "backup", "数据库备份", run_status, phases, events
+        ),
+        "build": _postprocess_item(
+            "build", "静态站构建", run_status, phases, events
+        ),
+    }
+
+
+def _build_dag_summary(last_run, source_funnels: list[dict], postprocess: dict) -> dict:
+    try:
+        stored_summary = json.loads(last_run["summary"] or "{}")
+    except json.JSONDecodeError:
+        stored_summary = {}
+    collected_summary = stored_summary.get("collected", {})
+    if isinstance(collected_summary, int):
+        collected_summary = {"total": collected_summary, "new": 0}
+
+    def metric(name: str, fallback: int = 0) -> int:
+        value = sum(row.get(name, 0) or 0 for row in source_funnels)
+        return value if value else fallback
+
+    return {
+        "pipeline_status": last_run["status"],
+        "publication_status": postprocess["build"]["status"],
+        "trigger": last_run["trigger"] or "",
+        "started_at": last_run["started_at"],
+        "ended_at": last_run["ended_at"],
+        "collected": metric("collected", collected_summary.get("total", 0) or 0),
+        "new_items": metric("new_items", collected_summary.get("new", 0) or 0),
+        "analyzed": metric("analyzed", stored_summary.get("analyzed", 0) or 0),
+        "inserted": metric("inserted", stored_summary.get("approved", 0) or 0),
+        "discarded": metric("discarded", stored_summary.get("discarded", 0) or 0),
+        "failed": sum(
+            (row.get("failed", 0) or 0) + (row.get("analysis_failed", 0) or 0)
+            for row in source_funnels
+        ),
+        "cost": round(sum(row.get("cost", 0) or 0 for row in source_funnels), 10),
+        "tokens": sum(row.get("tokens", 0) or 0 for row in source_funnels),
+    }
 
 
 def _event_to_dict(row) -> dict:

@@ -1,4 +1,5 @@
 import json
+import asyncio
 from pathlib import Path
 
 import pytest
@@ -75,6 +76,68 @@ def test_homepage_search_matches_summary_and_original_description():
     assert "(a.summary || '').toLowerCase().includes(q)" in app_js
     assert "(a.description || '').toLowerCase().includes(q)" in app_js
     assert "listSummary(a.summary || a.description || '')" in app_js
+
+
+@pytest.mark.asyncio
+async def test_debounced_builder_tracks_superseded_and_completed_runs():
+    class FakeBuilder:
+        def __init__(self):
+            self.build_count = 0
+
+        async def build(self):
+            self.build_count += 1
+
+    statuses = []
+
+    async def on_status(run_id, status, details):
+        statuses.append((run_id, status, details))
+
+    fake_builder = FakeBuilder()
+    debounced = builder.DebouncedBuilder(
+        fake_builder,
+        debounce_seconds=0,
+        on_status=on_status,
+    )
+
+    await debounced.schedule("run_1")
+    await debounced.schedule("run_2")
+    await debounced._timer
+
+    assert statuses == [
+        ("run_1", "queued", "等待 0 秒去抖"),
+        ("run_1", "superseded", "被后续流水线 run_2 合并"),
+        ("run_2", "queued", "等待 0 秒去抖"),
+        ("run_2", "running", "静态站构建中"),
+        ("run_2", "completed", "静态站构建完成"),
+    ]
+    assert fake_builder.build_count == 1
+
+
+@pytest.mark.asyncio
+async def test_debounced_builder_records_failed_build():
+    class FailingBuilder:
+        async def build(self):
+            raise RuntimeError("render failed")
+
+    statuses = []
+
+    async def on_status(run_id, status, details):
+        statuses.append((run_id, status, details))
+
+    debounced = builder.DebouncedBuilder(
+        FailingBuilder(),
+        debounce_seconds=0,
+        on_status=on_status,
+    )
+
+    await debounced.schedule("run_failed")
+    with pytest.raises(RuntimeError, match="render failed"):
+        await debounced._timer
+
+    assert statuses[-2:] == [
+        ("run_failed", "running", "静态站构建中"),
+        ("run_failed", "failed", "render failed"),
+    ]
 
 
 def test_article_detail_uses_shared_safe_renderer():

@@ -41,6 +41,7 @@ GitHub Actions (push master):
 - `docker-compose.yml` 通过 `PIPELINE_IMAGE` 接收目标镜像，未传入时才回退 `latest`，便于 VPS 首次初始化。
 - 部署任务串行排队，避免两个 SSH 部署同时修改 Compose 状态；不取消进行中的部署，避免在容器替换中途终止。
 - 部署任务仅在 pipeline 健康后构建静态站；健康检查、构建请求、关键静态页面或公网验收失败时，恢复部署前镜像和静态输出，deploy job 仍保持失败以便追查。
+- 日常 pipeline 完成后，静态构建默认等待 5 分钟去抖。等待期间新的 pipeline 完成会把旧任务标记为 `superseded`，由最新 run 统一构建；这属于正常合并，不是失败。
 - pipeline 镜像必须包含 `curl`（健康/构建请求）和 `git`（Deep Reports 临时 clone GitHub 仓库）。
 - Dockerfile 先安装稳定系统依赖，再复制业务源码；普通代码发布只生成较小的源码层，减少 VPS 从 GHCR 拉取的数据量。
 - SSH 建连上限为 30 秒，远程命令上限为 10 分钟；只拉取 pipeline 镜像，单次最多 3 分钟并重试 2 次，持续网络故障会快速失败。

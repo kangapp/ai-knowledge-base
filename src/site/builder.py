@@ -1,4 +1,5 @@
 import asyncio, json, re, shutil
+from collections.abc import Awaitable, Callable
 from pathlib import Path
 from html import unescape
 from jinja2 import Environment, FileSystemLoader
@@ -107,21 +108,58 @@ class SiteBuilder:
 
 class DebouncedBuilder:
     """去抖渲染器：pipeline 完成后 schedule()，5min 无新触发才真正构建"""
-    def __init__(self, builder: SiteBuilder, debounce_seconds: int = 300):
+    def __init__(
+        self,
+        builder: SiteBuilder,
+        debounce_seconds: int = 300,
+        on_status: Callable[[str, str, str], Awaitable[None]] | None = None,
+    ):
         self.builder = builder
         self.debounce_seconds = debounce_seconds
+        self.on_status = on_status
         self._timer: asyncio.Task | None = None
+        self._run_id = ""
 
-    async def schedule(self):
-        if self._timer:
+    async def _notify(self, run_id: str, status: str, details: str):
+        if self.on_status and run_id:
+            await self.on_status(run_id, status, details)
+
+    async def schedule(self, run_id: str = ""):
+        if self._timer and not self._timer.done():
+            previous_run_id = self._run_id
             self._timer.cancel()
-        self._timer = asyncio.create_task(self._wait_and_build())
+            await self._notify(
+                previous_run_id,
+                "superseded",
+                f"被后续流水线 {run_id or 'manual'} 合并",
+            )
+        self._run_id = run_id
+        await self._notify(run_id, "queued", f"等待 {self.debounce_seconds} 秒去抖")
+        self._timer = asyncio.create_task(self._wait_and_build(run_id))
 
-    async def _wait_and_build(self):
+    async def _wait_and_build(self, run_id: str):
         await asyncio.sleep(self.debounce_seconds)
-        await self.builder.build()
+        await self._notify(run_id, "running", "静态站构建中")
+        try:
+            await self.builder.build()
+        except Exception as exc:
+            await self._notify(run_id, "failed", str(exc))
+            raise
+        await self._notify(run_id, "completed", "静态站构建完成")
 
-    async def build_now(self):
-        if self._timer:
+    async def build_now(self, run_id: str = ""):
+        if self._timer and not self._timer.done():
+            previous_run_id = self._run_id
             self._timer.cancel()
-        await self.builder.build()
+            await self._notify(
+                previous_run_id,
+                "superseded",
+                f"被立即构建 {run_id or 'manual'} 取代",
+            )
+        await self._notify(run_id, "running", "静态站构建中")
+        try:
+            await self.builder.build()
+        except Exception as exc:
+            await self._notify(run_id, "failed", str(exc))
+            raise
+        await self._notify(run_id, "completed", "静态站构建完成")

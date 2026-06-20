@@ -92,7 +92,7 @@ Reviewer 结果和文章持久化完成后，`run_deep_report_stage()` 作为图
 | 首页 | Jinja2 构建时预渲染最近 100 条 + JS 后台加载 `data.json` 无缝扩展全量；卡片展示不超过 120 字的 Analyzer 中文摘要并限制三行；普通点击在右侧抽屉打开详情，修饰键仍打开独立详情页；筛选（来源/标签/日期/评分）纯客户端过滤 | `data.json`（列表 summary + 原始 description 搜索字段）+ `/api/articles/{id}` |
 | 详情页 | `article.html` 与首页抽屉复用 `article-detail.js`；通过 DOM API 安全渲染完整摘要、原始简介、全部标签、发布时间、四维评分和公开深度报告入口；加载/404/网络错误统一展示状态 | `/api/articles/{id}` 实时 SQL |
 | 仪表盘 | Jinja2 内联 `stats.json` 渲染 KPI 卡片 + Chart.js 画来源饼图 + 每日花费折线 | `stats.json`（KPI+分布+趋势，<10KB） |
-| DAG 运行页 | 5 秒轮询 `/api/pipeline/dag?detail=full`，展示阶段、source 漏斗、活跃 item、事件流 | `pipeline_runs` + `pipeline_phase_logs` + `pipeline_events` + `pipeline_source_runs` |
+| DAG 运行页 | 5 秒轮询 `/api/pipeline/dag?detail=full`；按运行摘要、核心处理、发布后处理三层展示，区分数据流水线和网站发布状态，支持切换最近运行；source 漏斗、活跃 item、原始事件用于排障 | `pipeline_runs` + `pipeline_phase_logs` + `pipeline_events` + `pipeline_source_runs` |
 | 深度报告列表 | `deep.html` 静态外壳 + JS 请求 completed 报告列表 | `/api/deep-reports` |
 | 深度报告详情 | `deep-report.html` 静态外壳 + JS 按 id 请求 V2 详情；按采用结论 → 场景 → 架构图 → 快速上手 → 部署运行 → 技术细节渲染，移动端架构降级为卡片 | `/api/deep-reports/{id}` / `/api/deep-reports/latest` |
 | 搜索 | 300ms 去抖 → `/api/search?q=xxx` FTS5 全文检索 | `/api/search` FTS5 |
@@ -103,6 +103,7 @@ Reviewer 结果和文章持久化完成后，`run_deep_report_stage()` 作为图
 - **Fan-out 并行**：4 个 SubAgent 各自专属 Prompt 和 model，共享通用 `analyze_items()`
 - **采集阶段去重**：Collector 后立即 DB 批量查重，已存在 url 不进入 LLM 分析
 - **调度口径**：APScheduler、采集 Cron 和每周维护任务均显式使用 `Asia/Shanghai`；同一进程内 pipeline 使用 `asyncio.Lock` 串行执行，碰撞任务记录 `pipeline.queued` 并等待，不静默漏跑。
+- **双生命周期**：`pipeline_runs.status` 只表示数据流水线；静态构建独立记录 queued/running/completed/failed/superseded。5 分钟去抖期间若有新流水线完成，旧构建标记 superseded，由最新 run 统一发布。
 - **GitHub 采集口径**：Search API 查询由最多 5 个 `topic:` qualifier / 显式 `keywords` 单条件请求组成，每个查询获取 `max_items * 3`（最大 100）个候选；本地合并、阈值过滤后优先返回数据库中未出现的 repo，再用已存在 repo 补足。增速源基于 `github_repo_snapshots` 的最新快照与窗口前最近基线快照计算 star/day。
 - **RSS 采集口径**：RSS feed 先由 `httpx.AsyncClient(timeout=30, follow_redirects=True)` 获取文本，再交给 `feedparser` 解析；英文关键词按词边界匹配，综合媒体源可用 `filter_scope: title` 只看标题强信号，避免长正文偶然提及 AI 造成误采集。
 - **Reviewer 裁决口径**：LLM 只给四维分和原因；代码统一维度 key、重算 `total_score`，并按阈值裁决 verdict，避免模型自由放行弱相关内容。
