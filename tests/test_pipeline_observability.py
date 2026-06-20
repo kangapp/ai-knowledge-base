@@ -2,7 +2,7 @@ import pytest
 from pathlib import Path
 
 from src.core.budget import BudgetTracker
-from src.core.config import BudgetConfig
+from src.core.config import BudgetConfig, SourceConfig
 from src.core.database import Database
 from src.graph.state import CostRecord, RawItem, ReviewedItem, AnalyzedItem
 from src import main
@@ -146,6 +146,53 @@ def test_build_pipeline_source_summaries_exposes_filtered_items():
     assert summary["filtered_items"] == 2
     assert summary["request_success_rate"] == 1
     assert summary["insert_rate"] == 0
+
+
+def test_build_pipeline_source_summaries_records_successful_zero_source():
+    source = SourceConfig(
+        id="rss_verge",
+        name="The Verge",
+        type="rss",
+        enabled=True,
+        priority=1,
+        cron="0 * * * *",
+        max_items=10,
+    )
+
+    summaries = main._build_pipeline_source_summaries(
+        run_id="run_zero",
+        raw_items=[],
+        new_items=[],
+        analyzed_items=[],
+        reviewed_items=[],
+        cost_records=[],
+        inserted_urls=set(),
+        active_sources=[source],
+    )
+
+    assert summaries == [
+        {
+            "run_id": "run_zero",
+            "source_id": "rss_verge",
+            "source": "rss",
+            "source_detail": "The Verge",
+            "collected": 0,
+            "new_items": 0,
+            "dedup_skipped": 0,
+            "analyzed": 0,
+            "analysis_failed": 0,
+            "approved": 0,
+            "retry": 0,
+            "discarded": 0,
+            "inserted": 0,
+            "failed": 0,
+            "cost": 0.0,
+            "tokens": 0,
+            "filtered_items": 0,
+            "request_success_rate": 0,
+            "insert_rate": 0,
+        }
+    ]
 
 
 def test_prepare_retry_review_items_reuses_existing_analysis():

@@ -199,6 +199,7 @@ def _build_pipeline_source_summaries(
     cost_records: list,
     inserted_urls: set[str],
     failed_counts: dict[str, int] | None = None,
+    active_sources: list | None = None,
 ) -> list[dict]:
     summaries: dict[str, dict] = {}
 
@@ -226,6 +227,9 @@ def _build_pipeline_source_summaries(
                 "insert_rate": 0,
             }
         return summaries[source_id]
+
+    for source in active_sources or []:
+        ensure(source.id, source.type, source.name)
 
     url_to_source: dict[str, tuple[str, str, str]] = {}
     for item in raw_items:
@@ -355,6 +359,7 @@ async def _record_source_summaries(
     cost_records: list,
     inserted_urls: set[str],
     error_log: list[dict],
+    active_sources: list,
 ):
     failed_counts: dict[str, int] = {}
     for error in error_log:
@@ -370,6 +375,7 @@ async def _record_source_summaries(
         cost_records=cost_records,
         inserted_urls=inserted_urls,
         failed_counts=failed_counts,
+        active_sources=active_sources,
     )
     for summary in summaries:
         await upsert_pipeline_source_run(db, summary)
@@ -471,6 +477,7 @@ async def run_pipeline(trigger: str = "cron", source_filter: str | list[str] | t
                 cost_records=[],
                 inserted_urls=set(),
                 error_log=error_log,
+                active_sources=active_sources,
             )
             summary = json.dumps({"collected": 0, "errors": error_log})
             await end_pipeline_run(_db, run_id, "failed", summary)
@@ -520,6 +527,7 @@ async def run_pipeline(trigger: str = "cron", source_filter: str | list[str] | t
                 cost_records=[],
                 inserted_urls=set(),
                 error_log=error_log,
+                active_sources=active_sources,
             )
             summary = json.dumps({"collected": {"total": len(raw_items), "new": 0}, "message": "all items already exist"})
             await end_pipeline_run(_db, run_id, "completed", summary)
@@ -799,6 +807,7 @@ async def run_pipeline(trigger: str = "cron", source_filter: str | list[str] | t
             cost_records=all_costs,
             inserted_urls=inserted_urls,
             error_log=error_log,
+            active_sources=active_sources,
         )
 
         analysis_failed = bool(new_items and not all_analyzed)
