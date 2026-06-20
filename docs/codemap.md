@@ -68,6 +68,7 @@
 
 - `src/db/operations.py`
   - 数据库操作集合：文章保存、标签保存、成本记录、统计查询、备份等。
+  - `get_article_detail()` 负责组合文章、标签、标准化四维评分和当前公开深度报告摘要。
   - 常见改动入口：文章查询、统计 SQL、pipeline run 记录、`collection_items` 明细、`pipeline_events` 事件流、`pipeline_source_runs` 漏斗、`cost_logs` 来源归因、GitHub repo 增速快照查询。
   - 费用统计读取 `cost_logs`，资源消耗预算使用 `config/agents.yaml` 的 `budget.monthly`。
   - 所有 `days=N` 查询窗口按北京时间“含今天的 N 个自然日”计算。
@@ -171,6 +172,11 @@
 
 - `src/site/builder.py`
   - 静态站生成、临时目录原子替换、dashboard 模板渲染。
+  - 首页使用 `list_summary`（120 字），`data.json` 保留最长 200 字 summary 供筛选和动态列表展示。
+
+- `src/site/templates/index.html` / `src/site/templates/article.html`
+  - 首页文章卡片、详情抽屉静态结构和可分享的独立详情页挂载点。
+  - 文章链接始终保留 `/article.html?id={id}`，普通点击由首页抽屉接管。
 
 - `src/site/templates/dashboard.html`
   - 仪表盘 DOM 结构。
@@ -189,8 +195,12 @@
   - 常见改动入口：采用结论、架构/流程布局、latest 回退和外链安全。
 
 - `src/site/static/js/app.js`
-  - 首页文章列表筛选、来源/标签/日期过滤。
+  - 首页文章列表筛选、来源/标签/日期过滤和详情抽屉点击接入。
   - 不再承载 dashboard Tab 控制逻辑。
+
+- `src/site/static/js/article-detail.js`
+  - 首页抽屉与独立详情页共用的文章详情请求和 DOM 安全渲染。
+  - 展示完整摘要、原始简介、全部标签、四维评分、处理信息和深度报告入口；负责加载/错误状态及抽屉关闭、焦点恢复。
 
 - `src/site/static/js/dashboard/api.js`
   - 仪表盘 API 请求封装，统一校验响应信封。

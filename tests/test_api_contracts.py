@@ -1,3 +1,4 @@
+import json
 from pathlib import Path
 
 import pytest
@@ -101,6 +102,79 @@ async def test_article_detail_includes_tags(api_client, api_db):
     assert body["code"] == 0
     assert body["data"]["title"] == "A"
     assert body["data"]["tags"] == ["Agent"]
+    assert body["data"]["dimensions"] == {}
+    assert body["data"]["deep_report"] is None
+
+
+@pytest.mark.asyncio
+async def test_article_detail_includes_dimensions_and_public_deep_report(api_client, api_db):
+    extra_data = json.dumps(
+        {
+            "dimensions": {
+                "ai_relevance": {"score": 35, "reason": "与 Agent 开发直接相关"},
+                "content_depth": {"score": 24, "reason": "包含实现细节"},
+                "information_density": {"score": 12, "reason": "信息密度高"},
+                "timeliness": {"score": 14, "reason": "近期发布"},
+            }
+        },
+        ensure_ascii=False,
+    )
+    await api_db.execute(
+        """
+        INSERT INTO articles
+        (title, url, description, summary, source, source_detail, relevance_score,
+         status, collected_at, published_at, extra_data)
+        VALUES (?, ?, ?, ?, ?, ?, ?, 'approved', ?, ?, ?)
+        """,
+        (
+            "Agent Tool",
+            "https://github.com/example/agent-tool",
+            "Original project description",
+            "中文分析摘要",
+            "github",
+            "example/agent-tool",
+            85,
+            "2026-06-20T10:00:00+08:00",
+            "2026-06-19T08:00:00+08:00",
+            extra_data,
+        ),
+    )
+    article = await api_db.fetch_one(
+        "SELECT id FROM articles WHERE url = ?",
+        ("https://github.com/example/agent-tool",),
+    )
+    await api_db.execute(
+        """
+        INSERT INTO deep_reports
+        (repo_url, repo_name, article_id, run_id, commit_sha, status,
+         candidate_score, trigger_reason, report_version)
+        VALUES (?, ?, ?, NULL, ?, 'completed', ?, ?, 1)
+        """,
+        (
+            "https://github.com/example/agent-tool",
+            "example/agent-tool",
+            article["id"],
+            "abc123",
+            92,
+            "值得深入评估",
+        ),
+    )
+    await api_db.commit()
+
+    response = api_client.get(f"/api/articles/{article['id']}")
+
+    assert response.status_code == 200
+    data = response.json()["data"]
+    assert data["dimensions"]["ai_relevance"] == {
+        "score": 35,
+        "max_score": 40,
+        "reason": "与 Agent 开发直接相关",
+    }
+    assert data["dimensions"]["info_density"]["score"] == 12
+    assert data["deep_report"]["repo_name"] == "example/agent-tool"
+    assert data["deep_report"]["candidate_score"] == 92
+    assert data["deep_report"]["url"].startswith("/deep-report.html?id=")
+    assert "extra_data" not in data
 
 
 def test_http_errors_use_project_error_codes(api_client):

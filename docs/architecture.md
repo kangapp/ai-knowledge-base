@@ -89,8 +89,8 @@ Reviewer 结果和文章持久化完成后，`run_deep_report_stage()` 作为图
 
 | 页面 | 策略 | 数据来源 |
 |------|------|---------|
-| 首页 | Jinja2 构建时预渲染最近 100 条 + JS 后台加载 `data.json` 无缝扩展全量；卡片优先展示 Analyzer 中文 summary，缺失时回退原始 description；筛选（来源/标签/日期/评分）纯客户端过滤 | `data.json`（列表 summary + 原始 description 搜索字段） |
-| 详情页 | `article.html` + JS 读 URL param → `fetch /api/articles/{id}` 渲染完整 summary | `/api/articles/{id}` 实时 SQL |
+| 首页 | Jinja2 构建时预渲染最近 100 条 + JS 后台加载 `data.json` 无缝扩展全量；卡片展示不超过 120 字的 Analyzer 中文摘要并限制三行；普通点击在右侧抽屉打开详情，修饰键仍打开独立详情页；筛选（来源/标签/日期/评分）纯客户端过滤 | `data.json`（列表 summary + 原始 description 搜索字段）+ `/api/articles/{id}` |
+| 详情页 | `article.html` 与首页抽屉复用 `article-detail.js`；通过 DOM API 安全渲染完整摘要、原始简介、全部标签、发布时间、四维评分和公开深度报告入口；加载/404/网络错误统一展示状态 | `/api/articles/{id}` 实时 SQL |
 | 仪表盘 | Jinja2 内联 `stats.json` 渲染 KPI 卡片 + Chart.js 画来源饼图 + 每日花费折线 | `stats.json`（KPI+分布+趋势，<10KB） |
 | DAG 运行页 | 5 秒轮询 `/api/pipeline/dag?detail=full`，展示阶段、source 漏斗、活跃 item、事件流 | `pipeline_runs` + `pipeline_phase_logs` + `pipeline_events` + `pipeline_source_runs` |
 | 深度报告列表 | `deep.html` 静态外壳 + JS 请求 completed 报告列表 | `/api/deep-reports` |

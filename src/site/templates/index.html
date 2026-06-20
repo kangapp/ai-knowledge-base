@@ -33,8 +33,8 @@
             <div class="tags">{% for tag in article_tags %}<span class="tag">{{ tag }}</span>{% endfor %}</div>
             {% endif %}
         </div>
-        <h3><a href="/article.html?id={{ article.id }}">{{ article.title }}</a></h3>
-        <p>{{ article.summary }}</p>
+        <h3><a href="/article.html?id={{ article.id }}" data-article-link data-article-id="{{ article.id }}">{{ article.title }}</a></h3>
+        <p>{{ article.list_summary }}</p>
         <div class="meta">
             <span>{{ article.source_detail or article.source }}</span>
             <span>{{ article.collected_at[:10] }}</span>
@@ -43,5 +43,15 @@
     </div>
     {% endfor %}
 </div>
+<aside id="article-detail-drawer" class="article-detail-drawer" hidden aria-label="文章详情">
+    <button class="article-drawer-backdrop" type="button" data-article-drawer-close aria-label="关闭文章详情"></button>
+    <section class="article-drawer-panel" role="dialog" aria-modal="true" aria-labelledby="article-drawer-title">
+        <div class="article-drawer-toolbar">
+            <strong id="article-drawer-title">文章详情</strong>
+            <button type="button" class="article-drawer-close" data-article-drawer-close aria-label="关闭">×</button>
+        </div>
+        <div class="article-drawer-body" data-article-detail-content></div>
+    </section>
+</aside>
 <script>window.__INIT__ = {articles: {{ articles|tojson }}, stats: {{ stats|tojson }}};</script>
 {% endblock %}

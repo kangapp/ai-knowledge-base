@@ -99,7 +99,47 @@
 |------|------|------|
 | article_id | int | 文章ID |
 
-**响应:** 返回完整 articles 表记录，并附加 `tags` 数组。
+**响应:** 返回文章正文信息，并附加：
+
+- `tags`：全部标签。
+- `dimensions`：标准化四维审核评分，每项包含 `score`、`max_score`、`reason`。
+- `deep_report`：关联的当前公开版本 completed 深度报告摘要；不存在时为 `null`。
+
+内部存储字段 `extra_data` 不直接返回。
+
+```json
+{
+  "code": 0,
+  "data": {
+    "id": 1,
+    "title": "Example",
+    "url": "https://example.com",
+    "description": "原始简介",
+    "summary": "AI 中文摘要",
+    "source": "github",
+    "source_detail": "org/repo",
+    "published_at": "2026-06-19T08:00:00+08:00",
+    "collected_at": "2026-06-20T10:00:00+08:00",
+    "relevance_score": 85,
+    "tags": ["Agent"],
+    "dimensions": {
+      "ai_relevance": {
+        "score": 35,
+        "max_score": 40,
+        "reason": "与 Agent 开发直接相关"
+      }
+    },
+    "deep_report": {
+      "id": 12,
+      "repo_name": "org/repo",
+      "candidate_score": 92,
+      "trigger_reason": "值得深入评估",
+      "url": "/deep-report.html?id=12"
+    }
+  },
+  "message": "ok"
+}
+```
 
 **错误:** 40401 - 文章不存在
 

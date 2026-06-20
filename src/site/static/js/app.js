@@ -45,6 +45,11 @@
         return s;
     }
 
+    function listSummary(value) {
+        const text = value || '';
+        return text.length <= 120 ? text : `${text.slice(0, 120)}...`;
+    }
+
     function render(articles) {
         const list = document.getElementById('article-list');
         if (!list) return;
@@ -61,10 +66,10 @@
                     <span class="topic-tag">${escapeHtml(label)}</span>
                     ${tagsHtml ? `<div class="tags">${tagsHtml}</div>` : ''}
                 </div>
-                <h3><a href="/article.html?id=${a.id}">${escapeHtml(a.title)}</a></h3>
-                <p>${escapeHtml(a.summary || a.description || '')}</p>
+                <h3><a href="/article.html?id=${a.id}" data-article-link data-article-id="${a.id}">${escapeHtml(a.title)}</a></h3>
+                <p>${escapeHtml(listSummary(a.summary || a.description || ''))}</p>
                 <div class="meta">
-                    <span>${a.source_detail || a.source}</span>
+                    <span>${escapeHtml(a.source_detail || a.source || '')}</span>
                     <span>${a.collected_at ? a.collected_at.slice(0, 10) : ''}</span>
                     <span class="score">${a.relevance_score}分</span>
                 </div>
@@ -172,6 +177,17 @@
         if (activeBtn) activeBtn.classList.add('active');
     }
 
+    function setupArticleDrawer() {
+        document.addEventListener('click', event => {
+            const link = event.target.closest('[data-article-link]');
+            if (!link || event.defaultPrevented) return;
+            if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+            if (!window.ArticleDetail) return;
+            event.preventDefault();
+            window.ArticleDetail.openDrawer(link.dataset.articleId, link);
+        });
+    }
+
     function debounce(fn, ms) {
         let timer;
         return function(...args) {
@@ -211,7 +227,10 @@
     }
 
     document.addEventListener('DOMContentLoaded', () => {
-        if (document.getElementById('article-list')) setupFilters();
+        if (document.getElementById('article-list')) {
+            setupFilters();
+            setupArticleDrawer();
+        }
         if (document.getElementById('stats-overview')) initDashboard();
     });
 })();

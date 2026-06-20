@@ -48,11 +48,12 @@ class SiteBuilder:
         stats = await get_stats(self.db, days=30)
 
         # 首页 — 优先展示 Analyzer 中文摘要，缺失时回退原始 description
-        recent = [a for a in all_articles[:100]]  # 实际按 collected_at 排序取前 100
+        recent = [dict(a) for a in all_articles[:100]]  # 实际按 collected_at 排序取前 100
         for a in recent:
             description = clean_text(a.get("description", "") or "", 200)
             a["description"] = description
             a["summary"] = clean_text(a.get("summary", "") or description, 200)
+            a["list_summary"] = clean_text(a["summary"], 120)
         index_html = self.env.get_template("index.html").render(
             articles=recent, stats=stats, updated=now_bj_iso()
         )

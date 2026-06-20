@@ -605,6 +605,63 @@ async def get_article_tags(db: Database, article_id: int) -> list[str]:
     return [r["name"] for r in rows]
 
 
+def _article_dimensions(extra_data: str | None) -> dict:
+    data = _decode_json_field(extra_data or "", {})
+    raw_dimensions = data.get("dimensions", {})
+    definitions = (
+        ("ai_relevance", "ai_relevance", 40),
+        ("content_depth", "content_depth", 30),
+        ("info_density", "info_density", 15),
+        ("timeliness", "timeliness", 15),
+    )
+    dimensions = {}
+    for name, key, max_score in definitions:
+        value = raw_dimensions.get(key, {})
+        if name == "info_density" and not value:
+            value = raw_dimensions.get("information_density", {})
+        if not isinstance(value, dict) or not value:
+            continue
+        dimensions[name] = {
+            "score": value.get("score", 0),
+            "max_score": max_score,
+            "reason": value.get("reason", ""),
+        }
+    return dimensions
+
+
+async def get_article_detail(db: Database, article_id: int) -> dict | None:
+    row = await db.fetch_one("SELECT * FROM articles WHERE id = ?", (article_id,))
+    if not row:
+        return None
+
+    article = dict(row)
+    article["tags"] = await get_article_tags(db, article_id)
+    article["dimensions"] = _article_dimensions(article.pop("extra_data", None))
+
+    report = await db.fetch_one(
+        """
+        SELECT id, repo_name, candidate_score, trigger_reason
+        FROM deep_reports
+        WHERE article_id = ?
+          AND status = 'completed'
+          AND report_version = (
+              SELECT public_version FROM deep_report_settings WHERE id = 1
+          )
+        ORDER BY updated_at DESC, id DESC
+        LIMIT 1
+        """,
+        (article_id,),
+    )
+    if report:
+        article["deep_report"] = {
+            **dict(report),
+            "url": f"/deep-report.html?id={report['id']}",
+        }
+    else:
+        article["deep_report"] = None
+    return article
+
+
 async def count_articles(db: Database, query: str = "", source: str = "", days: int = 30) -> int:
     where_sql, params = _article_filters(query, source, days)
     if query:

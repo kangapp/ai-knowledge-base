@@ -44,11 +44,9 @@ async def list_articles(
 async def get_article(article_id: int):
     if not _db:
         raise HTTPException(500, "DB not initialized")
-    row = await _db.fetch_one("SELECT * FROM articles WHERE id = ?", (article_id,))
-    if not row:
+    article = await operations.get_article_detail(_db, article_id)
+    if not article:
         raise HTTPException(status_code=404, detail=f"文章 {article_id} 不存在")
-    article = dict(row)
-    article["tags"] = await operations.get_article_tags(_db, article_id)
     return envelope(article)
 
 
