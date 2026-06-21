@@ -74,3 +74,23 @@ def test_project_sources_disable_broken_feeds_and_use_official_producthunt_feed(
     assert sources["rss_reuters"].enabled is False
     assert sources["rss_producthunt"].enabled is True
     assert sources["rss_producthunt"].config["url"] == "https://www.producthunt.com/feed"
+
+
+def test_project_sources_include_initial_hotlist_sources():
+    cfg = load_sources_config(Path("config/sources.yaml"))
+    sources = {source.id: source for source in cfg.sources}
+
+    expected = {
+        "hotlist_aihot": ("aihot", None),
+        "hotlist_juejin": ("juejin", "juejin.cn"),
+        "hotlist_zhihu_ai": ("zhihu", "zhihu.com"),
+    }
+    for source_id, (platform_id, expected_domain) in expected.items():
+        source = sources[source_id]
+        assert source.type == "hotlist"
+        assert source.enabled is True
+        assert source.config["platform_id"] == platform_id
+        assert source.config.get("expected_domain") == expected_domain
+        assert source.config["filter_keywords"]
+
+    assert sources["hotlist_zhihu_ai"].config["filter_scope"] == "title"

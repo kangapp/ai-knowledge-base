@@ -79,6 +79,51 @@ def test_homepage_search_matches_summary_and_original_description():
 
 
 @pytest.mark.asyncio
+async def test_homepage_uses_hotlist_source_detail_as_label(tmp_path, monkeypatch):
+    articles = [
+        {
+            "id": 1,
+            "title": "AI 热榜文章",
+            "url": "https://example.com/hotlist",
+            "description": "description",
+            "summary": "summary",
+            "source": "hotlist",
+            "source_detail": "AIHOT",
+            "relevance_score": 90,
+            "tags": ["AI"],
+            "published_at": "",
+            "collected_at": "2026-06-21T10:00:00",
+        }
+    ]
+
+    async def fake_search_articles(*args, **kwargs):
+        return articles
+
+    async def fake_get_stats(*args, **kwargs):
+        return {}
+
+    monkeypatch.setattr(builder, "search_articles", fake_search_articles)
+    monkeypatch.setattr(builder, "get_stats", fake_get_stats)
+
+    output_dir = tmp_path / "output"
+    site_builder = builder.SiteBuilder(
+        db=object(),
+        output_dir=output_dir,
+        template_dir=ROOT / "src/site/templates",
+    )
+    await site_builder.build()
+
+    visible_html = (output_dir / "index.html").read_text().split(
+        "<script>window.__INIT__", 1
+    )[0]
+    app_js = (ROOT / "src/site/static/js/app.js").read_text()
+
+    assert '<span class="topic-tag">AIHOT</span>' in visible_html
+    assert "source === 'hotlist' && sourceDetail" in app_js
+    assert "['rss', 'hotlist'].includes(a.source)" in app_js
+
+
+@pytest.mark.asyncio
 async def test_debounced_builder_tracks_superseded_and_completed_runs():
     class FakeBuilder:
         def __init__(self):

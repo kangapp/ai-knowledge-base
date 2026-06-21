@@ -9,7 +9,7 @@ class RawItem(BaseModel):
     url: str
     title: str
     description: str = ""
-    source: Literal["github", "rss", "feishu", "arxiv"]
+    source: Literal["github", "rss", "hotlist", "feishu", "arxiv"]
     source_detail: str = ""
     published_at: str = ""
     raw_metadata: dict = {}

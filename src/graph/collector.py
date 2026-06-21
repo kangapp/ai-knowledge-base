@@ -4,6 +4,8 @@ import logging
 import re
 import time
 from datetime import datetime, timedelta
+from urllib.parse import urlparse
+
 import httpx
 import feedparser
 
@@ -13,6 +15,10 @@ from ..core.time import now_bj, now_bj_iso
 from ..db.operations import record_source_health
 
 logger = logging.getLogger("pipeline")
+HOTLIST_HEADERS = {
+    "User-Agent": "Mozilla/5.0 (compatible; AIKnowledgeBase/1.0)",
+    "Accept": "application/json",
+}
 
 
 def _quote_github_term(term: str) -> str:
@@ -151,7 +157,7 @@ async def collect_rss(source: SourceConfig) -> list[RawItem]:
         resp.raise_for_status()
 
     feed = feedparser.parse(resp.text)
-    for entry in feed.entries[:source.max_items]:
+    for entry in feed.entries:
         title = entry.get("title", "")
         summary = entry.get("summary", "")
         match_text = title if filter_scope == "title" else f"{title} {summary}"
@@ -167,6 +173,82 @@ async def collect_rss(source: SourceConfig) -> list[RawItem]:
             raw_metadata={"feed": cfg["url"], "source_id": source.id},
             collected_at=now,
         ))
+        if len(items) >= source.max_items:
+            break
+    return items
+
+
+def _is_safe_hotlist_url(url: str, expected_domain: str) -> bool:
+    parsed = urlparse(url)
+    if parsed.scheme != "https" or not parsed.hostname:
+        return False
+    if not expected_domain:
+        return True
+
+    hostname = parsed.hostname.lower()
+    expected = expected_domain.strip().lower()
+    return hostname == expected or hostname.endswith(f".{expected}")
+
+
+async def collect_hotlist(source: SourceConfig) -> list[RawItem]:
+    cfg = source.config
+    platform_id = cfg["platform_id"]
+    expected_domain = cfg.get("expected_domain", "")
+    keywords = cfg.get("filter_keywords", [])
+    filter_scope = cfg.get("filter_scope", "title_summary")
+
+    async with httpx.AsyncClient(
+        timeout=30,
+        follow_redirects=True,
+        headers=HOTLIST_HEADERS,
+    ) as client:
+        resp = await client.get(
+            cfg["api_url"],
+            params={"id": platform_id, "latest": ""},
+        )
+        resp.raise_for_status()
+        payload = resp.json()
+
+    status = payload.get("status")
+    if status not in {"success", "cache"}:
+        raise ValueError(f"NewsNow 响应状态异常: {status}")
+
+    items = []
+    now = now_bj_iso()
+    for rank, entry in enumerate(payload.get("items", []), start=1):
+        title = entry.get("title")
+        url = entry.get("url", "")
+        if not isinstance(title, str) or not title.strip():
+            continue
+        if not _is_safe_hotlist_url(url, expected_domain):
+            continue
+
+        extra = entry.get("extra") or {}
+        description = extra.get("hover", "") if isinstance(extra, dict) else ""
+        info = extra.get("info", "") if isinstance(extra, dict) else ""
+        match_text = title if filter_scope == "title" else f"{title} {description}"
+        if keywords and not _matches_rss_keywords(match_text, keywords):
+            continue
+
+        items.append(RawItem(
+            url=url,
+            title=title.strip(),
+            description=str(description or "")[:500],
+            source="hotlist",
+            source_detail=source.name,
+            published_at=str(entry.get("pubDate") or ""),
+            raw_metadata={
+                "item_id": str(entry.get("id") or ""),
+                "rank": rank,
+                "info": str(info or ""),
+                "platform_id": platform_id,
+                "updated_time": payload.get("updatedTime"),
+                "source_id": source.id,
+            },
+            collected_at=now,
+        ))
+        if len(items) >= source.max_items:
+            break
     return items
 
 
@@ -280,6 +362,7 @@ async def collect_arxiv(source: SourceConfig) -> list[RawItem]:
 COLLECTOR_MAP = {
     "github": collect_github,
     "rss": collect_rss,
+    "hotlist": collect_hotlist,
     "feishu": collect_feishu,
     "arxiv": collect_arxiv,
 }

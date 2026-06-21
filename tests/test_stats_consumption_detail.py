@@ -143,12 +143,16 @@ async def test_consumption_detail_source_trend_uses_article_source_detail(tmp_pa
         await db.initialize()
         rss_url = "https://36kr.com/p/123"
         arxiv_url = "https://arxiv.org/abs/2605.00001"
+        hotlist_url = "https://www.zhihu.com/question/123"
         await _insert_article(db, title="36kr item", url=rss_url, source="rss", source_detail="36氪")
         await _insert_article(db, title="arxiv item", url=arxiv_url, source="arxiv", source_detail="cs.AI")
+        await _insert_article(db, title="Zhihu item", url=hotlist_url, source="hotlist", source_detail="知乎 AI 热榜")
         await _insert_cost(db, run_id="r1", agent="rss_analyzer", provider="deepseek", cost=0.2, days_ago=0, ref_url=rss_url)
         await _insert_cost(db, run_id="r1", agent="reviewer", provider="deepseek", cost=0.3, days_ago=0, ref_url=rss_url)
         await _insert_cost(db, run_id="r2", agent="arxiv_analyzer", provider="minimax", cost=0.4, days_ago=0, ref_url=arxiv_url)
         await _insert_cost(db, run_id="r2", agent="reviewer", provider="minimax", cost=0.5, days_ago=0, ref_url=arxiv_url)
+        await _insert_cost(db, run_id="r3", agent="rss_analyzer", provider="deepseek", cost=0.6, days_ago=0, ref_url=hotlist_url)
+        await _insert_cost(db, run_id="r3", agent="reviewer", provider="deepseek", cost=0.7, days_ago=0, ref_url=hotlist_url)
         await db.commit()
 
         data = await get_consumption_detail_stats(db, "day")
@@ -161,6 +165,8 @@ async def test_consumption_detail_source_trend_uses_article_source_detail(tmp_pa
         assert source_costs[("36氪", "review")] == 0.3
         assert source_costs[("arxiv", "analyze")] == 0.4
         assert source_costs[("arxiv", "review")] == 0.5
+        assert source_costs[("知乎 AI 热榜", "analyze")] == 0.6
+        assert source_costs[("知乎 AI 热榜", "review")] == 0.7
         assert "review" not in {row["source"] for row in data["source_trend"]}
     finally:
         await db.close()

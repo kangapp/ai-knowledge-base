@@ -30,7 +30,7 @@ class LLMConfig(BaseModel):
 class SourceConfig(BaseModel):
     id: str
     name: str
-    type: str  # github / rss / feishu / arxiv
+    type: str  # github / rss / hotlist / feishu / arxiv
     enabled: bool
     priority: int
     cron: str

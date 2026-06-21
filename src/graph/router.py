@@ -2,7 +2,13 @@ import logging
 from .state import PipelineState
 
 logger = logging.getLogger("pipeline")
-ROUTE_MAP = {"github": "routed_github", "rss": "routed_rss", "feishu": "routed_feishu", "arxiv": "routed_arxiv"}
+ROUTE_MAP = {
+    "github": "routed_github",
+    "rss": "routed_rss",
+    "hotlist": "routed_rss",
+    "feishu": "routed_feishu",
+    "arxiv": "routed_arxiv",
+}
 
 
 async def router_node(state: PipelineState) -> dict:
@@ -13,7 +19,7 @@ async def router_node(state: PipelineState) -> dict:
         key = ROUTE_MAP.get(item.source)
         if key:
             result[key].append(item)
-            if item.source == "rss" and item.source_detail:
+            if item.source in {"rss", "hotlist"} and item.source_detail:
                 rss_by_source[item.source_detail] = rss_by_source.get(item.source_detail, 0) + 1
         else:
             result["routed_rss"].append(item)  # 兜底

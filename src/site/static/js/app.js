@@ -30,6 +30,9 @@
     const state = { source: '', tag: '', days: 30, query: '' };
 
     function getSourceLabel(source, sourceDetail) {
+        if (source === 'hotlist' && sourceDetail) {
+            return sourceDetail;
+        }
         if (source === 'rss' && sourceDetail) {
             return window.__RSS_LABELS__[sourceDetail] || sourceDetail.replace(/^https?:\/\//, '').split('/')[0];
         }
@@ -85,13 +88,13 @@
             articles = articles.filter(a => new Date(a.collected_at) >= cutoff);
         }
         if (state.source) {
-            // state.source 可能是 'github'、'rss'、或具体 RSS 子源名（如 '36氪'）
+            // state.source 可能是基础类型，或 RSS/热榜的具体子源名
             articles = articles.filter(a => {
                 if (state.source === 'github' || state.source === 'feishu' || state.source === 'arxiv') {
                     return a.source === state.source;
                 }
-                // RSS 子源匹配：source_detail 匹配，或 source=rss 且无 detail
-                if (a.source === 'rss') {
+                // RSS/热榜子源匹配：source_detail 匹配，或无 detail 时按基础类型匹配
+                if (['rss', 'hotlist'].includes(a.source)) {
                     return a.source_detail === state.source || (!a.source_detail && state.source === 'rss');
                 }
                 return false;
@@ -129,7 +132,7 @@
             // 按 label 分组去重，value 使用最后一个匹配的 raw
             const sourceMap = {};
             INIT.articles.forEach(a => {
-                const raw = a.source === 'rss' && a.source_detail ? a.source_detail : a.source;
+                const raw = ['rss', 'hotlist'].includes(a.source) && a.source_detail ? a.source_detail : a.source;
                 const normalized = getOptionLabel(raw);
                 if (!sourceMap[normalized]) {
                     sourceMap[normalized] = { label: normalized, value: raw };

@@ -14,7 +14,7 @@ ai-knowledge-base/
 │
 ├── config/                 # 配置文件（YAML）
 │   ├── llm.yaml            #   Provider 注册 (base_url, api_key, models, 价格)
-│   ├── sources.yaml        #   数据源定义（RSS 按订阅源独立条目，各自 cron）
+│   ├── sources.yaml        #   数据源定义（RSS/NewsNow 热榜按源独立条目，各自 cron）
 │   └── agents.yaml         #   SubAgent 绑定 (primary/fallback model, params, prompt 路径) + 全局预算
 │
 ├── prompts/                # 各 Agent 的 Prompt 模板（Git 版本管理）
@@ -37,7 +37,7 @@ ai-knowledge-base/
 │   ├── graph/              # LangGraph 工作流
 │   │   ├── pipeline.py     #   DAG 编排入口
 │   │   ├── state.py        #   State + AnalyzedItem/ReviewedItem Pydantic 模型定义
-│   │   ├── collector.py    #   按源并行采集；GitHub topic/keyword 查询；DB 批量查重
+│   │   ├── collector.py    #   按源并行采集；GitHub/RSS/NewsNow 热榜适配；DB 批量查重
 │   │   ├── router.py       #   100% 规则匹配（按 RawItem.source 字段分流）
 │   │   ├── aggregator.py   #   汇总并行结果 + Pydantic 校验 + 成本统计
 │   │   ├── reviewer.py     #   四维评分 (AI相关度0-40/内容深度0-30/信息密度0-15/时效性0-15)
@@ -106,7 +106,8 @@ ai-knowledge-base/
 - **错误隔离**：单源采集失败不影响其余源（try/except 隔离），空数据跳过 analyzer 不调 LLM；仅所有源全挂才标记 pipeline failed
 - **GitHub 采集**：`topics`/`keywords` 最多拆成 5 个单条件 Search 请求并在本地合并去重，避免对 `topic:` qualifier 使用无效 `OR`；`exclude_terms` 在 API 返回后本地过滤；`trend_mode` 仅过滤对应配置源自己的采集结果
 - **GitHub AI 开发工具源**：`github_ai_devtools` 专门捕获代码库理解、知识图谱、AI 编程工具类项目，避免与通用 LLM/RAG/MCP 源混在一起
-- **RSS 采集**：先用 `httpx.AsyncClient(timeout=30)` 获取 feed 文本，再由 `feedparser` 解析；英文关键词按词边界匹配；综合媒体源用 `filter_scope: title` 只匹配标题，减少长正文偶然提及 AI 带来的误采集
+- **RSS 采集**：先用 `httpx.AsyncClient(timeout=30)` 获取 feed 文本，再由 `feedparser` 解析；先过滤关键词再限制 `max_items`；英文关键词按词边界匹配；综合媒体源用 `filter_scope: title` 只匹配标题
+- **NewsNow 热榜采集**：`hotlist` 类型通过配置的 `api_url/platform_id` 抓取，校验 HTTPS 和可选 `expected_domain`，将排名和平台元数据写入 `raw_metadata`，并复用 RSS Analyzer
 - **Reviewer 审核**：模型只输出四维分，代码负责维度 key 规范化、总分重算和最终 verdict 裁决
 - **Deep Reports 后置阶段**：Reviewer/入库后最多选择 1 个高价值 GitHub repo，临时 clone 并只读取受限文本源码；阶段失败不影响主 pipeline。
 - **API 响应统一入口**：除 `/api/health` 外，成功响应走 `api.responses.envelope()`；`HTTPException`、参数校验错误、未捕获异常统一由 `src/main.py` 注册 handler。

@@ -18,7 +18,7 @@
 | url | TEXT UNIQUE | 防同源重复采集，不做跨源语义去重 |
 | description | TEXT | 原始摘要/README 摘要 |
 | summary | TEXT | AI 生成摘要（详情页按需加载） |
-| source | TEXT | github / rss / feishu / arxiv |
+| source | TEXT | github / rss / hotlist / feishu / arxiv |
 | source_detail | TEXT | 来源详情 (repo、频道名等) |
 | relevance_score | INTEGER | 0-100 |
 | status | TEXT | pending / approved / retry / discarded |
@@ -142,7 +142,7 @@ FTS5 全文索引：`articles_fts` over (title, summary, description)
 | level | TEXT | info / success / warning / error |
 | status | TEXT | running / done / failed / approved / discarded / retry / inserted 等 |
 | source_id | TEXT | 配置源 id |
-| source | TEXT | github / rss / feishu / arxiv |
+| source | TEXT | github / rss / hotlist / feishu / arxiv |
 | source_detail | TEXT | 展示来源或 repo 名 |
 | ref_url | TEXT | item URL |
 | title | TEXT | item 标题 |
@@ -176,7 +176,7 @@ FTS5 全文索引：`articles_fts` over (title, summary, description)
 | tokens_out | INTEGER | |
 | cost | REAL | |
 | ref_url | TEXT | LLM 调用关联的原始文章 URL |
-| source | TEXT | 成本记录时的来源快照：github / rss / feishu / arxiv |
+| source | TEXT | 成本记录时的来源快照：github / rss / hotlist / feishu / arxiv |
 | source_detail | TEXT | 成本记录时的来源细分；RSS 存 feed 名称或展示名 |
 | source_id | TEXT | 成本记录时的源 ID；统一使用 `config/sources.yaml` 中的配置 id |
 | status | TEXT DEFAULT 'success' | success / parse_failed / request_failed |
@@ -212,7 +212,7 @@ FTS5 全文索引：`articles_fts` over (title, summary, description)
 | run_id | TEXT FK → pipeline_runs.id | |
 | url | TEXT | 原始 URL |
 | title | TEXT | 原始标题 |
-| source | TEXT | github / rss / feishu / arxiv |
+| source | TEXT | github / rss / hotlist / feishu / arxiv |
 | source_id | TEXT | 配置 id |
 | source_detail | TEXT | 来源细分 |
 | status | TEXT | collected / dedup_skipped / inserted / reviewed_retry / reviewed_discarded |
@@ -301,7 +301,7 @@ UNIQUE(source_id, date)
 | id | INTEGER PK | |
 | url | TEXT UNIQUE | 数据源 URL |
 | name | TEXT | 数据源名称 |
-| type | TEXT | 类型（github / rss / feishu / arxiv） |
+| type | TEXT | 类型（github / rss / hotlist / feishu / arxiv） |
 | discovered_at | TEXT | 发现时间 |
 | status | TEXT | candidate / enabled / disabled |
 | added_at | TEXT | 加入时间 |

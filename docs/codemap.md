@@ -129,7 +129,8 @@
   - 多源采集和 DB 查重。
   - GitHub 采集将 `topics`/`keywords` 拆成最多 5 个单条件 Search 请求，每个请求获取扩大后的候选池；合并和阈值过滤后优先返回 DB 中未出现的 repo。
   - `github_ai_devtools` 用于抓取代码库理解、交互式知识图谱、AI 编程工具类仓库，关键词在 `config/sources.yaml` 维护。
-  - RSS 采集先用 `httpx.AsyncClient(timeout=30)` 拉取 feed 文本，再交给 `feedparser` 解析；关键词过滤使用 `_matches_rss_keywords()`，英文关键词按词边界匹配，综合媒体可用 `filter_scope: title` 避免长正文噪音。
+  - RSS 采集先用 `httpx.AsyncClient(timeout=30)` 拉取 feed 文本，再交给 `feedparser` 解析；先过滤关键词再限制数量，关键词过滤使用 `_matches_rss_keywords()`。
+  - `collect_hotlist()` 通过 NewsNow 统一接口抓取 AIHOT、掘金、知乎等热榜，校验 HTTPS/目标域名并保留榜单排名元数据。
   - `RawItem.raw_metadata.source_id` 保存配置 id，供 source health、成本归因等后续阶段使用。
 
 - `src/main.py`
@@ -147,7 +148,7 @@
   - 使用 `data/kb.db` 并显式初始化数据库连接；维护 Cron 使用 `Asia/Shanghai`。
 
 - `src/graph/router.py`
-  - 按 `RawItem.source` 做规则路由。
+  - 按 `RawItem.source` 做规则路由；`hotlist` 复用 `routed_rss` 和 RSS Analyzer。
 
 - `src/graph/analyzers/`
   - 各源 Analyzer 薄层；通用实现位于 `base.py`。

@@ -3,7 +3,14 @@ import pytest
 from unittest.mock import AsyncMock, patch
 from datetime import datetime, timezone
 
-from src.graph.collector import _build_github_queries, _matches_rss_keywords, collect_github, collect_rss, collect_all
+from src.graph.collector import (
+    _build_github_queries,
+    _matches_rss_keywords,
+    collect_all,
+    collect_github,
+    collect_hotlist,
+    collect_rss,
+)
 from src.graph.state import RawItem
 from src.core.config import SourceConfig
 
@@ -247,6 +254,144 @@ async def test_collect_rss_title_scope_ignores_summary_noise():
         items = await collect_rss(source)
 
     assert [item.url for item in items] == ["https://example.com/2"]
+
+
+@pytest.mark.asyncio
+async def test_collect_rss_filters_before_applying_max_items():
+    source = make_source(
+        id="rss_test",
+        name="RSS Test",
+        type="rss",
+        max_items=2,
+        config={"url": "https://example.com/feed", "filter_keywords": ["AI"]},
+    )
+    entries = [
+        {"title": "General news 1", "summary": "", "link": "https://example.com/1"},
+        {"title": "General news 2", "summary": "", "link": "https://example.com/2"},
+        {"title": "AI news 1", "summary": "", "link": "https://example.com/3"},
+        {"title": "AI news 2", "summary": "", "link": "https://example.com/4"},
+        {"title": "AI news 3", "summary": "", "link": "https://example.com/5"},
+    ]
+    mock_resp = AsyncMock()
+    mock_resp.text = "<rss></rss>"
+    mock_resp.raise_for_status = lambda: None
+
+    with patch("httpx.AsyncClient.get", return_value=mock_resp), \
+         patch("feedparser.parse", return_value=type("Feed", (), {"entries": entries})()):
+        items = await collect_rss(source)
+
+    assert [item.url for item in items] == [
+        "https://example.com/3",
+        "https://example.com/4",
+    ]
+
+
+@pytest.mark.asyncio
+async def test_collect_hotlist_maps_newsnow_items_and_filters_before_limit():
+    source = make_source(
+        id="hotlist_aihot",
+        name="AIHOT",
+        type="hotlist",
+        max_items=2,
+        config={
+            "api_url": "https://newsnow.example/api/s",
+            "platform_id": "aihot",
+            "filter_keywords": ["AI", "LLM"],
+            "filter_scope": "title_summary",
+        },
+    )
+    payload = {
+        "status": "cache",
+        "updatedTime": 1782007931830,
+        "items": [
+            {"id": "1", "title": "General news", "url": "https://example.com/1"},
+            {
+                "id": "2",
+                "title": "New developer tool",
+                "url": "https://example.com/2",
+                "pubDate": "2026-06-21T01:00:00Z",
+                "extra": {"hover": "An AI coding assistant", "info": "Tools"},
+            },
+            {"id": "3", "title": "LLM release", "url": "https://example.com/3"},
+            {"id": "4", "title": "AI model update", "url": "https://example.com/4"},
+        ],
+    }
+    mock_resp = AsyncMock()
+    mock_resp.json = lambda: payload
+    mock_resp.raise_for_status = lambda: None
+
+    with patch("httpx.AsyncClient.get", return_value=mock_resp) as mock_get:
+        items = await collect_hotlist(source)
+
+    mock_get.assert_called_once_with(
+        "https://newsnow.example/api/s",
+        params={"id": "aihot", "latest": ""},
+    )
+    assert [item.url for item in items] == [
+        "https://example.com/2",
+        "https://example.com/3",
+    ]
+    assert items[0].source == "hotlist"
+    assert items[0].source_detail == "AIHOT"
+    assert items[0].description == "An AI coding assistant"
+    assert items[0].published_at == "2026-06-21T01:00:00Z"
+    assert items[0].raw_metadata == {
+        "item_id": "2",
+        "rank": 2,
+        "info": "Tools",
+        "platform_id": "aihot",
+        "updated_time": 1782007931830,
+        "source_id": "hotlist_aihot",
+    }
+
+
+@pytest.mark.asyncio
+async def test_collect_hotlist_skips_unsafe_or_unexpected_domains():
+    source = make_source(
+        id="hotlist_zhihu_ai",
+        name="知乎 AI 热榜",
+        type="hotlist",
+        config={
+            "api_url": "https://newsnow.example/api/s",
+            "platform_id": "zhihu",
+            "expected_domain": "zhihu.com",
+            "filter_keywords": [],
+        },
+    )
+    payload = {
+        "status": "success",
+        "items": [
+            {"id": "1", "title": "HTTP", "url": "http://www.zhihu.com/question/1"},
+            {"id": "2", "title": "Wrong host", "url": "https://evil.example/question/2"},
+            {"id": "3", "title": "Valid", "url": "https://www.zhihu.com/question/3"},
+        ],
+    }
+    mock_resp = AsyncMock()
+    mock_resp.json = lambda: payload
+    mock_resp.raise_for_status = lambda: None
+
+    with patch("httpx.AsyncClient.get", return_value=mock_resp):
+        items = await collect_hotlist(source)
+
+    assert [item.url for item in items] == ["https://www.zhihu.com/question/3"]
+
+
+@pytest.mark.asyncio
+async def test_collect_hotlist_rejects_unsuccessful_response_status():
+    source = make_source(
+        type="hotlist",
+        config={
+            "api_url": "https://newsnow.example/api/s",
+            "platform_id": "aihot",
+        },
+    )
+    mock_resp = AsyncMock()
+    mock_resp.json = lambda: {"status": "error", "items": []}
+    mock_resp.raise_for_status = lambda: None
+
+    with patch("httpx.AsyncClient.get", return_value=mock_resp):
+        with pytest.raises(ValueError, match="NewsNow 响应状态异常"):
+            await collect_hotlist(source)
 
 
 @pytest.mark.asyncio

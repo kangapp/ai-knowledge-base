@@ -189,6 +189,48 @@ sources:
       keywords: [LLM, agent, RAG, transformer]
       lookback_days: 7
 
+  # ===== 技术热榜（NewsNow） =====
+  - id: hotlist_aihot
+    name: AIHOT
+    type: hotlist
+    enabled: true
+    priority: 2
+    cron: "0 */2 * * *"
+    max_items: 10
+    config:
+      api_url: "https://newsnow.busiyi.world/api/s"
+      platform_id: "aihot"
+      filter_keywords: [AI, LLM, Agent, RAG, MCP, OpenAI, Anthropic, DeepSeek, 大模型, 人工智能]
+      filter_scope: title_summary
+
+  - id: hotlist_juejin
+    name: 稀土掘金热榜
+    type: hotlist
+    enabled: true
+    priority: 2
+    cron: "0 */4 * * *"
+    max_items: 10
+    config:
+      api_url: "https://newsnow.busiyi.world/api/s"
+      platform_id: "juejin"
+      expected_domain: "juejin.cn"
+      filter_keywords: [AI, LLM, 大模型, 人工智能, Agent, RAG, MCP, LangChain, OpenAI, DeepSeek]
+      filter_scope: title_summary
+
+  - id: hotlist_zhihu_ai
+    name: 知乎 AI 热榜
+    type: hotlist
+    enabled: true
+    priority: 3
+    cron: "0 */4 * * *"
+    max_items: 10
+    config:
+      api_url: "https://newsnow.busiyi.world/api/s"
+      platform_id: "zhihu"
+      expected_domain: "zhihu.com"
+      filter_keywords: [AI, LLM, 大模型, 人工智能, Agent, OpenAI, Anthropic, DeepSeek, 豆包, Kimi, 通义, 智谱]
+      filter_scope: title
+
   # ===== 飞书 =====
   - id: feishu
     name: 飞书知识文档
