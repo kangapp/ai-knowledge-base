@@ -26,6 +26,36 @@ async def test_parse_and_validate_success():
     assert result.tags == ["AI"]
     assert result.retry_count == 0
 
+
+def test_parse_and_validate_preserves_project_type():
+    from src.graph.analyzers.base import parse_and_validate
+
+    raw = json.dumps({
+        "title": "Goose",
+        "summary": "可执行、编辑和测试代码的 Coding Agent",
+        "tags": ["Agent"],
+        "language": "zh",
+        "project_type": "coding_tool",
+    })
+
+    result = parse_and_validate(
+        raw,
+        ref_url="https://github.com/aaif-goose/goose",
+    )
+
+    assert result.project_type == "coding_tool"
+
+
+def test_analyzed_item_allows_missing_project_type():
+    item = AnalyzedItem(
+        ref_url="https://example.com/article",
+        title="Article",
+        summary="Summary",
+    )
+
+    assert item.project_type is None
+
+
 def test_parse_markdown_wrapped_json():
     from src.graph.analyzers.base import parse_and_validate
     raw = '```json\n{"title": "T", "summary": "S", "tags": ["X"], "language": "en"}\n```'

@@ -320,7 +320,13 @@ async def run_deep_report_stage(
             status="running",
             message="开始选择深度报告候选",
         )
-        candidate = await select_deep_report_candidate(db, raw_items, analyzed_items, reviewed_items)
+        selection = await select_deep_report_candidate(
+            db,
+            raw_items,
+            analyzed_items,
+            reviewed_items,
+        )
+        candidate = selection.candidate
         if candidate is None:
             await record_pipeline_event(
                 db,
@@ -329,8 +335,29 @@ async def run_deep_report_stage(
                 event="deep.selector_skipped",
                 status="skipped",
                 message="没有满足条件的深度报告候选",
+                payload=selection.diagnostics,
             )
             return DeepReportStageResult(status="skipped", message="no candidate")
+
+        await record_pipeline_event(
+            db,
+            run_id=run_id,
+            phase="deep_report",
+            event="deep.selector_done",
+            level="success",
+            status="done",
+            source_id=candidate.source_id,
+            source="github",
+            source_detail=candidate.source_detail,
+            ref_url=candidate.repo_url,
+            title=candidate.title,
+            message="已选择深度报告候选",
+            payload={
+                "candidate_score": candidate.candidate_score,
+                "project_type": candidate.metadata.get("project_type"),
+                "diagnostics": selection.diagnostics,
+            },
+        )
 
         resolved_article_id = _resolve_article_id(candidate, raw_items, article_ids)
         if resolved_article_id is not None:

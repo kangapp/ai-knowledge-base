@@ -3,6 +3,17 @@ from pydantic import BaseModel, Field
 import operator
 from typing import Literal, Optional, Annotated
 
+PROJECT_TYPES = (
+    "coding_tool",
+    "ai_infrastructure",
+    "framework",
+    "research",
+    "dataset",
+    "benchmark",
+    "resource_collection",
+    "other",
+)
+
 
 class RawItem(BaseModel):
     """Collector 产出 — 原始采集数据"""
@@ -28,6 +39,7 @@ class AnalyzedItem(BaseModel):
     source_detail: str = ""
     source_id: str = ""
     metadata: dict = Field(default_factory=dict)
+    project_type: str | None = None
 
 
 class ReviewedItem(BaseModel):

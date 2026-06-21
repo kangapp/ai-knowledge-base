@@ -4,6 +4,14 @@
 
 ## P0 已完成
 
+- [x] 修复 Deep Reports 长期无新报告
+  - 定位 2026-06-12 后 123 次 `deep.selector_skipped`，生成、clone、LLM 和入库链路均未执行
+  - 最近 29 个 approved GitHub 项目中 27 个被英文精确短语误判为无 Coding 交付证据
+  - GitHub Analyzer 新增结构化 `project_type`，按主要交付物区分 Coding 工具、AI 基础设施、框架、研究、数据集、benchmark 和资源合集
+  - Selector 改为 `coding_tool` + Reviewer ≥85 + AI 相关度 ≥28 + 开发者实用性 ≥24；候选分只负责排序
+  - `deep.selector_skipped` / `deep.selector_done` 增加拒绝原因汇总，`no candidate` 可直接排障
+  - 使用 goose、context7、rtk、ponytail 等生产样本补充回归测试
+
 - [x] 接入 NewsNow 技术热榜数据源
   - 新增配置驱动的 `hotlist` Collector，首批启用 AIHOT、稀土掘金热榜和知乎 AI 热榜
   - 热榜响应执行状态、HTTPS 和可选目标域名校验，排名及平台元数据写入 `raw_metadata`

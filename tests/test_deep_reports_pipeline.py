@@ -9,7 +9,9 @@ from src.core.config import SourceConfig, SourcesConfig
 from src.core.database import Database
 from src.db.operations import save_deep_report
 from src.deep_reports.models import (
+    DeepReportCandidate,
     DeepReportOutput,
+    DeepReportSelection,
     DeepReportStageResult,
     RepoFile,
     RepoInspection,
@@ -67,11 +69,20 @@ def _analyzed(url: str, *, source: str = "github", source_id: str = "github_ai_d
         source=source,
         source_detail="github trending",
         source_id=source_id,
+        project_type="coding_tool",
     )
 
 
 def _reviewed(url: str, *, verdict: str = "approved", score: int = 88) -> ReviewedItem:
-    return ReviewedItem(ref_url=url, total_score=score, dimensions={}, verdict=verdict)
+    return ReviewedItem(
+        ref_url=url,
+        total_score=score,
+        dimensions={
+            "ai_relevance": {"score": 32},
+            "developer_utility": {"score": 26},
+        },
+        verdict=verdict,
+    )
 
 
 def _inspection(repo_url: str = "https://github.com/acme/dev-agent", repo_name: str = "acme/dev-agent") -> RepoInspection:
@@ -204,11 +215,17 @@ async def test_deep_report_stage_skips_when_no_candidate(tmp_path):
         assert result == DeepReportStageResult(status="skipped", message="no candidate")
         rows = await db.fetch_all("SELECT * FROM deep_reports")
         assert rows == []
-        events = await db.fetch_all("SELECT event, status FROM pipeline_events ORDER BY id")
+        events = await db.fetch_all(
+            "SELECT event, status, payload FROM pipeline_events ORDER BY id"
+        )
         assert [(row["event"], row["status"]) for row in events] == [
             ("deep.selector_start", "running"),
             ("deep.selector_skipped", "skipped"),
         ]
+        payload = json.loads(events[-1]["payload"])
+        assert payload["reviewed_total"] == 1
+        assert payload["eligible"] == 0
+        assert payload["rejected"]["not_github"] == 1
     finally:
         await db.close()
 
@@ -273,12 +290,19 @@ async def test_deep_report_stage_clone_failure_persists_failed_row_and_event(tmp
         assert row["status"] == "failed"
         assert row["article_id"] == 42
         assert row["error"] == "clone exploded"
-        events = await db.fetch_all("SELECT event, status, message FROM pipeline_events ORDER BY id")
+        events = await db.fetch_all(
+            "SELECT event, status, message, payload FROM pipeline_events ORDER BY id"
+        )
         assert [(item["event"], item["status"]) for item in events] == [
             ("deep.selector_start", "running"),
+            ("deep.selector_done", "done"),
             ("deep.clone_start", "running"),
             ("deep.failed", "failed"),
         ]
+        selector_payload = json.loads(events[1]["payload"])
+        assert selector_payload["candidate_score"] == 82
+        assert selector_payload["project_type"] == "coding_tool"
+        assert selector_payload["diagnostics"]["eligible"] == 1
         assert events[-1]["message"] == "clone exploded"
     finally:
         await db.close()
@@ -385,6 +409,7 @@ async def test_deep_report_stage_success_saves_costs_report_and_uses_to_thread(t
         events = await db.fetch_all("SELECT event, status, cost, tokens, payload FROM pipeline_events ORDER BY id")
         assert [(row["event"], row["status"]) for row in events] == [
             ("deep.selector_start", "running"),
+            ("deep.selector_done", "done"),
             ("deep.clone_start", "running"),
             ("deep.scan_done", "done"),
             ("deep.analyze_start", "running"),
@@ -524,21 +549,22 @@ async def test_deep_report_stage_same_commit_failure_does_not_downgrade_complete
             return None, [_cost(status="request_failed", cost=0.001, tokens_in=90, tokens_out=0, attempt_no=1, error="timeout")]
 
         from src.deep_reports.service import run_deep_report_stage
-        from src.deep_reports.models import DeepReportCandidate
-
         async def fake_selector(*_args, **_kwargs):
-            return DeepReportCandidate(
-                repo_url=raw.url,
-                repo_name="acme/dev-agent",
-                article_id=42,
-                source_id="github_ai_devtools",
-                source_detail="github trending",
-                title="Dev Agent",
-                summary="summary",
-                reviewer_score=88,
-                candidate_score=90,
-                trigger_reason="forced",
-                metadata={},
+            return DeepReportSelection(
+                candidate=DeepReportCandidate(
+                    repo_url=raw.url,
+                    repo_name="acme/dev-agent",
+                    article_id=42,
+                    source_id="github_ai_devtools",
+                    source_detail="github trending",
+                    title="Dev Agent",
+                    summary="summary",
+                    reviewer_score=88,
+                    candidate_score=90,
+                    trigger_reason="forced",
+                    metadata={"project_type": "coding_tool"},
+                ),
+                diagnostics={"eligible": 1, "rejected": {}},
             )
 
         with pytest.MonkeyPatch.context() as monkeypatch:

@@ -5,6 +5,7 @@ from src.graph.analyzers.base import parse_and_validate
 from src.graph.state import AnalyzedItem
 
 PROMPT_FILES = ["github_analyzer.md", "rss_analyzer.md", "feishu_analyzer.md", "arxiv_analyzer.md"]
+PROJECT_ROOT = Path(__file__).parent.parent
 
 
 @pytest.mark.parametrize("prompt_file", PROMPT_FILES)
@@ -12,6 +13,23 @@ def test_prompt_has_schema_instruction(prompt_file):
     content = (Path(__file__).parent.parent / "prompts" / prompt_file).read_text()
     assert "json" in content.lower()
     assert "schema" in content.lower()  # 检查 schema 占位符存在
+
+
+def test_github_prompt_defines_project_type_contract():
+    content = (PROJECT_ROOT / "prompts" / "github_analyzer.md").read_text()
+
+    for value in (
+        "coding_tool",
+        "ai_infrastructure",
+        "framework",
+        "research",
+        "dataset",
+        "benchmark",
+        "resource_collection",
+        "other",
+    ):
+        assert value in content
+    assert "主要交付物" in content
 
 
 @pytest.mark.parametrize("seed", json.loads((Path(__file__).parent / "fixtures" / "seed_articles.json").read_text()))

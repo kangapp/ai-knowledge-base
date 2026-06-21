@@ -6,7 +6,12 @@ from ...core.llm_client import LLMRegistry
 from ...core.json_utils import extract_json_object
 
 logger = logging.getLogger("pipeline")
-ANALYZED_SCHEMA_DESC = '{"title": "string", "summary": "100-200字中文", "tags": ["标签1", "标签2"], "language": "zh|en"}'
+ANALYZED_SCHEMA_DESC = (
+    '{"title": "string", "summary": "100-200字中文", '
+    '"tags": ["标签1", "标签2"], "language": "zh|en", '
+    '"project_type": "GitHub only: coding_tool|ai_infrastructure|framework|'
+    'research|dataset|benchmark|resource_collection|other"}'
+)
 
 
 def load_prompt(agent_name: str, registry: LLMRegistry) -> str:

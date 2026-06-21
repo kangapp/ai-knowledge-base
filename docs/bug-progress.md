@@ -1,5 +1,32 @@
 # Bug 处理记录
 
+## Bug 41: Deep Reports 候选选择器误杀全部新项目（2026-06-21）
+
+**现象**：生产环境自 2026-06-12 后没有自动生成新的深度报告。流水线正常完成，但深度报告阶段持续返回 `no candidate`。
+
+**证据**：
+
+- 生产数据库累计 123 次 `deep.selector_skipped`。
+- 2026-06-12 后没有新的 `deep.clone_start`，说明故障发生在 clone、LLM 和入库之前。
+- 最近 29 个 approved GitHub 项目中，27 个被判定为没有 Coding 交付证据。
+- `goose`、`context7`、`rtk`、`ponytail` 等明确的 Coding 工具同样被过滤。
+
+**根因**：
+
+- Selector 只识别少量英文精确短语，真实 GitHub description 较短，Analyzer 摘要主要为中文。
+- Reviewer ≥85 后还要求候选分 ≥85；普通 GitHub 来源即使命中一项能力通常也只有 72–78 分。
+- 测试 fixture 使用专门匹配词表的英文描述，未覆盖真实生产样本。
+
+**处理**：
+
+- GitHub Analyzer 输出结构化 `project_type`，按主要交付物分类。
+- Selector 只接受 `coding_tool`，并要求 Reviewer ≥85、`ai_relevance` ≥28、`developer_utility` ≥24。
+- 候选分只用于合格候选排序，不再作为额外门槛。
+- 缺失或未知项目类型 fail closed，不回退旧关键词算法。
+- 选择事件记录各拒绝原因数量，并加入真实生产项目回归测试。
+
+---
+
 ## 部署远程命令超时（2026-06-11）
 
 **现象**：test 和 build-image 成功，deploy 远程步骤运行约 10 分钟后失败；VPS 仓库 HEAD 已更新，但容器仍运行旧镜像。

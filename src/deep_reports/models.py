@@ -46,6 +46,11 @@ class DeepReportCandidate(BaseModel):
     metadata: dict = Field(default_factory=dict)
 
 
+class DeepReportSelection(BaseModel):
+    candidate: DeepReportCandidate | None = None
+    diagnostics: dict = Field(default_factory=dict)
+
+
 class FlowStep(BaseModel):
     model_config = ConfigDict(extra="forbid")
 

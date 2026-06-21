@@ -100,8 +100,9 @@
   - 常见改动入口：采用决策、架构图节点/边、快速上手/部署流程、源码证据和阶段返回契约。
 
 - `src/deep_reports/selector.py`
-  - 从本轮 approved GitHub 项目中选择最多 1 个候选；Reviewer 和候选分均至少 85，并要求正文中存在明确 Coding 工具能力和交付证据。
-  - 常见改动入口：Coding 能力词表、评测/文档提及排除、readiness 评分和 7 天重复分析窗口。
+  - 从本轮 approved GitHub 项目中选择最多 1 个候选；要求 `project_type=coding_tool`、Reviewer ≥85、AI 相关度 ≥28、开发者实用性 ≥24。
+  - 候选分仅用于排序；选择结果附带单一拒绝原因汇总，供 `deep.selector_skipped` / `deep.selector_done` 事件排障。
+  - 常见改动入口：项目类型准入、Reviewer 维度阈值、排序权重和 7 天重复分析窗口。
 
 - `src/deep_reports/inspector.py`
   - 临时 shallow clone，过滤依赖/构建目录、二进制和超限文件，读取 README、manifest、入口文件、关键源码与 commit SHA；不执行仓库代码。
