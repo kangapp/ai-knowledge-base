@@ -150,6 +150,9 @@
 - [x] 新增 GitHub AI 开发工具数据源
   - 新增 `github_ai_devtools`，面向 Understand-Anything、GitNexus、probe 这类代码库理解/知识图谱/AI 开发工具仓库
   - 使用 `pushed` 90 天窗口和用途型关键词：`interactive knowledge graph`、`codebase knowledge graph`、`code understanding`、`codebase understanding`、`repository analysis`
+- [x] 优化 GitHub AI 开发工具召回
+  - 查询词调整为 Coding Agent、AI 编程助手、代码生成、代码审查和 AI IDE，直接对齐 Deep Report 的 `coding_tool` 类型
+  - 采集阶段过滤教程、课程、面试题、writeup 和资源合集等明显非工具仓库，审核与报告质量门槛保持不变
 - [x] 收紧 RSS 数据源采集口径
   - 英文关键词按词边界匹配，避免 `AI` 命中 `raises`、`chair` 等普通单词片段
   - 综合媒体 RSS 使用 `filter_scope: title`，避免长正文/推荐内容里偶然出现 AI 词导致误采集

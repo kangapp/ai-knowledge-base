@@ -57,12 +57,20 @@ def test_project_sources_include_github_ai_devtools():
     assert source.config["min_stars"] == 100
     assert source.config["topics"] == []
     assert source.config["keywords"] == [
-        "interactive knowledge graph",
-        "codebase knowledge graph",
-        "code understanding",
-        "codebase understanding",
-        "repository analysis",
+        "coding agent",
+        "AI coding assistant",
+        "code generation",
+        "AI code review",
+        "AI IDE",
     ]
+    assert {
+        "tutorial",
+        "course",
+        "awesome",
+        "interview",
+        "writeup",
+        "write-ups",
+    }.issubset(set(source.config["exclude_terms"]))
 
 
 def test_project_sources_disable_broken_feeds_and_use_official_producthunt_feed():

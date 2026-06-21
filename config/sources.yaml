@@ -59,8 +59,8 @@ sources:
     max_items: 10
     config:
       topics: []
-      keywords: ["interactive knowledge graph", "codebase knowledge graph", "code understanding", "codebase understanding", "repository analysis"]
-      exclude_terms: [wallpaper, porn, nsfw, account, registration, card]
+      keywords: ["coding agent", "AI coding assistant", "code generation", "AI code review", "AI IDE"]
+      exclude_terms: [wallpaper, porn, nsfw, account, registration, card, tutorial, course, awesome, interview, writeup, write-ups]
       lookback_type: pushed
       lookback_days: 90
       min_stars: 100
