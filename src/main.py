@@ -12,6 +12,7 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from .core.config import load_llm_config, load_sources_config, load_agents_config
 from .core.database import Database
 from .core.llm_client import LLMRegistry
+from .core.source_governance import rollup_source_health_daily
 from .core.source_registry import list_schedulable_sources, sync_sources_config
 from .core.time import BEIJING_TZ, now_bj_iso, run_id_bj
 from .graph.pipeline import build_pipeline, record_phase_start, record_phase_end, set_pipeline_db, reset_analyzer_counter
@@ -893,6 +894,7 @@ async def run_pipeline(trigger: str = "cron", source_filter: str | list[str] | t
             error_log=error_log,
             active_sources=active_sources,
         )
+        await rollup_source_health_daily(_db, run_id)
         await record_phase_end(
             _db,
             run_id,
