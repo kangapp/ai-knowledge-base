@@ -91,6 +91,7 @@ GitHub Actions (push master):
 - **调度重叠**：采集任务按 cron 分组注册并使用北京时间；若上一轮仍未完成，新任务记录 `pipeline.queued` 后等待进程内锁，上一轮结束后继续执行，不再跳过整组。
 - **连续零采集**：先查 `/api/sources/stats` 的 `health_status/last_error/last_run_at`。`failed` 是请求失败，`success_zero` 是请求成功但关键词零命中，`dedup_only` 是本轮全部重复，`analysis_failed` 是已采集但分析阶段失败。
 - **全部来源同时 analysis_failed**：优先查看健康表“错误”列和 `pipeline_runs.summary.errors`。预算或 Provider 不可用会记录具体原因；若有新条目但 Analyzer 全部失败，该 run 应为 `failed`。预算按北京时间当天 `cost_logs` 对账，容器重启不会绕过 hard limit，跨日会自动恢复。
+- **数据源自动治理**：预算阻断不计入源质量；自动动作只会降权、隔离或禁用，不会删除。人工禁用会设置覆盖标记，不会被自动恢复。
 - **历史分析失败补跑**：修复后手动触发对应来源或全源 pipeline。未分析条目没有写入 `articles`，会重新进入 Collector；用 `analyzed > 0`、`cost > 0`、最新 source status 为 healthy 验证恢复。
 - **RSS 地址失效**：优先切换到来源官方 Feed；不存在稳定官方 Feed 时在 `config/sources.yaml` 设为 `enabled: false`，不要用不稳定代理伪装成可用源。
 - **部署在 6-10 分钟内失败**：查看 `2/6 Pull immutable image` 阶段。GHCR 拉取单次 3 分钟、最多 2 次；网络持续过慢时快速失败，不继续占用 runner。

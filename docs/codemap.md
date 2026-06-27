@@ -88,6 +88,14 @@
   - pipeline 开始时由 `src/main.py::_sync_registry_budget()` 使用 DB 当日费用覆盖内存快照，避免重启绕过预算。
   - soft limit 仅在 fallback 非空时切换；hard limit 才停止所有新请求。
 
+- `src/core/source_registry.py`
+  - DB-backed 数据源注册表；同步 `sources.yaml` bootstrap 数据，并返回可调度源。
+  - 人工禁用源设置 `manual_override` 后，自动同步不得恢复。
+
+- `src/core/source_governance.py`
+  - 计算每日数据源健康分，并执行 active/degraded/quarantined/disabled 自动迁移。
+  - 预算阻断只记录 `budget_blocked`，不降低源质量分。
+
 - `src/core/time.py`
   - 项目业务时间统一入口，当前使用北京时间（Asia/Shanghai / UTC+8）。
   - 常见改动入口：日志时间、run_id、采集入库时间、站点构建更新时间。

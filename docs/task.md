@@ -1,8 +1,16 @@
 # 当前任务拆解
 
-更新时间：2026-06-21
+更新时间：2026-06-27
 
 ## P0 已完成
+
+- [x] 数据源自动治理闭环
+  - 新增 `source_registry/source_health_daily/source_governance_events`，`sources.yaml` 作为 bootstrap，运行调度读取注册表
+  - 自动发现源只进入 candidate，不再直接写回正式配置
+  - 数据源每日计算健康分，支持 active、degraded、quarantined、disabled 等治理状态迁移
+  - 预算阻断单独记录 `budget_blocked`，不降低源质量分
+  - `/api/sources/stats` 返回 `governance_status/health_score/budget_blocked/last_governance_reason`
+  - Dashboard 数据源健康表展示治理状态、健康分和预算阻断
 
 - [x] 修复 Deep Reports 长期无新报告
   - 定位 2026-06-12 后 123 次 `deep.selector_skipped`，生成、clone、LLM 和入库链路均未执行
