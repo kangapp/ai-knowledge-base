@@ -209,6 +209,18 @@ def test_homepage_contains_article_drawer_and_shareable_links():
     assert "ArticleDetail.openDrawer" in app_js
 
 
+def test_homepage_supports_local_favorites_view():
+    index_html = (ROOT / "src/site/templates/index.html").read_text()
+    app_js = (ROOT / "src/site/static/js/app.js").read_text()
+
+    assert 'data-favorite-filter="all"' in index_html
+    assert 'data-favorite-filter="favorites"' in index_html
+    assert "ai_kb_favorite_articles" in app_js
+    assert "localStorage" in app_js
+    assert "data-favorite-toggle" in app_js
+    assert "state.favoritesOnly" in app_js
+
+
 @pytest.mark.asyncio
 async def test_homepage_uses_short_list_summary_without_truncating_data_summary(tmp_path, monkeypatch):
     full_summary = "这是一段用于详情展示的完整中文摘要。" * 12

@@ -5,6 +5,10 @@
     <input type="search" id="search-box" placeholder="搜索... (FTS5)">
     <select id="source-filter"><option value="">全部来源</option></select>
     <select id="tag-filter"><option value="">全部标签</option></select>
+    <div class="favorite-filters" aria-label="收藏筛选">
+        <button type="button" class="active" data-favorite-filter="all">全部</button>
+        <button type="button" data-favorite-filter="favorites">收藏</button>
+    </div>
     <div class="date-filters">
         <button data-days="7">近 7 天</button>
         <button data-days="30">近 30 天</button>
@@ -33,6 +37,7 @@
             {% if article_tags %}
             <div class="tags">{% for tag in article_tags %}<span class="tag">{{ tag }}</span>{% endfor %}</div>
             {% endif %}
+            <button type="button" class="favorite-btn" data-favorite-toggle data-article-id="{{ article.id }}" aria-label="收藏文章" aria-pressed="false">☆</button>
         </div>
         <h3><a href="/article.html?id={{ article.id }}" data-article-link data-article-id="{{ article.id }}">{{ article.title }}</a></h3>
         <p>{{ article.list_summary }}</p>

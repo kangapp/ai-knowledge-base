@@ -27,7 +27,9 @@
     };
 
     const INIT = window.__INIT__ || { articles: [], stats: {} };
-    const state = { source: '', tag: '', days: 30, query: '' };
+    const FAVORITES_KEY = 'ai_kb_favorite_articles';
+    const state = { source: '', tag: '', days: 30, query: '', favoritesOnly: false };
+    let favoriteIds = loadFavoriteIds();
 
     function getSourceLabel(source, sourceDetail) {
         if (source === 'hotlist' && sourceDetail) {
@@ -57,17 +59,19 @@
         const list = document.getElementById('article-list');
         if (!list) return;
         if (articles.length === 0) {
-            list.innerHTML = '<p class="loading">暂无文章</p>';
+            list.innerHTML = `<p class="loading">${state.favoritesOnly ? '暂无收藏文章' : '暂无文章'}</p>`;
             return;
         }
         list.innerHTML = articles.map(a => {
             const label = getSourceLabel(a.source, a.source_detail);
             const tagsHtml = (a.tags || []).slice(0, 3).map(t => `<span class="tag">${escapeHtml(t)}</span>`).join('');
+            const isFavorite = favoriteIds.has(String(a.id));
             return `
             <div class="article-card" data-score="${a.relevance_score}" data-source="${a.source}" data-source-detail="${a.source_detail || ''}">
                 <div class="card-header">
                     <span class="topic-tag">${escapeHtml(label)}</span>
                     ${tagsHtml ? `<div class="tags">${tagsHtml}</div>` : ''}
+                    <button type="button" class="favorite-btn ${isFavorite ? 'active' : ''}" data-favorite-toggle data-article-id="${a.id}" aria-label="${isFavorite ? '取消收藏文章' : '收藏文章'}" aria-pressed="${isFavorite ? 'true' : 'false'}">${isFavorite ? '★' : '☆'}</button>
                 </div>
                 <h3><a href="/article.html?id=${a.id}" data-article-link data-article-id="${a.id}">${escapeHtml(a.title)}</a></h3>
                 <p>${escapeHtml(listSummary(a.summary || a.description || ''))}</p>
@@ -103,6 +107,9 @@
         if (state.tag) {
             articles = articles.filter(a => (a.tags || []).includes(state.tag));
         }
+        if (state.favoritesOnly) {
+            articles = articles.filter(a => favoriteIds.has(String(a.id)));
+        }
         if (state.query) {
             const q = state.query.toLowerCase();
             articles = articles.filter(a =>
@@ -112,6 +119,29 @@
             );
         }
         render(articles);
+    }
+
+    function loadFavoriteIds() {
+        try {
+            return new Set(JSON.parse(localStorage.getItem(FAVORITES_KEY) || '[]').map(String));
+        } catch (_) {
+            return new Set();
+        }
+    }
+
+    function saveFavoriteIds() {
+        localStorage.setItem(FAVORITES_KEY, JSON.stringify([...favoriteIds]));
+    }
+
+    function toggleFavorite(articleId) {
+        const id = String(articleId);
+        if (favoriteIds.has(id)) {
+            favoriteIds.delete(id);
+        } else {
+            favoriteIds.add(id);
+        }
+        saveFavoriteIds();
+        filterArticles();
     }
 
     function escapeHtml(str) {
@@ -174,10 +204,27 @@
             });
         });
 
+        document.querySelectorAll('[data-favorite-filter]').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('[data-favorite-filter]').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                state.favoritesOnly = btn.dataset.favoriteFilter === 'favorites';
+                filterArticles();
+            });
+        });
+
+        document.addEventListener('click', event => {
+            const btn = event.target.closest('[data-favorite-toggle]');
+            if (!btn) return;
+            event.preventDefault();
+            toggleFavorite(btn.dataset.articleId);
+        });
+
         // default: show active button
         const activeBtn = document.querySelector('.date-filters button.active') ||
                           document.querySelector('.date-filters button[data-days="30"]');
         if (activeBtn) activeBtn.classList.add('active');
+        filterArticles();
     }
 
     function setupArticleDrawer() {
