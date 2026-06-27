@@ -1,5 +1,6 @@
 import re
 import logging
+import json
 import httpx
 import feedparser
 import hashlib
@@ -174,6 +175,23 @@ class SourceDiscovery:
                 INSERT OR IGNORE INTO discovered_sources (url, name, type, status, discovered_at)
                 VALUES (?, ?, ?, 'candidate', datetime('now', '+8 hours'))
             """, (source.config.get("url", ""), source.name, source.type))
+            await self._db.execute(
+                """
+                INSERT INTO source_registry
+                (id, name, type, status, enabled, priority, cron, max_items, config_json)
+                VALUES (?, ?, ?, 'candidate', 0, ?, ?, ?, ?)
+                ON CONFLICT(id) DO NOTHING
+                """,
+                (
+                    source.id,
+                    source.name,
+                    source.type,
+                    source.priority,
+                    source.cron,
+                    source.max_items,
+                    json.dumps(source.config, ensure_ascii=False),
+                ),
+            )
             await self._db.commit()
             logger.info("discovered_source.recorded", extra={"source_id": source.id, "type": source.type})
         except Exception as e:

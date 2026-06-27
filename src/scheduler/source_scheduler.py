@@ -31,9 +31,6 @@ async def run_weekly_source_maintenance():
         discovery = SourceDiscovery(db)
         new_sources = await discovery.discover()
         added_count = 0
-        for source in new_sources:
-            if SourceManager.add(source):
-                added_count += 1
 
         logger.info("scheduler.complete", extra={
             "evicted": len(evicted),
