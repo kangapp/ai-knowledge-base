@@ -12,6 +12,7 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from .core.config import load_llm_config, load_sources_config, load_agents_config
 from .core.database import Database
 from .core.llm_client import LLMRegistry
+from .core.source_registry import sync_sources_config
 from .core.time import BEIJING_TZ, now_bj_iso, run_id_bj
 from .graph.pipeline import build_pipeline, record_phase_start, record_phase_end, set_pipeline_db, reset_analyzer_counter
 from .graph.state import PipelineState, ReviewedItem
@@ -1068,6 +1069,7 @@ async def lifespan(app: FastAPI):
 
     # APScheduler
     sources_cfg = load_sources_config(CONFIG_DIR / "sources.yaml")
+    await sync_sources_config(_db, sources_cfg.sources)
     _scheduler = AsyncIOScheduler(timezone=BEIJING_TZ)
     _register_source_jobs(_scheduler, sources_cfg.sources, run_pipeline)
     _scheduler.start()
