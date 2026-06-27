@@ -159,6 +159,47 @@ async def _get_latest_analysis_errors(db: Database) -> dict[str, str]:
     }
 
 
+async def _get_governance_map(db: Database) -> dict[str, dict]:
+    rows = await db.fetch_all("""
+        SELECT sr.id, sr.status, shd.health_score, shd.budget_blocked
+        FROM source_registry sr
+        LEFT JOIN (
+            SELECT source_id, health_score, budget_blocked
+            FROM source_health_daily
+            WHERE (source_id, date) IN (
+                SELECT source_id, MAX(date)
+                FROM source_health_daily
+                GROUP BY source_id
+            )
+        ) shd ON shd.source_id = sr.id
+    """)
+    return {
+        row["id"]: {
+            "governance_status": row["status"],
+            "health_score": row["health_score"],
+            "budget_blocked": bool(row["budget_blocked"] or 0),
+        }
+        for row in rows
+    }
+
+
+async def _get_latest_governance_reasons(db: Database) -> dict[str, str]:
+    rows = await db.fetch_all("""
+        WITH ranked AS (
+            SELECT source_id, reason,
+                   ROW_NUMBER() OVER (
+                       PARTITION BY source_id
+                       ORDER BY created_at DESC, id DESC
+                   ) AS row_number
+            FROM source_governance_events
+        )
+        SELECT source_id, reason
+        FROM ranked
+        WHERE row_number = 1
+    """)
+    return {row["source_id"]: row["reason"] for row in rows}
+
+
 def _derive_health_status(source: SourceConfig, latest: dict | None) -> str:
     if not source.enabled:
         return "disabled"
@@ -214,6 +255,8 @@ async def get_source_stats(period: str = "week"):
         latest_source_runs = await _get_latest_source_runs(db)
         latest_source_errors = await _get_latest_source_errors(db)
         latest_analysis_errors = await _get_latest_analysis_errors(db)
+        governance_map = await _get_governance_map(db)
+        governance_reasons = await _get_latest_governance_reasons(db)
         health_map = {h["source_id"]: h for h in health_data}
 
         stats = []
@@ -249,12 +292,17 @@ async def get_source_stats(period: str = "week"):
             metrics = source_run_metrics.get(source.id, {})
             latest = latest_source_runs.get(source.id)
             health_status = _derive_health_status(source, latest)
+            governance = governance_map.get(source.id, {})
             stats.append({
                 "id": source.id,
                 "name": source.name,
                 "type": source.type,
                 "enabled": source.enabled,
                 "health_status": health_status,
+                "governance_status": governance.get("governance_status"),
+                "health_score": governance.get("health_score"),
+                "budget_blocked": governance.get("budget_blocked", False),
+                "last_governance_reason": governance_reasons.get(source.id),
                 "approved_rate": round(approved_rate, 3),
                 "total_collected": total,
                 "avg_score": h["avg_score"],

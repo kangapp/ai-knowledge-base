@@ -306,6 +306,55 @@ async def test_source_stats_period_uses_calendar_window(api_client, api_db, monk
     assert week["avg_score"] == 85.0
 
 
+@pytest.mark.asyncio
+async def test_source_stats_include_governance_fields(api_client, api_db, monkeypatch):
+    await api_db.execute(
+        """
+        INSERT INTO source_registry
+        (id, name, type, status, enabled, priority, cron, max_items, config_json)
+        VALUES ('rss_test', 'RSS Test', 'rss', 'degraded', 1, 2, '0 1 * * *', 5, '{}')
+        """
+    )
+    await api_db.execute(
+        """
+        INSERT INTO source_health_daily
+        (source_id, date, health_score, budget_blocked)
+        VALUES ('rss_test', '2026-06-27', 42, 1)
+        """
+    )
+    await api_db.execute(
+        """
+        INSERT INTO source_governance_events
+        (source_id, event, from_status, to_status, reason)
+        VALUES ('rss_test', 'auto_transition', 'active', 'degraded', '健康分低于50')
+        """
+    )
+    await api_db.commit()
+    monkeypatch.setattr(
+        "src.api.sources.SourceManager.load",
+        lambda: [
+            SourceConfig(
+                id="rss_test",
+                name="RSS Test",
+                type="rss",
+                enabled=True,
+                priority=2,
+                cron="0 1 * * *",
+                max_items=5,
+                config={},
+            )
+        ],
+    )
+    monkeypatch.setattr("src.api.sources._today", lambda: "2026-06-27")
+
+    source = api_client.get("/api/sources/stats?period=day").json()["data"]["sources"][0]
+
+    assert source["governance_status"] == "degraded"
+    assert source["health_score"] == 42
+    assert source["budget_blocked"] is True
+    assert source["last_governance_reason"] == "健康分低于50"
+
+
 @pytest.mark.parametrize(
     ("enabled", "latest", "expected"),
     [
