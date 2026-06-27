@@ -34,7 +34,7 @@ async def test_initialize_and_migrate(tmp_path):
 
         # 验证迁移版本
         v = await db.fetch_one("SELECT version FROM schema_version")
-        assert v["version"] == 11
+        assert v["version"] == 12
 
         deep_report_columns = await db.fetch_all("PRAGMA table_info(deep_reports)")
         deep_report_column_names = {row["name"] for row in deep_report_columns}
@@ -61,6 +61,41 @@ async def test_initialize_and_migrate(tmp_path):
         assert "collection_items" in names
         assert "pipeline_source_runs" in names
         assert "pipeline_events" in names
+    finally:
+        await db.close()
+
+
+@pytest.mark.asyncio
+async def test_source_governance_tables_exist(tmp_path):
+    db = Database(tmp_path / "governance.db", migrations_dir=_MIGRATIONS_DIR)
+    await db.initialize()
+    try:
+        tables = {
+            row["name"]
+            for row in await db.fetch_all(
+                "SELECT name FROM sqlite_master WHERE type='table'"
+            )
+        }
+        assert "source_registry" in tables
+        assert "source_health_daily" in tables
+        assert "source_governance_events" in tables
+
+        registry_cols = {
+            row["name"]
+            for row in await db.fetch_all("PRAGMA table_info(source_registry)")
+        }
+        assert {
+            "id",
+            "name",
+            "type",
+            "status",
+            "enabled",
+            "priority",
+            "cron",
+            "max_items",
+            "config_json",
+            "manual_override",
+        } <= registry_cols
     finally:
         await db.close()
 

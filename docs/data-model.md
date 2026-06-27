@@ -315,6 +315,64 @@ UNIQUE(source_id, date)
 | 1 | https://example.com/feed.xml | Example RSS | rss | 2026-05-20T10:00:00 | candidate | null | null | null |
 | 2 | https://github.com/foo/bar | foo/bar | github | 2026-05-18T08:00:00 | enabled | 2026-05-19T09:00:00 | null | null |
 
+### source_registry — 数据源运行注册表
+
+| 列 | 类型 | 说明 |
+|----|------|------|
+| id | TEXT PK | 数据源 ID |
+| name | TEXT | 数据源名称 |
+| type | TEXT | github / rss / hotlist / feishu / arxiv |
+| status | TEXT | candidate / trial / active / degraded / quarantined / disabled / rejected |
+| enabled | INTEGER | 是否参与调度 |
+| priority | INTEGER | 调度优先级 |
+| cron | TEXT | cron 表达式 |
+| max_items | INTEGER | 单次最大采集数 |
+| config_json | TEXT | 源配置 JSON |
+| manual_override | INTEGER | 人工覆盖标记，自动治理不得覆盖 |
+| created_at | TEXT | 北京时间 |
+| updated_at | TEXT | 北京时间 |
+
+`sources.yaml` 只作为 bootstrap 和人工兜底；运行时调度读取该表。自动治理只能调整状态或禁用源，不自动删除源。
+
+### source_health_daily — 数据源每日治理指标
+
+| 列 | 类型 | 说明 |
+|----|------|------|
+| source_id | TEXT | 数据源 ID |
+| date | TEXT | YYYY-MM-DD |
+| request_success_rate | REAL | 请求成功率 |
+| collected | INTEGER | 采集数 |
+| new_items | INTEGER | 新增数 |
+| analyzed | INTEGER | 分析成功数 |
+| analysis_failed | INTEGER | 分析失败数 |
+| approved | INTEGER | 审核通过数 |
+| discarded | INTEGER | 审核丢弃数 |
+| avg_score | REAL | 平均分 |
+| cost | REAL | LLM 成本 |
+| tokens | INTEGER | Token 数 |
+| health_score | REAL | 自动治理健康分 |
+| budget_blocked | INTEGER | 是否预算阻断 |
+| updated_at | TEXT | 北京时间 |
+
+UNIQUE(source_id, date)
+
+预算阻断轮次只记录 `budget_blocked`，不降低 `health_score`。
+
+### source_governance_events — 数据源治理事件
+
+| 列 | 类型 | 说明 |
+|----|------|------|
+| id | INTEGER PK | |
+| source_id | TEXT | 数据源 ID |
+| event | TEXT | 事件名 |
+| from_status | TEXT | 原状态 |
+| to_status | TEXT | 新状态 |
+| reason | TEXT | 自动动作原因 |
+| payload_json | TEXT | 事件上下文 |
+| created_at | TEXT | 北京时间 |
+
+所有自动降权、隔离、禁用和人工操作都写入该表，方便 Dashboard 和运维追溯。
+
 ### github_repo_snapshots — GitHub 仓库星标快照
 
 | 列 | 类型 | 说明 |
