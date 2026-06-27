@@ -48,6 +48,6 @@ agents:
     budget_weight: 1.0
 
 budget:
-  monthly: 10.0
+  monthly: 60.0
   soft_limit: 0.8
   hard_limit: 1.0
