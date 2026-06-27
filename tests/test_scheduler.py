@@ -45,6 +45,18 @@ def test_group_sources_by_cron_skips_disabled_and_groups_same_cron():
     }
 
 
+def test_group_enabled_sources_keeps_only_schedulable_registry_statuses():
+    from src.main import _group_enabled_sources_by_cron
+
+    sources = [
+        SourceConfig(id="active", name="Active", type="rss", enabled=True, priority=1, cron="0 1 * * *", max_items=10, config={}),
+        SourceConfig(id="trial", name="Trial", type="rss", enabled=True, priority=1, cron="0 1 * * *", max_items=10, config={}),
+    ]
+
+    grouped = _group_enabled_sources_by_cron(sources)
+    assert grouped == {"0 1 * * *": ["active", "trial"]}
+
+
 def test_register_source_jobs_registers_one_job_per_cron_group():
     from src.main import _register_source_jobs
 
