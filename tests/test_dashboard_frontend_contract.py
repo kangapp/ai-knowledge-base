@@ -66,6 +66,17 @@ def test_dashboard_source_health_shows_stage_status_and_recent_funnel():
     assert ".source-health-status" in styles
 
 
+def test_dashboard_renders_source_governance_fields():
+    renderers = (ROOT / "src/site/static/js/dashboard/renderers.js").read_text()
+
+    assert "governance_status" in renderers
+    assert "health_score" in renderers
+    assert "budget_blocked" in renderers
+    assert "last_governance_reason" in renderers
+    assert "治理状态" in renderers
+    assert "健康分" in renderers
+
+
 def test_dashboard_consumption_passes_trend_window_separately():
     api_js = (ROOT / "src/site/static/js/dashboard/api.js").read_text()
     state_js = (ROOT / "src/site/static/js/dashboard/state.js").read_text()

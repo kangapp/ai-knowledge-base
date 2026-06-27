@@ -295,6 +295,10 @@ body.article-drawer-open { overflow: hidden; }
 .source-health-status.failed, .source-health-status.analysis_failed { background: #fee2e2; color: #991b1b; }
 .source-health-status.dedup_only, .source-health-status.success_zero { background: #fef3c7; color: #92400e; }
 .source-health-status.disabled, .source-health-status.not_scheduled { background: #f3f4f6; color: #4b5563; }
+.source-governance-status { display: inline-block; padding: 0.15rem 0.4rem; border-radius: 4px; background: #eef2ff; color: #3730a3; white-space: nowrap; font-size: 0.75rem; }
+.source-governance-status.degraded { background: #fef3c7; color: #92400e; }
+.source-governance-status.quarantined, .source-governance-status.disabled, .source-governance-status.rejected { background: #fee2e2; color: #991b1b; }
+.source-governance-status.active, .source-governance-status.trial { background: #dcfce7; color: #166534; }
 .source-health-error { max-width: 16rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #991b1b; }
 
 @media (max-width: 900px) {

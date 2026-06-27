@@ -47,6 +47,23 @@
         }[status] || '未知';
     }
 
+    function governanceLabel(status) {
+        return {
+            candidate: '候选',
+            trial: '试运行',
+            active: '运行中',
+            degraded: '降权',
+            quarantined: '隔离',
+            disabled: '已禁用',
+            rejected: '已拒绝',
+        }[status] || '-';
+    }
+
+    function sourceErrorText(source) {
+        if (source.budget_blocked) return '预算阻断';
+        return source.last_error || source.last_governance_reason || '-';
+    }
+
     function sourceLastRun(value) {
         if (!value) return '-';
         return String(value).replace('T', ' ').slice(0, 16);
@@ -216,7 +233,7 @@
             <table class="log-table">
                 <thead>
                     <tr>
-                        <th>数据源</th><th>状态</th><th>窗口采集</th><th>本轮新增</th>
+                        <th>数据源</th><th>状态</th><th>治理状态</th><th>健康分</th><th>窗口采集</th><th>本轮新增</th>
                         <th>本轮去重</th><th>分析失败</th><th>通过率</th><th>平均分</th>
                         <th>最近运行</th><th>错误</th>
                     </tr>
@@ -226,6 +243,8 @@
                         <tr>
                             <td>${escapeHtml(sourceDisplayName(s))}</td>
                             <td><span class="source-health-status ${escapeHtml(s.health_status)}">${sourceHealthLabel(s.health_status)}</span></td>
+                            <td><span class="source-governance-status ${escapeHtml(s.governance_status || '')}">${governanceLabel(s.governance_status)}</span></td>
+                            <td>${s.health_score == null ? '-' : Number(s.health_score).toFixed(1)}</td>
                             <td>${s.total_collected || 0}</td>
                             <td>${s.last_new_items || 0}</td>
                             <td>${s.last_dedup_skipped || 0}</td>
@@ -233,7 +252,7 @@
                             <td>${((s.approved_rate || 0) * 100).toFixed(1)}%</td>
                             <td>${s.avg_score == null ? '-' : Number(s.avg_score).toFixed(1)}</td>
                             <td>${escapeHtml(sourceLastRun(s.last_run_at))}</td>
-                            <td class="source-health-error" title="${escapeHtml(s.last_error)}">${escapeHtml(s.last_error || '-')}</td>
+                            <td class="source-health-error" title="${escapeHtml(sourceErrorText(s))}">${escapeHtml(sourceErrorText(s))}</td>
                         </tr>
                     `).join('')}
                 </tbody>
