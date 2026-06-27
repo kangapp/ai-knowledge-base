@@ -4,6 +4,8 @@ from .config import SourceConfig
 from .database import Database
 
 SCHEDULABLE_STATUSES = {"active", "degraded", "trial"}
+GOVERNED_STATUSES = {"degraded", "quarantined", "trial", "rejected"}
+TRIAL_MAX_ITEMS = 3
 
 
 def _status_for_source(source: SourceConfig) -> str:
@@ -15,6 +17,11 @@ def _enabled_for_status(status: str) -> int:
 
 
 def _row_to_source(row) -> SourceConfig:
+    config = json.loads(row["config_json"] or "{}")
+    status = row["status"]
+    max_items = row["max_items"]
+    if status == "trial":
+        max_items = min(max_items, TRIAL_MAX_ITEMS)
     return SourceConfig(
         id=row["id"],
         name=row["name"],
@@ -22,20 +29,22 @@ def _row_to_source(row) -> SourceConfig:
         enabled=bool(row["enabled"]),
         priority=row["priority"],
         cron=row["cron"],
-        max_items=row["max_items"],
-        config=json.loads(row["config_json"] or "{}"),
+        max_items=max_items,
+        config=config,
     )
 
 
 async def sync_sources_config(db: Database, sources: list[SourceConfig]) -> None:
     for source in sources:
         existing = await db.fetch_one(
-            "SELECT manual_override FROM source_registry WHERE id = ?",
+            "SELECT status, manual_override FROM source_registry WHERE id = ?",
             (source.id,),
         )
         if existing and existing["manual_override"]:
             continue
         status = _status_for_source(source)
+        if existing and source.enabled and existing["status"] in GOVERNED_STATUSES:
+            status = existing["status"]
         await db.execute(
             """
             INSERT INTO source_registry
@@ -77,6 +86,36 @@ async def list_schedulable_sources(db: Database) -> list[SourceConfig]:
         """
     )
     return [_row_to_source(row) for row in rows]
+
+
+async def list_pipeline_sources(
+    db: Database,
+    source_filter: str | list[str] | tuple[str, ...] | set[str] | None = None,
+) -> list[SourceConfig]:
+    rows = await db.fetch_all(
+        """
+        SELECT *
+        FROM source_registry
+        WHERE enabled = 1 AND status IN ('active', 'degraded', 'trial')
+        ORDER BY priority ASC, id ASC
+        """
+    )
+    sources = [_row_to_source(row) for row in rows]
+    if source_filter is None:
+        return sources
+    source_ids = {source_filter} if isinstance(source_filter, str) else set(source_filter)
+    return [source for source in sources if source.id in source_ids]
+
+
+async def get_source_statuses(db: Database, source_ids: set[str]) -> dict[str, str]:
+    if not source_ids:
+        return {}
+    placeholders = ",".join("?" for _ in source_ids)
+    rows = await db.fetch_all(
+        f"SELECT id, status FROM source_registry WHERE id IN ({placeholders})",
+        tuple(source_ids),
+    )
+    return {row["id"]: row["status"] for row in rows}
 
 
 async def update_source_status(

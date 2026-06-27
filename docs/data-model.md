@@ -215,7 +215,7 @@ FTS5 全文索引：`articles_fts` over (title, summary, description)
 | source | TEXT | github / rss / hotlist / feishu / arxiv |
 | source_id | TEXT | 配置 id |
 | source_detail | TEXT | 来源细分 |
-| status | TEXT | collected / dedup_skipped / inserted / reviewed_retry / reviewed_discarded |
+| status | TEXT | collected / dedup_skipped / inserted / reviewed_retry / reviewed_discarded / trial_approved / trial_retry |
 | reason | TEXT | 状态原因 |
 | raw_metadata | TEXT | JSON 原始元数据 |
 | article_id | INTEGER FK → articles.id | 入库文章 id |
@@ -332,7 +332,7 @@ UNIQUE(source_id, date)
 | created_at | TEXT | 北京时间 |
 | updated_at | TEXT | 北京时间 |
 
-`sources.yaml` 只作为 bootstrap 和人工兜底；运行时调度读取该表。自动治理只能调整状态或禁用源，不自动删除源。
+`sources.yaml` 只作为 bootstrap 和人工兜底；运行时调度和 pipeline 均读取该表。自动治理只能调整状态或禁用源，不自动删除源。`trial` 源小流量试跑，单轮最多采集 3 条；试跑通过审核的 item 只写 `collection_items/cost_logs/source_health_daily`，不写入正式 `articles`。
 
 ### source_health_daily — 数据源每日治理指标
 
@@ -357,6 +357,8 @@ UNIQUE(source_id, date)
 UNIQUE(source_id, date)
 
 预算阻断轮次只记录 `budget_blocked`，不降低 `health_score`。
+
+`trial` 源最近 3 次健康记录全部满足请求成功率 >= 0.8、有新增、健康分 >= 50 且非预算阻断时，自动转为 `active`；否则转为 `rejected`。
 
 ### source_governance_events — 数据源治理事件
 

@@ -127,28 +127,37 @@ async def test_weekly_source_maintenance_initializes_kb_database(monkeypatch):
         async def close(self):
             calls.append(("close", None))
 
-    class FakeTracker:
-        def __init__(self, db):
-            pass
-
-        async def check_and_evict(self, sources):
-            return []
-
     class FakeDiscovery:
         def __init__(self, db):
             pass
 
         async def discover(self):
+            calls.append(("discover", None))
             return []
 
+    async def fake_promote(db):
+        calls.append(("promote", None))
+        return []
+
+    async def fake_evaluate(db):
+        calls.append(("evaluate", None))
+        return {}
+
     monkeypatch.setattr(source_scheduler, "Database", FakeDatabase)
-    monkeypatch.setattr(source_scheduler, "SourceHealthTracker", FakeTracker)
     monkeypatch.setattr(source_scheduler, "SourceDiscovery", FakeDiscovery)
-    monkeypatch.setattr(source_scheduler.SourceManager, "load", lambda: [])
+    monkeypatch.setattr(source_scheduler, "promote_candidates_to_trial", fake_promote)
+    monkeypatch.setattr(source_scheduler, "evaluate_trial_sources", fake_evaluate)
 
     await source_scheduler.run_weekly_source_maintenance()
 
-    assert calls == [("path", "data/kb.db"), ("initialize", None), ("close", None)]
+    assert calls == [
+        ("path", "data/kb.db"),
+        ("initialize", None),
+        ("discover", None),
+        ("promote", None),
+        ("evaluate", None),
+        ("close", None),
+    ]
 
 
 def test_weekly_source_maintenance_uses_beijing_timezone():
