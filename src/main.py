@@ -13,7 +13,12 @@ from .core.config import load_llm_config, load_sources_config, load_agents_confi
 from .core.database import Database
 from .core.llm_client import LLMRegistry
 from .core.source_governance import rollup_source_health_daily
-from .core.source_registry import list_schedulable_sources, sync_sources_config
+from .core.source_registry import (
+    get_source_statuses,
+    list_pipeline_sources,
+    list_schedulable_sources,
+    sync_sources_config,
+)
 from .core.time import BEIJING_TZ, now_bj_iso, run_id_bj
 from .graph.pipeline import build_pipeline, record_phase_start, record_phase_end, set_pipeline_db, reset_analyzer_counter
 from .graph.state import PipelineState, ReviewedItem
@@ -488,8 +493,14 @@ async def run_pipeline(trigger: str = "cron", source_filter: str | list[str] | t
         await record_phase_start(_db, run_id, "collect")
 
         sources_cfg = load_sources_config(CONFIG_DIR / "sources.yaml")
-        active_sources = [s for s in sources_cfg.sources if s.enabled]
-        active_sources = _filter_sources(active_sources, source_filter)
+        await sync_sources_config(_db, sources_cfg.sources)
+        active_sources = await list_pipeline_sources(_db, source_filter)
+        source_statuses = await get_source_statuses(_db, {source.id for source in active_sources})
+        trial_source_ids = {
+            source_id
+            for source_id, status in source_statuses.items()
+            if status == "trial"
+        }
         logger.info("pipeline.start", extra={
             "run_id": run_id,
             "trigger": trigger,
@@ -719,11 +730,43 @@ async def run_pipeline(trigger: str = "cron", source_filter: str | list[str] | t
 
             if reviewed.verdict == "approved":
                 analysis_cost, analysis_tokens = item_costs.get(reviewed.ref_url, (0.0, 0))
+                source_id, source, source_detail = _source_identity(raw)
+                if source_id in trial_source_ids:
+                    await record_collection_item(
+                        _db,
+                        run_id=run_id,
+                        url=raw.url,
+                        title=raw.title,
+                        source=source,
+                        source_id=source_id,
+                        source_detail=source_detail,
+                        status="trial_approved",
+                        reason="trial_not_persisted",
+                        raw_metadata=raw.raw_metadata,
+                    )
+                    await record_pipeline_event(
+                        _db,
+                        run_id=run_id,
+                        phase="persist",
+                        event="pipeline.trial_approved",
+                        level="success",
+                        status="trial",
+                        source_id=source_id,
+                        source=source,
+                        source_detail=source_detail,
+                        ref_url=raw.url,
+                        title=analyzed.title,
+                        cost=analysis_cost,
+                        tokens=analysis_tokens,
+                        message="试跑源审核通过，未写入正式文章",
+                        payload={"score": reviewed.total_score},
+                    )
+                    passed_count += 1
+                    continue
                 article_id = await save_article(_db, raw, analyzed, reviewed, analysis_cost, analysis_tokens)
                 if article_id:
                     inserted_urls.add(reviewed.ref_url)
                     article_ids[raw.url] = article_id
-                    source_id, source, source_detail = _source_identity(raw)
                     await record_collection_item(
                         _db,
                         run_id=run_id,
@@ -784,10 +827,11 @@ async def run_pipeline(trigger: str = "cron", source_filter: str | list[str] | t
                     discarded_count += 1
                 else:
                     analysis_cost, analysis_tokens = item_costs.get(reviewed.ref_url, (0.0, 0))
-                    article_id = await save_article(_db, raw, analyzed, reviewed, analysis_cost, analysis_tokens)
-                    if article_id:
-                        article_ids[raw.url] = article_id
                     source_id, source, source_detail = _source_identity(raw)
+                    if source_id not in trial_source_ids:
+                        article_id = await save_article(_db, raw, analyzed, reviewed, analysis_cost, analysis_tokens)
+                        if article_id:
+                            article_ids[raw.url] = article_id
                     await record_collection_item(
                         _db,
                         run_id=run_id,
@@ -796,8 +840,8 @@ async def run_pipeline(trigger: str = "cron", source_filter: str | list[str] | t
                         source=source,
                         source_id=source_id,
                         source_detail=source_detail,
-                        status="reviewed_retry",
-                        reason="retry",
+                        status="trial_retry" if source_id in trial_source_ids else "reviewed_retry",
+                        reason="trial_not_persisted" if source_id in trial_source_ids else "retry",
                         raw_metadata=raw.raw_metadata,
                     )
                     await record_pipeline_event(

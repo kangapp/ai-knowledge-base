@@ -1,6 +1,6 @@
 # 代码地图
 
-更新时间：2026-06-19
+更新时间：2026-06-28
 
 ## CI/CD 与部署
 
@@ -89,12 +89,14 @@
   - soft limit 仅在 fallback 非空时切换；hard limit 才停止所有新请求。
 
 - `src/core/source_registry.py`
-  - DB-backed 数据源注册表；同步 `sources.yaml` bootstrap 数据，并返回可调度源。
-  - 人工禁用源设置 `manual_override` 后，自动同步不得恢复。
+  - DB-backed 数据源注册表；同步 `sources.yaml` bootstrap 数据，并返回可调度源和 pipeline 运行源。
+  - 人工禁用源设置 `manual_override` 后，自动同步不得恢复；自动 degraded/quarantined/trial/rejected 状态不会被 YAML bootstrap 重置。
+  - `trial` 源在这里统一限量到最多 3 条。
 
 - `src/core/source_governance.py`
   - 计算每日数据源健康分，并执行 active/degraded/quarantined/disabled 自动迁移。
   - 预算阻断只记录 `budget_blocked`，不降低源质量分。
+  - 候选源自动进入 trial；trial 最近 3 次健康记录达标后转 active，否则转 rejected。
 
 - `src/core/time.py`
   - 项目业务时间统一入口，当前使用北京时间（Asia/Shanghai / UTC+8）。
@@ -143,8 +145,10 @@
   - `RawItem.raw_metadata.source_id` 保存配置 id，供 source health、成本归因等后续阶段使用。
 
 - `src/main.py`
+  - Pipeline 运行源从 `source_registry` 读取，`sources.yaml` 只在运行前同步 bootstrap 数据。
   - GitHub repo 快照在 DB 查重前写入，`trend_mode=true` 的源只过滤本源采集结果，不影响同批次其它 GitHub/RSS/arXiv 源。
   - 图外入库前按 `ref_url` 汇总 Analyzer + Reviewer 成本，写入文章级 `analysis_cost/analysis_tokens`，并为 Reviewer 成本补齐来源快照。
+  - `trial` 源通过审核后只记录试跑事件和健康数据，不写入正式文章。
   - Pipeline 会写入 `collection_items`、`pipeline_source_runs` 和 `pipeline_events`，用于追踪采集、去重、分析、审核、入库的 source 级漏斗和 item 级事件。
   - Retry 轮复用已有 `AnalyzedItem` 直接重审 Reviewer，不再重新进入 Analyzer；入口为 `_prepare_retry_review_items()`。
   - 有新条目但 Analyzer 全部失败时写入失败 item/cost/source funnel，并将 pipeline 标记 failed；不会继续 Deep Report 或站点构建。
@@ -153,7 +157,7 @@
   - LangGraph DAG 编排、phase log 记录、Analyzer/Reviewer item 级事件记录。
 
 - `src/scheduler/source_scheduler.py`
-  - 每周数据源健康维护：低质量源淘汰、候选源发现。
+  - 每周数据源维护：发现候选源、候选转小流量 trial、评估 trial 自动上线或拒绝。
   - 使用 `data/kb.db` 并显式初始化数据库连接；维护 Cron 使用 `Asia/Shanghai`。
 
 - `src/graph/router.py`

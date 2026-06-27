@@ -1,6 +1,10 @@
 from .database import Database
 from .time import today_bj
 
+TRIAL_RUNS_REQUIRED = 3
+TRIAL_MIN_SUCCESS_RATE = 0.8
+TRIAL_MIN_HEALTH_SCORE = 50
+
 
 def calculate_health_score(metrics: dict) -> float | None:
     if metrics.get("budget_blocked"):
@@ -87,6 +91,66 @@ async def apply_governance(db: Database, source_id: str) -> str | None:
     if latest < 50 and current["status"] == "active":
         return await _change_status(db, source_id, "degraded", "健康分低于50")
     return current["status"]
+
+
+async def promote_candidates_to_trial(db: Database, limit: int = 5) -> list[str]:
+    rows = await db.fetch_all(
+        """
+        SELECT id, status
+        FROM source_registry
+        WHERE status = 'candidate' AND manual_override = 0
+        ORDER BY created_at ASC, id ASC
+        LIMIT ?
+        """,
+        (limit,),
+    )
+    promoted: list[str] = []
+    for row in rows:
+        await _change_status(db, row["id"], "trial", "候选源进入小流量试跑")
+        promoted.append(row["id"])
+    return promoted
+
+
+def _trial_passes(rows) -> bool:
+    if any(row["budget_blocked"] for row in rows):
+        return False
+    return all(
+        row["request_success_rate"] >= TRIAL_MIN_SUCCESS_RATE
+        and row["new_items"] > 0
+        and row["health_score"] is not None
+        and row["health_score"] >= TRIAL_MIN_HEALTH_SCORE
+        for row in rows
+    )
+
+
+async def evaluate_trial_sources(db: Database) -> dict[str, str]:
+    trials = await db.fetch_all(
+        """
+        SELECT id
+        FROM source_registry
+        WHERE status = 'trial' AND manual_override = 0
+        ORDER BY id ASC
+        """
+    )
+    changed: dict[str, str] = {}
+    for trial in trials:
+        rows = await db.fetch_all(
+            """
+            SELECT request_success_rate, new_items, health_score, budget_blocked
+            FROM source_health_daily
+            WHERE source_id = ?
+            ORDER BY date DESC
+            LIMIT ?
+            """,
+            (trial["id"], TRIAL_RUNS_REQUIRED),
+        )
+        if len(rows) < TRIAL_RUNS_REQUIRED:
+            continue
+        if _trial_passes(rows):
+            changed[trial["id"]] = await _change_status(db, trial["id"], "active", "试跑3次达标，自动上线")
+        else:
+            changed[trial["id"]] = await _change_status(db, trial["id"], "rejected", "试跑3次未达标，自动拒绝")
+    return changed
 
 
 async def rollup_source_health_daily(db: Database, run_id: str) -> None:
