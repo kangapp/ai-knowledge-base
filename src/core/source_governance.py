@@ -100,9 +100,11 @@ async def rollup_source_health_daily(db: Database, run_id: str) -> None:
     )
     date = today_bj()
     for row in rows:
+        attempts = row["collected"] + row["failed"]
+        request_success_rate = row["collected"] / attempts if attempts else 0
         budget_blocked = 1 if row["analysis_failed"] and row["cost"] == 0 else 0
         metrics = {
-            "request_success_rate": row["request_success_rate"],
+            "request_success_rate": request_success_rate,
             "collected": row["collected"],
             "new_items": row["new_items"],
             "approved": row["approved"],
@@ -134,7 +136,7 @@ async def rollup_source_health_daily(db: Database, run_id: str) -> None:
             (
                 row["source_id"],
                 date,
-                row["request_success_rate"],
+                request_success_rate,
                 row["collected"],
                 row["new_items"],
                 row["analyzed"],
