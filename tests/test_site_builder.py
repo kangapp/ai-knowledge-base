@@ -221,6 +221,13 @@ def test_homepage_supports_local_favorites_view():
     assert "state.favoritesOnly" in app_js
 
 
+def test_homepage_loads_full_article_list_for_filters():
+    app_js = (ROOT / "src/site/static/js/app.js").read_text()
+
+    assert "fetch('/data.json')" in app_js
+    assert "allArticles" in app_js
+
+
 @pytest.mark.asyncio
 async def test_homepage_uses_short_list_summary_without_truncating_data_summary(tmp_path, monkeypatch):
     full_summary = "这是一段用于详情展示的完整中文摘要。" * 12

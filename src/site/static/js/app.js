@@ -29,6 +29,7 @@
     const INIT = window.__INIT__ || { articles: [], stats: {} };
     const FAVORITES_KEY = 'ai_kb_favorite_articles';
     const state = { source: '', tag: '', days: 30, query: '', favoritesOnly: false };
+    let allArticles = INIT.articles;
     let favoriteIds = loadFavoriteIds();
 
     function getSourceLabel(source, sourceDetail) {
@@ -85,7 +86,7 @@
     }
 
     function filterArticles() {
-        let articles = INIT.articles;
+        let articles = allArticles;
         if (state.days > 0) {
             const cutoff = new Date();
             cutoff.setDate(cutoff.getDate() - state.days);
@@ -161,7 +162,7 @@
         if (sourceFilter) {
             // 按 label 分组去重，value 使用最后一个匹配的 raw
             const sourceMap = {};
-            INIT.articles.forEach(a => {
+            allArticles.forEach(a => {
                 const raw = ['rss', 'hotlist'].includes(a.source) && a.source_detail ? a.source_detail : a.source;
                 const normalized = getOptionLabel(raw);
                 if (!sourceMap[normalized]) {
@@ -183,7 +184,7 @@
 
         const tagFilter = document.getElementById('tag-filter');
         if (tagFilter) {
-            const allTags = [...new Set(INIT.articles.flatMap(a => a.tags || []))].sort();
+            const allTags = [...new Set(allArticles.flatMap(a => a.tags || []))].sort();
             allTags.forEach(t => {
                 const opt = document.createElement('option');
                 opt.value = t; opt.textContent = t;
@@ -225,6 +226,17 @@
                           document.querySelector('.date-filters button[data-days="30"]');
         if (activeBtn) activeBtn.classList.add('active');
         filterArticles();
+    }
+
+    async function loadAllArticles() {
+        try {
+            const response = await fetch('/data.json');
+            if (response.ok) {
+                allArticles = await response.json();
+            }
+        } catch (_) {
+            allArticles = INIT.articles;
+        }
     }
 
     function setupArticleDrawer() {
@@ -276,8 +288,9 @@
         }
     }
 
-    document.addEventListener('DOMContentLoaded', () => {
+    document.addEventListener('DOMContentLoaded', async () => {
         if (document.getElementById('article-list')) {
+            await loadAllArticles();
             setupFilters();
             setupArticleDrawer();
         }
