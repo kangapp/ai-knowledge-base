@@ -140,6 +140,7 @@
   - 多源采集和 DB 查重。
   - GitHub 采集将 `topics`/`keywords` 拆成最多 5 个单条件 Search 请求，每个请求获取扩大后的候选池；合并和阈值过滤后优先返回 DB 中未出现的 repo。
   - `github_ai_devtools` 用于抓取 Coding Agent、AI 编程助手、代码生成/审查和 AI IDE 类仓库，并在采集阶段过滤教程、课程、writeup 和资源合集等明显噪音；关键词在 `config/sources.yaml` 维护。
+  - `github_agent_infra` 复用 GitHub collector，抓取 Agent 联网、浏览器/MCP、视频字幕和社交平台采集相关工具仓库；关键词在 `config/sources.yaml` 维护。
   - RSS 采集先用 `httpx.AsyncClient(timeout=30)` 拉取 feed 文本，再交给 `feedparser` 解析；先过滤关键词再限制数量，关键词过滤使用 `_matches_rss_keywords()`。
   - `collect_hotlist()` 通过 NewsNow 统一接口抓取 AIHOT、掘金、知乎等热榜，校验 HTTPS/目标域名并保留榜单排名元数据。
   - `RawItem.raw_metadata.source_id` 保存配置 id，供 source health、成本归因等后续阶段使用。

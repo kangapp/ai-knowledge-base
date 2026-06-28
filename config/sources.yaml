@@ -67,6 +67,23 @@ sources:
       min_forks: 0
       min_watchers: 0
 
+  - id: github_agent_infra
+    name: GitHub Agent 联网工具
+    type: github
+    enabled: true
+    priority: 1
+    cron: "0 */6 * * *"
+    max_items: 10
+    config:
+      topics: [ai-agent, mcp, web-scraper]
+      keywords: ["AI agent web access", "agent internet", "MCP browser", "youtube transcript agent", "twitter scraper agent"]
+      exclude_terms: [wallpaper, porn, nsfw, account, registration, card, tutorial, course, awesome, interview, writeup, write-ups]
+      lookback_type: pushed
+      lookback_days: 90
+      min_stars: 100
+      min_forks: 0
+      min_watchers: 0
+
   # ===== 中文科技媒体 =====
   - id: rss_36kr
     name: 36氪

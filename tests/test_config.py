@@ -73,6 +73,33 @@ def test_project_sources_include_github_ai_devtools():
     }.issubset(set(source.config["exclude_terms"]))
 
 
+def test_project_sources_include_github_agent_infra():
+    cfg = load_sources_config(Path("config/sources.yaml"))
+    sources = {source.id: source for source in cfg.sources}
+
+    source = sources["github_agent_infra"]
+    assert source.type == "github"
+    assert source.enabled is True
+    assert source.config["lookback_type"] == "pushed"
+    assert source.config["lookback_days"] == 90
+    assert source.config["min_stars"] == 100
+    assert source.config["topics"] == ["ai-agent", "mcp", "web-scraper"]
+    assert source.config["keywords"] == [
+        "AI agent web access",
+        "agent internet",
+        "MCP browser",
+        "youtube transcript agent",
+        "twitter scraper agent",
+    ]
+    assert {
+        "tutorial",
+        "course",
+        "awesome",
+        "interview",
+        "writeup",
+    }.issubset(set(source.config["exclude_terms"]))
+
+
 def test_project_sources_disable_broken_feeds_and_use_official_producthunt_feed():
     cfg = load_sources_config(Path("config/sources.yaml"))
     sources = {source.id: source for source in cfg.sources}
