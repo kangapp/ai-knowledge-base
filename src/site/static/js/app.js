@@ -30,10 +30,22 @@
     const FAVORITES_KEY = 'ai_kb_favorite_articles';
     const HIDDEN_KEY = 'ai_kb_hidden_articles';
     const PAGE_SIZE_KEY = 'ai_kb_page_size';
+    const SCORE_DIMENSIONS = [
+        ['ai_relevance', 'AI 相关度'],
+        ['developer_utility', '项目实用性'],
+        ['project_signal', '项目信号'],
+        ['content_clarity', '内容清晰度'],
+        ['content_depth', '内容深度'],
+        ['info_density', '信息密度'],
+        ['timeliness', '时效性'],
+    ];
     const state = { source: '', tag: '', days: 30, query: '', favoritesOnly: false, view: 'all', page: 1, pageSize: loadPageSize() };
     let allArticles = INIT.articles;
     let favoriteIds = loadFavoriteIds();
     let hiddenIds = loadHiddenIds();
+    const scoreDetailCache = new Map();
+    let activeScoreTrigger = null;
+    let scoreTooltipHideTimer = null;
 
     function getSourceLabel(source, sourceDetail) {
         if (source === 'hotlist' && sourceDetail) {
@@ -84,7 +96,7 @@
                 <div class="meta">
                     <span>${escapeHtml(a.source_detail || a.source || '')}</span>
                     <span>${a.collected_at ? a.collected_at.slice(0, 10) : ''}</span>
-                    <span class="score">${a.relevance_score}分</span>
+                    <span class="score" data-score-tooltip data-article-id="${a.id}" tabindex="0" aria-label="查看评分组成">${a.relevance_score}分</span>
                 </div>
             </div>
         `}).join('');
@@ -213,6 +225,115 @@
 
     function escapeHtml(str) {
         return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
+
+    function getScoreTooltip() {
+        return document.getElementById('score-tooltip');
+    }
+
+    function positionScoreTooltip(trigger, tooltip) {
+        const rect = trigger.getBoundingClientRect();
+        const gap = 8;
+        const margin = 12;
+        tooltip.hidden = false;
+        const left = Math.min(window.innerWidth - tooltip.offsetWidth - margin, Math.max(margin, rect.left));
+        let top = rect.bottom + gap;
+        if (top + tooltip.offsetHeight > window.innerHeight - margin) {
+            top = rect.top - tooltip.offsetHeight - gap;
+        }
+        tooltip.style.left = `${left}px`;
+        tooltip.style.top = `${Math.max(margin, top)}px`;
+    }
+
+    async function loadScoreDetail(articleId) {
+        if (scoreDetailCache.has(articleId)) return scoreDetailCache.get(articleId);
+        const response = await fetch(`/api/articles/${encodeURIComponent(articleId)}`);
+        const payload = await response.json();
+        if (!response.ok || payload.code !== 0 || !payload.data) {
+            throw new Error(payload.message || '评分加载失败');
+        }
+        scoreDetailCache.set(articleId, payload.data);
+        return payload.data;
+    }
+
+    function renderScoreTooltip(trigger, article, message) {
+        const tooltip = getScoreTooltip();
+        if (!tooltip) return;
+        if (message) {
+            tooltip.innerHTML = `<div class="score-tooltip-status">${escapeHtml(message)}</div>`;
+            positionScoreTooltip(trigger, tooltip);
+            return;
+        }
+        const dimensions = article.dimensions || {};
+        const rows = SCORE_DIMENSIONS.filter(([key]) => dimensions[key]).map(([key, label]) => {
+            const dim = dimensions[key];
+            const score = Number(dim.score || 0);
+            const maxScore = Number(dim.max_score || 0);
+            const percent = maxScore ? Math.max(0, Math.min(100, score / maxScore * 100)) : 0;
+            const reason = dim.reason ? `<p>${escapeHtml(String(dim.reason))}</p>` : '';
+            return `
+                <div class="score-tooltip-row">
+                    <div class="score-tooltip-heading"><strong>${label}</strong><span>${score}/${maxScore}</span></div>
+                    <div class="score-tooltip-track"><span style="width:${percent}%"></span></div>
+                    ${reason}
+                </div>
+            `;
+        }).join('');
+        tooltip.innerHTML = rows || '<div class="score-tooltip-status">暂无评分组成</div>';
+        positionScoreTooltip(trigger, tooltip);
+    }
+
+    async function showScoreTooltip(trigger) {
+        clearTimeout(scoreTooltipHideTimer);
+        const articleId = trigger.dataset.articleId;
+        if (!articleId) return;
+        activeScoreTrigger = trigger;
+        trigger.setAttribute('aria-describedby', 'score-tooltip');
+        renderScoreTooltip(trigger, null, '正在加载评分组成…');
+        try {
+            const article = await loadScoreDetail(articleId);
+            if (activeScoreTrigger === trigger) renderScoreTooltip(trigger, article);
+        } catch (error) {
+            if (activeScoreTrigger === trigger) renderScoreTooltip(trigger, null, error.message || '评分加载失败');
+        }
+    }
+
+    function hideScoreTooltip() {
+        const tooltip = getScoreTooltip();
+        if (!tooltip) return;
+        if (activeScoreTrigger) activeScoreTrigger.removeAttribute('aria-describedby');
+        activeScoreTrigger = null;
+        tooltip.hidden = true;
+    }
+
+    function scheduleHideScoreTooltip() {
+        clearTimeout(scoreTooltipHideTimer);
+        scoreTooltipHideTimer = setTimeout(hideScoreTooltip, 120);
+    }
+
+    function setupScoreTooltip() {
+        document.addEventListener('pointerenter', event => {
+            const trigger = event.target.closest('[data-score-tooltip]');
+            if (trigger) showScoreTooltip(trigger);
+        }, true);
+        document.addEventListener('pointerleave', event => {
+            if (event.target.closest('[data-score-tooltip]')) scheduleHideScoreTooltip();
+        }, true);
+        document.addEventListener('focusin', event => {
+            const trigger = event.target.closest('[data-score-tooltip]');
+            if (trigger) showScoreTooltip(trigger);
+        });
+        document.addEventListener('focusout', event => {
+            if (event.target.closest('[data-score-tooltip]')) scheduleHideScoreTooltip();
+        });
+        document.addEventListener('click', event => {
+            const trigger = event.target.closest('[data-score-tooltip]');
+            if (!trigger) return;
+            event.preventDefault();
+            showScoreTooltip(trigger);
+        });
+        window.addEventListener('resize', hideScoreTooltip);
+        window.addEventListener('scroll', hideScoreTooltip, true);
     }
 
     function setupFilters() {
@@ -391,6 +512,7 @@
             await loadAllArticles();
             setupFilters();
             setupArticleDrawer();
+            setupScoreTooltip();
         }
         if (document.getElementById('stats-overview')) initDashboard();
     });

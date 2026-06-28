@@ -46,11 +46,12 @@
         <div class="meta">
             <span>{{ article.source_detail or article.source }}</span>
             <span>{{ article.collected_at[:10] }}</span>
-            <span class="score">{{ article.relevance_score }}分</span>
+            <span class="score" data-score-tooltip data-article-id="{{ article.id }}" tabindex="0" aria-label="查看评分组成">{{ article.relevance_score }}分</span>
         </div>
     </div>
     {% endfor %}
 </div>
+<div id="score-tooltip" class="score-tooltip" role="tooltip" hidden></div>
 <div id="pagination-controls" class="pagination-controls" aria-label="分页" role="navigation"></div>
 <aside id="article-detail-drawer" class="article-detail-drawer" hidden aria-label="文章详情">
     <button class="article-drawer-backdrop" type="button" data-article-drawer-close aria-label="关闭文章详情"></button>

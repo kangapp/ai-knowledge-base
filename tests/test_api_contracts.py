@@ -177,6 +177,52 @@ async def test_article_detail_includes_dimensions_and_public_deep_report(api_cli
     assert "extra_data" not in data
 
 
+@pytest.mark.asyncio
+async def test_article_detail_includes_github_review_dimensions(api_client, api_db):
+    extra_data = json.dumps(
+        {
+            "dimensions": {
+                "ai_relevance": {"score": 32, "reason": "AI 开发工具"},
+                "developer_utility": {"score": 23, "reason": "能直接改善开发流程"},
+                "project_signal": {"score": 15, "reason": "社区信号强"},
+                "content_clarity": {"score": 8, "reason": "说明清楚"},
+            }
+        },
+        ensure_ascii=False,
+    )
+    await api_db.execute(
+        """
+        INSERT INTO articles
+        (title, url, description, summary, source, source_detail, relevance_score,
+         status, collected_at, extra_data)
+        VALUES (?, ?, 'desc', 'summary', 'github', 'example/repo', 78, 'approved', datetime('now', '+8 hours'), ?)
+        """,
+        (
+            "Repo",
+            "https://github.com/example/repo",
+            extra_data,
+        ),
+    )
+    article = await api_db.fetch_one(
+        "SELECT id FROM articles WHERE url = ?",
+        ("https://github.com/example/repo",),
+    )
+    await api_db.commit()
+
+    response = api_client.get(f"/api/articles/{article['id']}")
+
+    assert response.status_code == 200
+    dimensions = response.json()["data"]["dimensions"]
+    assert dimensions["ai_relevance"]["max_score"] == 35
+    assert dimensions["developer_utility"] == {
+        "score": 23,
+        "max_score": 30,
+        "reason": "能直接改善开发流程",
+    }
+    assert dimensions["project_signal"]["max_score"] == 20
+    assert dimensions["content_clarity"]["max_score"] == 15
+
+
 def test_http_errors_use_project_error_codes(api_client):
     response = api_client.get("/api/articles/99999")
 

@@ -608,16 +608,27 @@ async def get_article_tags(db: Database, article_id: int) -> list[str]:
 def _article_dimensions(extra_data: str | None) -> dict:
     data = _decode_json_field(extra_data or "", {})
     raw_dimensions = data.get("dimensions", {})
-    definitions = (
+    article_definitions = (
         ("ai_relevance", "ai_relevance", 40),
         ("content_depth", "content_depth", 30),
         ("info_density", "info_density", 15),
         ("timeliness", "timeliness", 15),
     )
+    github_definitions = (
+        ("ai_relevance", "ai_relevance", 35),
+        ("developer_utility", "developer_utility", 30),
+        ("project_signal", "project_signal", 20),
+        ("content_clarity", "content_clarity", 15),
+    )
+    is_github_review = any(
+        key in raw_dimensions
+        for key in ("developer_utility", "project_signal", "content_clarity")
+    )
+    definitions = github_definitions if is_github_review else article_definitions
     dimensions = {}
     for name, key, max_score in definitions:
         value = raw_dimensions.get(key, {})
-        if name == "info_density" and not value:
+        if not is_github_review and name == "info_density" and not value:
             value = raw_dimensions.get("information_density", {})
         if not isinstance(value, dict) or not value:
             continue

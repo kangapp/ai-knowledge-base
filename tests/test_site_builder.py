@@ -253,6 +253,22 @@ def test_homepage_loads_full_article_list_for_filters():
     assert "allArticles" in app_js
 
 
+def test_homepage_score_tooltip_uses_article_detail_dimensions():
+    index_html = (ROOT / "src/site/templates/index.html").read_text()
+    app_js = (ROOT / "src/site/static/js/app.js").read_text()
+    css = (ROOT / "src/site/static/css/style.css").read_text()
+
+    assert 'id="score-tooltip"' in index_html
+    assert "data-score-tooltip" in index_html
+    assert "data-score-tooltip" in app_js
+    assert "setupScoreTooltip" in app_js
+    assert "renderScoreTooltip" in app_js
+    assert "developer_utility" in app_js
+    assert "项目实用性" in app_js
+    assert "`/api/articles/${encodeURIComponent(articleId)}`" in app_js
+    assert ".score-tooltip" in css
+
+
 @pytest.mark.asyncio
 async def test_homepage_uses_short_list_summary_without_truncating_data_summary(tmp_path, monkeypatch):
     full_summary = "这是一段用于详情展示的完整中文摘要。" * 12

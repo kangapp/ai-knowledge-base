@@ -1,6 +1,9 @@
 (function() {
     const DIMENSIONS = [
         ['ai_relevance', 'AI 相关度'],
+        ['developer_utility', '项目实用性'],
+        ['project_signal', '项目信号'],
+        ['content_clarity', '内容清晰度'],
         ['content_depth', '内容深度'],
         ['info_density', '信息密度'],
         ['timeliness', '时效性'],

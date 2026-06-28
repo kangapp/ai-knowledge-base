@@ -256,7 +256,7 @@ UNIQUE(run_id, source_id)
 
 **审核评分口径：**
 
-- 新写入的 `extra_data.dimensions` 统一使用 `ai_relevance/content_depth/info_density/timeliness` 四个 key。
+- 普通文章新写入的 `extra_data.dimensions` 使用 `ai_relevance/content_depth/info_density/timeliness` 四个 key；GitHub repo 使用 `ai_relevance/developer_utility/project_signal/content_clarity` 四个 key。
 - Reviewer 模型输出会在代码层规范化，`information_density` 历史别名会映射到 `info_density`，`currency` 历史别名会映射到 `timeliness`。
 - `relevance_score` 不信任模型输出的 `total_score`，由四维分相加得到。
 - `status` 不信任模型输出的 `verdict`，由代码按阈值裁决：低 AI 相关度直接丢弃，高总分且高 AI 相关度才通过。
@@ -550,6 +550,9 @@ UNIQUE(repo_url, commit_sha, report_version)
 | content_depth | 内容深度 | 有详细技术实现或分析 |
 | info_density | 信息密度 | 内容充实、信息价值高 |
 | timeliness | 时效性 | 近期发布的内容 |
+| developer_utility | 项目实用性 | GitHub repo 能直接改善开发者工作流 |
+| project_signal | 项目信号 | GitHub repo 有 stars、topics、趋势等社区信号 |
+| content_clarity | 内容清晰度 | GitHub repo 摘要清楚说明做什么、给谁用、如何接入 |
 
 ## 配置文件结构
 
