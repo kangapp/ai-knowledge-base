@@ -18,7 +18,7 @@
 | url | TEXT UNIQUE | 防同源重复采集，不做跨源语义去重 |
 | description | TEXT | 原始摘要/README 摘要 |
 | summary | TEXT | AI 生成摘要（详情页按需加载） |
-| source | TEXT | github / rss / hotlist / feishu / arxiv |
+| source | TEXT | github / rss / hotlist / hn / feishu / arxiv |
 | source_detail | TEXT | 来源详情 (repo、频道名等) |
 | relevance_score | INTEGER | 0-100 |
 | status | TEXT | pending / approved / retry / discarded |
@@ -142,7 +142,7 @@ FTS5 全文索引：`articles_fts` over (title, summary, description)
 | level | TEXT | info / success / warning / error |
 | status | TEXT | running / done / failed / approved / discarded / retry / inserted 等 |
 | source_id | TEXT | 配置源 id |
-| source | TEXT | github / rss / hotlist / feishu / arxiv |
+| source | TEXT | github / rss / hotlist / hn / feishu / arxiv |
 | source_detail | TEXT | 展示来源或 repo 名 |
 | ref_url | TEXT | item URL |
 | title | TEXT | item 标题 |
@@ -176,7 +176,7 @@ FTS5 全文索引：`articles_fts` over (title, summary, description)
 | tokens_out | INTEGER | |
 | cost | REAL | |
 | ref_url | TEXT | LLM 调用关联的原始文章 URL |
-| source | TEXT | 成本记录时的来源快照：github / rss / hotlist / feishu / arxiv |
+| source | TEXT | 成本记录时的来源快照：github / rss / hotlist / hn / feishu / arxiv |
 | source_detail | TEXT | 成本记录时的来源细分；RSS 存 feed 名称或展示名 |
 | source_id | TEXT | 成本记录时的源 ID；统一使用 `config/sources.yaml` 中的配置 id |
 | status | TEXT DEFAULT 'success' | success / parse_failed / request_failed |
@@ -212,7 +212,7 @@ FTS5 全文索引：`articles_fts` over (title, summary, description)
 | run_id | TEXT FK → pipeline_runs.id | |
 | url | TEXT | 原始 URL |
 | title | TEXT | 原始标题 |
-| source | TEXT | github / rss / hotlist / feishu / arxiv |
+| source | TEXT | github / rss / hotlist / hn / feishu / arxiv |
 | source_id | TEXT | 配置 id |
 | source_detail | TEXT | 来源细分 |
 | status | TEXT | collected / dedup_skipped / inserted / reviewed_retry / reviewed_discarded / trial_approved / trial_retry |
@@ -301,7 +301,7 @@ UNIQUE(source_id, date)
 | id | INTEGER PK | |
 | url | TEXT UNIQUE | 数据源 URL |
 | name | TEXT | 数据源名称 |
-| type | TEXT | 类型（github / rss / hotlist / feishu / arxiv） |
+| type | TEXT | 类型（github / rss / hotlist / hn / feishu / arxiv） |
 | discovered_at | TEXT | 发现时间 |
 | status | TEXT | candidate / enabled / disabled |
 | added_at | TEXT | 加入时间 |
@@ -321,7 +321,7 @@ UNIQUE(source_id, date)
 |----|------|------|
 | id | TEXT PK | 数据源 ID |
 | name | TEXT | 数据源名称 |
-| type | TEXT | github / rss / hotlist / feishu / arxiv |
+| type | TEXT | github / rss / hotlist / hn / feishu / arxiv |
 | status | TEXT | candidate / trial / active / degraded / quarantined / disabled / rejected |
 | enabled | INTEGER | 是否参与调度 |
 | priority | INTEGER | 调度优先级 |
@@ -605,17 +605,17 @@ sources:
       filter_keywords: [AI, LLM, Agent, RAG, machine learning]
       filter_scope: title_summary
 
-  - id: rss_hackernews_ai
+  - id: hn_ai
     name: Hacker News AI
-    type: rss
+    type: hn
     enabled: true
-    priority: 2
+    priority: 3
     cron: "0 */6 * * *"      # 高频
     max_items: 10
     config:
-      url: "https://hnrss.org/frontpage?q=ai+llm+agent"
-      filter_keywords: [AI, LLM, Agent, RAG, OpenAI]
-      filter_scope: title
+      api_url: "https://hn.algolia.com/api/v1/search_by_date"
+      query: "AI OR LLM OR agent OR RAG OR MCP"
+      filter_keywords: [AI, LLM, agent, RAG, MCP, OpenAI]
 ```
 
 RSS 过滤约定：

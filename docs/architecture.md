@@ -15,7 +15,7 @@ APScheduler 北京时间 cron 分组触发 (同 cron 源合并为一个 pipeline
    Router ─── 100% 规则匹配 (按 RawItem.source 字段分流)
        │
        ├──► analyzers/github    (Send fan-out)
-       ├──► analyzers/rss       (RSS + hotlist, 并行执行, 空数据跳过)
+       ├──► analyzers/rss       (RSS + hotlist + HN, 并行执行, 空数据跳过)
        ├──► analyzers/feishu    (共享 base.analyze_items())
        └──► analyzers/arxiv     (自动打 1-3 个标签)
        │
@@ -108,6 +108,7 @@ Reviewer 结果和文章持久化完成后，`run_deep_report_stage()` 作为图
 - **GitHub 采集口径**：Search API 查询由最多 5 个 `topic:` qualifier / 显式 `keywords` 单条件请求组成，每个查询获取 `max_items * 3`（最大 100）个候选；本地合并、阈值过滤后优先返回数据库中未出现的 repo，再用已存在 repo 补足。增速源基于 `github_repo_snapshots` 的最新快照与窗口前最近基线快照计算 star/day。
 - **RSS 采集口径**：RSS feed 先由 `httpx.AsyncClient(timeout=30, follow_redirects=True)` 获取文本，再交给 `feedparser` 解析；遍历完整 feed，先做关键词过滤，再限制 `max_items`；英文关键词按词边界匹配，综合媒体源可用 `filter_scope: title` 只看标题强信号。
 - **热榜采集口径**：`hotlist` 通过配置中的 NewsNow `api_url + platform_id` 获取榜单；只接受 HTTPS URL，可按 `expected_domain` 限制目标域名，先过滤关键词再限制数量。热榜条目路由到 `rss_analyzer`，但入库保留 `source=hotlist` 和配置 source ID。
+- **HN 采集口径**：`hn` 通过 Algolia Hacker News Search API 获取 `story`，先按关键词过滤再限制数量；无外链时回退到 HN item URL。HN 条目路由到 `rss_analyzer`，入库保留 `source=hn` 和配置 source ID。
 - **Reviewer 裁决口径**：LLM 只给四维分和原因；代码统一维度 key、重算 `total_score`，并按阈值裁决 verdict，避免模型自由放行弱相关内容。
 - **成本记账口径**：只要 LLM 返回 usage 就记录 `cost_logs`；解析失败和 retry 都按真实调用次数计费，文章级成本由同一 `ref_url` 的 Analyzer + Reviewer 成本汇总得到。
 - **Deep Reports 失败隔离**：源码级分析位于 Reviewer/入库后的图外阶段，最多处理一个候选；不执行仓库代码，失败记录保留排障信息但不阻塞主 pipeline。

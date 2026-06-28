@@ -397,7 +397,7 @@ curl -X POST http://localhost:8000/api/pipeline/run
 curl -X POST "http://localhost:8000/api/pipeline/run?source=github_trending"
 
 # 指定多个源（多次调用）
-curl -X POST "http://localhost:8000/api/pipeline/run?source=rss_hackernews_ai"
+curl -X POST "http://localhost:8000/api/pipeline/run?source=hn_ai"
 ```
 
 **查看已配置的数据源 ID：**

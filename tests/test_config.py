@@ -100,6 +100,35 @@ def test_project_sources_include_github_agent_infra():
     }.issubset(set(source.config["exclude_terms"]))
 
 
+def test_project_sources_include_recommended_ai_feeds():
+    cfg = load_sources_config(Path("config/sources.yaml"))
+    sources = {source.id: source for source in cfg.sources}
+
+    hf = sources["rss_huggingface"]
+    assert hf.type == "rss"
+    assert hf.enabled is True
+    assert hf.config["url"] == "https://huggingface.co/blog/feed.xml"
+    assert "agent" in hf.config["filter_keywords"]
+
+    msr = sources["rss_microsoft_research"]
+    assert msr.type == "rss"
+    assert msr.enabled is True
+    assert msr.config["url"] == "https://www.microsoft.com/en-us/research/feed/"
+    assert "LLM" in msr.config["filter_keywords"]
+
+
+def test_project_sources_include_hacker_news_ai():
+    cfg = load_sources_config(Path("config/sources.yaml"))
+    sources = {source.id: source for source in cfg.sources}
+
+    source = sources["hn_ai"]
+    assert source.type == "hn"
+    assert source.enabled is True
+    assert source.config["api_url"] == "https://hn.algolia.com/api/v1/search_by_date"
+    assert source.config["query"] == "AI OR LLM OR agent OR RAG OR MCP"
+    assert source.config["filter_keywords"] == ["AI", "LLM", "agent", "RAG", "MCP", "OpenAI"]
+
+
 def test_project_sources_disable_broken_feeds_and_use_official_producthunt_feed():
     cfg = load_sources_config(Path("config/sources.yaml"))
     sources = {source.id: source for source in cfg.sources}

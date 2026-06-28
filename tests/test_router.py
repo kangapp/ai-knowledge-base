@@ -11,10 +11,11 @@ async def test_router_classifies_by_source():
         RawItem(url="c", title="c", source="feishu", collected_at=""),
         RawItem(url="d", title="d", source="arxiv", collected_at=""),
         RawItem(url="e", title="e", source="hotlist", collected_at=""),
+        RawItem(url="f", title="f", source="hn", collected_at=""),
     ])
     result = await router_node(state)
     assert len(result["routed_github"]) == 1
-    assert len(result["routed_rss"]) == 2
+    assert len(result["routed_rss"]) == 3
     assert len(result["routed_feishu"]) == 1
     assert len(result["routed_arxiv"]) == 1
 

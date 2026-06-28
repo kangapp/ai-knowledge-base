@@ -986,9 +986,9 @@ async def get_consumption_detail_stats(
     # 4. 来源费用构成（按文章真实来源归因，历史数据回退到 agent 推断）
     source_expr = """
         CASE
-            WHEN cl.source IN ('rss', 'hotlist') AND NULLIF(TRIM(cl.source_detail), '') IS NOT NULL THEN cl.source_detail
+            WHEN cl.source IN ('rss', 'hotlist', 'hn') AND NULLIF(TRIM(cl.source_detail), '') IS NOT NULL THEN cl.source_detail
             WHEN NULLIF(TRIM(cl.source), '') IS NOT NULL THEN cl.source
-            WHEN a.source IN ('rss', 'hotlist') AND NULLIF(TRIM(a.source_detail), '') IS NOT NULL THEN a.source_detail
+            WHEN a.source IN ('rss', 'hotlist', 'hn') AND NULLIF(TRIM(a.source_detail), '') IS NOT NULL THEN a.source_detail
             WHEN NULLIF(TRIM(a.source), '') IS NOT NULL THEN a.source
             WHEN cl.ref_url LIKE 'https://36kr.com/%' OR cl.ref_url LIKE 'http://36kr.com/%' THEN '36氪'
             WHEN cl.ref_url LIKE 'https://www.huxiu.com/%' OR cl.ref_url LIKE 'http://www.huxiu.com/%' THEN '虎嗅'

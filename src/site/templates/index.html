@@ -18,8 +18,9 @@
 </div>
 <div id="article-list">
     {% for article in articles %}
-    {% if article.source in ['rss', 'hotlist'] and article.source_detail %}
+    {% if article.source in ['rss', 'hotlist', 'hn'] and article.source_detail %}
         {% if article.source == 'hotlist' %}{% set source_label = article.source_detail %}
+        {% elif article.source == 'hn' %}{% set source_label = article.source_detail %}
         {% elif article.source_detail == 'https://36kr.com/feed' %}{% set source_label = '36氪' %}
         {% elif article.source_detail == 'https://www.ithome.com/rss/' %}{% set source_label = 'IT之家' %}
         {% elif article.source_detail == 'https://techcrunch.com/feed/' %}{% set source_label = 'TechCrunch' %}

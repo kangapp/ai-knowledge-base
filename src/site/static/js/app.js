@@ -22,6 +22,7 @@
         '掘金': '掘金',
         'Reuters': 'Reuters',
         'github': 'GitHub',
+        'hn': 'Hacker News',
         'feishu': '飞书',
         'arxiv': 'arXiv',
     };
@@ -49,6 +50,9 @@
 
     function getSourceLabel(source, sourceDetail) {
         if (source === 'hotlist' && sourceDetail) {
+            return sourceDetail;
+        }
+        if (source === 'hn' && sourceDetail) {
             return sourceDetail;
         }
         if (source === 'rss' && sourceDetail) {
@@ -116,7 +120,7 @@
                     return a.source === state.source;
                 }
                 // RSS/热榜子源匹配：source_detail 匹配，或无 detail 时按基础类型匹配
-                if (['rss', 'hotlist'].includes(a.source)) {
+                if (['rss', 'hotlist', 'hn'].includes(a.source)) {
                     return a.source_detail === state.source || (!a.source_detail && state.source === 'rss');
                 }
                 return false;
@@ -351,7 +355,7 @@
             // 按 label 分组去重，value 使用最后一个匹配的 raw
             const sourceMap = {};
             allArticles.forEach(a => {
-                const raw = ['rss', 'hotlist'].includes(a.source) && a.source_detail ? a.source_detail : a.source;
+                const raw = ['rss', 'hotlist', 'hn'].includes(a.source) && a.source_detail ? a.source_detail : a.source;
                 const normalized = getOptionLabel(raw);
                 if (!sourceMap[normalized]) {
                     sourceMap[normalized] = { label: normalized, value: raw };

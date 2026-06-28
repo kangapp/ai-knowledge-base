@@ -143,6 +143,7 @@
   - `github_agent_infra` 复用 GitHub collector，抓取 Agent 联网、浏览器/MCP、视频字幕和社交平台采集相关工具仓库；关键词在 `config/sources.yaml` 维护。
   - RSS 采集先用 `httpx.AsyncClient(timeout=30)` 拉取 feed 文本，再交给 `feedparser` 解析；先过滤关键词再限制数量，关键词过滤使用 `_matches_rss_keywords()`。
   - `collect_hotlist()` 通过 NewsNow 统一接口抓取 AIHOT、掘金、知乎等热榜，校验 HTTPS/目标域名并保留榜单排名元数据。
+  - `collect_hn()` 通过 Algolia Hacker News Search API 抓取 story，按关键词过滤后复用 RSS Analyzer。
   - `RawItem.raw_metadata.source_id` 保存配置 id，供 source health、成本归因等后续阶段使用。
 
 - `src/main.py`
@@ -162,7 +163,7 @@
   - 使用 `data/kb.db` 并显式初始化数据库连接；维护 Cron 使用 `Asia/Shanghai`。
 
 - `src/graph/router.py`
-  - 按 `RawItem.source` 做规则路由；`hotlist` 复用 `routed_rss` 和 RSS Analyzer。
+  - 按 `RawItem.source` 做规则路由；`hotlist` 和 `hn` 复用 `routed_rss` 和 RSS Analyzer。
 
 - `src/graph/analyzers/`
   - 各源 Analyzer 薄层；通用实现位于 `base.py`。

@@ -78,6 +78,14 @@ def test_homepage_search_matches_summary_and_original_description():
     assert "listSummary(a.summary || a.description || '')" in app_js
 
 
+def test_homepage_uses_hn_source_detail_as_label():
+    index_html = (ROOT / "src/site/templates/index.html").read_text()
+    app_js = (ROOT / "src/site/static/js/app.js").read_text()
+
+    assert "article.source in ['rss', 'hotlist', 'hn']" in index_html
+    assert "source === 'hn' && sourceDetail" in app_js
+
+
 @pytest.mark.asyncio
 async def test_homepage_uses_hotlist_source_detail_as_label(tmp_path, monkeypatch):
     articles = [
@@ -120,7 +128,7 @@ async def test_homepage_uses_hotlist_source_detail_as_label(tmp_path, monkeypatc
 
     assert '<span class="topic-tag">AIHOT</span>' in visible_html
     assert "source === 'hotlist' && sourceDetail" in app_js
-    assert "['rss', 'hotlist'].includes(a.source)" in app_js
+    assert "['rss', 'hotlist', 'hn'].includes(a.source)" in app_js
 
 
 @pytest.mark.asyncio

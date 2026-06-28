@@ -8,6 +8,7 @@ from src.graph.collector import (
     _matches_rss_keywords,
     collect_all,
     collect_github,
+    collect_hn,
     collect_hotlist,
     collect_rss,
 )
@@ -392,6 +393,53 @@ async def test_collect_hotlist_rejects_unsuccessful_response_status():
     with patch("httpx.AsyncClient.get", return_value=mock_resp):
         with pytest.raises(ValueError, match="NewsNow 响应状态异常"):
             await collect_hotlist(source)
+
+
+@pytest.mark.asyncio
+async def test_collect_hn_maps_algolia_hits_and_filters_before_limit():
+    source = make_source(
+        id="hn_ai",
+        name="Hacker News AI",
+        type="hn",
+        max_items=2,
+        config={
+            "api_url": "https://hn.algolia.example/api/v1/search_by_date",
+            "query": "AI OR LLM",
+            "filter_keywords": ["AI", "LLM"],
+        },
+    )
+    payload = {
+        "hits": [
+            {"objectID": "1", "title": "General startup launch", "url": "https://example.com/1", "created_at": "2026-06-01T01:00:00Z", "points": 12, "num_comments": 4},
+            {"objectID": "2", "title": "AI browser agent", "url": "https://example.com/2", "created_at": "2026-06-01T02:00:00Z", "points": 50, "num_comments": 20},
+            {"objectID": "3", "story_title": "Ask HN: LLM memory", "story_url": "", "created_at": "2026-06-01T03:00:00Z", "points": 30, "num_comments": 10},
+            {"objectID": "4", "title": "AI model release", "url": "https://example.com/4", "created_at": "2026-06-01T04:00:00Z"},
+        ]
+    }
+    mock_resp = AsyncMock()
+    mock_resp.json = lambda: payload
+    mock_resp.raise_for_status = lambda: None
+
+    with patch("httpx.AsyncClient.get", return_value=mock_resp) as mock_get:
+        items = await collect_hn(source)
+
+    mock_get.assert_called_once_with(
+        "https://hn.algolia.example/api/v1/search_by_date",
+        params={"tags": "story", "query": "AI OR LLM", "hitsPerPage": 6},
+    )
+    assert [item.url for item in items] == [
+        "https://example.com/2",
+        "https://news.ycombinator.com/item?id=3",
+    ]
+    assert items[0].source == "hn"
+    assert items[0].source_detail == "Hacker News AI"
+    assert items[0].description == "points=50 comments=20"
+    assert items[0].raw_metadata == {
+        "object_id": "2",
+        "points": 50,
+        "num_comments": 20,
+        "source_id": "hn_ai",
+    }
 
 
 @pytest.mark.asyncio

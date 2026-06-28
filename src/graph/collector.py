@@ -252,6 +252,54 @@ async def collect_hotlist(source: SourceConfig) -> list[RawItem]:
     return items
 
 
+async def collect_hn(source: SourceConfig) -> list[RawItem]:
+    cfg = source.config
+    items = []
+    now = now_bj_iso()
+    keywords = cfg.get("filter_keywords", [])
+
+    async with httpx.AsyncClient(timeout=30, follow_redirects=True) as client:
+        resp = await client.get(
+            cfg["api_url"],
+            params={
+                "tags": "story",
+                "query": cfg.get("query", ""),
+                "hitsPerPage": min(source.max_items * 3, 100),
+            },
+        )
+        resp.raise_for_status()
+        payload = resp.json()
+
+    for hit in payload.get("hits", []):
+        object_id = str(hit.get("objectID") or "")
+        title = hit.get("title") or hit.get("story_title") or ""
+        if not title or not object_id:
+            continue
+        if keywords and not _matches_rss_keywords(title, keywords):
+            continue
+        url = hit.get("url") or hit.get("story_url") or f"https://news.ycombinator.com/item?id={object_id}"
+        points = hit.get("points") or 0
+        comments = hit.get("num_comments") or 0
+        items.append(RawItem(
+            url=url,
+            title=title,
+            description=f"points={points} comments={comments}",
+            source="hn",
+            source_detail=source.name,
+            published_at=str(hit.get("created_at") or ""),
+            raw_metadata={
+                "object_id": object_id,
+                "points": points,
+                "num_comments": comments,
+                "source_id": source.id,
+            },
+            collected_at=now,
+        ))
+        if len(items) >= source.max_items:
+            break
+    return items
+
+
 # ===== 飞书认证 =====
 class FeishuAuth:
     """惰性 token 管理"""
@@ -363,6 +411,7 @@ COLLECTOR_MAP = {
     "github": collect_github,
     "rss": collect_rss,
     "hotlist": collect_hotlist,
+    "hn": collect_hn,
     "feishu": collect_feishu,
     "arxiv": collect_arxiv,
 }

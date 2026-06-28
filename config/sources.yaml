@@ -194,6 +194,42 @@ sources:
       filter_keywords: [AI, artificial intelligence]
       filter_scope: title
 
+  - id: rss_huggingface
+    name: Hugging Face Blog
+    type: rss
+    enabled: true
+    priority: 3
+    cron: "0 9 * * *"
+    max_items: 10
+    config:
+      url: "https://huggingface.co/blog/feed.xml"
+      filter_keywords: [AI, LLM, agent, agents, RAG, transformers, inference, model, benchmark]
+      filter_scope: title_summary
+
+  - id: rss_microsoft_research
+    name: Microsoft Research
+    type: rss
+    enabled: true
+    priority: 3
+    cron: "0 9 * * *"
+    max_items: 10
+    config:
+      url: "https://www.microsoft.com/en-us/research/feed/"
+      filter_keywords: [AI, LLM, agent, artificial intelligence, machine learning, language model, multimodal]
+      filter_scope: title_summary
+
+  - id: hn_ai
+    name: Hacker News AI
+    type: hn
+    enabled: true
+    priority: 3
+    cron: "0 */6 * * *"
+    max_items: 10
+    config:
+      api_url: "https://hn.algolia.com/api/v1/search_by_date"
+      query: "AI OR LLM OR agent OR RAG OR MCP"
+      filter_keywords: [AI, LLM, agent, RAG, MCP, OpenAI]
+
   - id: rss_arxiv
     name: arXiv AI/ML
     type: arxiv
