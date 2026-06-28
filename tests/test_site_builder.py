@@ -226,13 +226,24 @@ def test_homepage_supports_pagination_and_hidden_articles():
     app_js = (ROOT / "src/site/static/js/app.js").read_text()
 
     assert 'data-view-filter="hidden"' in index_html
-    assert 'id="page-size-filter"' in index_html
     assert 'id="pagination-controls"' in index_html
+    assert 'data-page-size' in app_js
     assert "ai_kb_hidden_articles" in app_js
     assert "ai_kb_page_size" in app_js
     assert "hiddenIds" in app_js
     assert "state.page" in app_js
     assert "renderPagination" in app_js
+
+
+def test_homepage_pagination_is_fixed_bottom_bar():
+    index_html = (ROOT / "src/site/templates/index.html").read_text()
+    app_js = (ROOT / "src/site/static/js/app.js").read_text()
+    css = (ROOT / "src/site/static/css/style.css").read_text()
+
+    assert 'id="page-size-filter"' not in index_html
+    assert 'data-page-size' in app_js
+    assert "position: fixed" in css
+    assert "padding-bottom" in css
 
 
 def test_homepage_loads_full_article_list_for_filters():

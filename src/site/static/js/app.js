@@ -144,6 +144,11 @@
         const el = document.getElementById('pagination-controls');
         if (!el) return;
         el.innerHTML = `
+            <label>每页
+                <select data-page-size aria-label="每页条数">
+                    ${[10, 20, 50, 100].map(size => `<option value="${size}" ${state.pageSize === size ? 'selected' : ''}>${size}</option>`).join('')}
+                </select>
+            </label>
             <button type="button" data-page-prev ${state.page <= 1 ? 'disabled' : ''}>上一页</button>
             <span>${total ? state.page : 0} / ${total ? totalPages : 0} 页 · ${total} 条</span>
             <button type="button" data-page-next ${state.page >= totalPages ? 'disabled' : ''}>下一页</button>
@@ -260,17 +265,6 @@
             });
         }
 
-        const pageSizeFilter = document.getElementById('page-size-filter');
-        if (pageSizeFilter) {
-            pageSizeFilter.value = String(state.pageSize);
-            pageSizeFilter.addEventListener('change', e => {
-                state.pageSize = parseInt(e.target.value, 10) || 20;
-                state.page = 1;
-                savePageSize();
-                filterArticles();
-            });
-        }
-
         document.querySelectorAll('.date-filters button').forEach(btn => {
             btn.addEventListener('click', () => {
                 document.querySelectorAll('.date-filters button').forEach(b => b.classList.remove('active'));
@@ -315,6 +309,14 @@
                 state.page += 1;
                 filterArticles();
             }
+        });
+
+        document.addEventListener('change', event => {
+            if (!event.target.matches('[data-page-size]')) return;
+            state.pageSize = parseInt(event.target.value, 10) || 20;
+            state.page = 1;
+            savePageSize();
+            filterArticles();
         });
 
         // default: show active button
