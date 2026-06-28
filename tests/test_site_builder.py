@@ -213,12 +213,26 @@ def test_homepage_supports_local_favorites_view():
     index_html = (ROOT / "src/site/templates/index.html").read_text()
     app_js = (ROOT / "src/site/static/js/app.js").read_text()
 
-    assert 'data-favorite-filter="all"' in index_html
-    assert 'data-favorite-filter="favorites"' in index_html
+    assert 'data-view-filter="all"' in index_html
+    assert 'data-view-filter="favorites"' in index_html
     assert "ai_kb_favorite_articles" in app_js
     assert "localStorage" in app_js
     assert "data-favorite-toggle" in app_js
     assert "state.favoritesOnly" in app_js
+
+
+def test_homepage_supports_pagination_and_hidden_articles():
+    index_html = (ROOT / "src/site/templates/index.html").read_text()
+    app_js = (ROOT / "src/site/static/js/app.js").read_text()
+
+    assert 'data-view-filter="hidden"' in index_html
+    assert 'id="page-size-filter"' in index_html
+    assert 'id="pagination-controls"' in index_html
+    assert "ai_kb_hidden_articles" in app_js
+    assert "ai_kb_page_size" in app_js
+    assert "hiddenIds" in app_js
+    assert "state.page" in app_js
+    assert "renderPagination" in app_js
 
 
 def test_homepage_loads_full_article_list_for_filters():

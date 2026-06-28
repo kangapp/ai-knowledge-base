@@ -28,9 +28,12 @@
 
     const INIT = window.__INIT__ || { articles: [], stats: {} };
     const FAVORITES_KEY = 'ai_kb_favorite_articles';
-    const state = { source: '', tag: '', days: 30, query: '', favoritesOnly: false };
+    const HIDDEN_KEY = 'ai_kb_hidden_articles';
+    const PAGE_SIZE_KEY = 'ai_kb_page_size';
+    const state = { source: '', tag: '', days: 30, query: '', favoritesOnly: false, view: 'all', page: 1, pageSize: loadPageSize() };
     let allArticles = INIT.articles;
     let favoriteIds = loadFavoriteIds();
+    let hiddenIds = loadHiddenIds();
 
     function getSourceLabel(source, sourceDetail) {
         if (source === 'hotlist' && sourceDetail) {
@@ -67,12 +70,14 @@
             const label = getSourceLabel(a.source, a.source_detail);
             const tagsHtml = (a.tags || []).slice(0, 3).map(t => `<span class="tag">${escapeHtml(t)}</span>`).join('');
             const isFavorite = favoriteIds.has(String(a.id));
+            const isHidden = hiddenIds.has(String(a.id));
             return `
             <div class="article-card" data-score="${a.relevance_score}" data-source="${a.source}" data-source-detail="${a.source_detail || ''}">
                 <div class="card-header">
                     <span class="topic-tag">${escapeHtml(label)}</span>
                     ${tagsHtml ? `<div class="tags">${tagsHtml}</div>` : ''}
                     <button type="button" class="favorite-btn ${isFavorite ? 'active' : ''}" data-favorite-toggle data-article-id="${a.id}" aria-label="${isFavorite ? '取消收藏文章' : '收藏文章'}" aria-pressed="${isFavorite ? 'true' : 'false'}">${isFavorite ? '★' : '☆'}</button>
+                    <button type="button" class="hide-btn ${isHidden ? 'active' : ''}" data-hide-toggle data-article-id="${a.id}">${isHidden ? '恢复' : '屏蔽'}</button>
                 </div>
                 <h3><a href="/article.html?id=${a.id}" data-article-link data-article-id="${a.id}">${escapeHtml(a.title)}</a></h3>
                 <p>${escapeHtml(listSummary(a.summary || a.description || ''))}</p>
@@ -108,6 +113,11 @@
         if (state.tag) {
             articles = articles.filter(a => (a.tags || []).includes(state.tag));
         }
+        if (state.view === 'hidden') {
+            articles = articles.filter(a => hiddenIds.has(String(a.id)));
+        } else {
+            articles = articles.filter(a => !hiddenIds.has(String(a.id)));
+        }
         if (state.favoritesOnly) {
             articles = articles.filter(a => favoriteIds.has(String(a.id)));
         }
@@ -119,7 +129,25 @@
                 (a.description || '').toLowerCase().includes(q)
             );
         }
-        render(articles);
+        renderPage(articles);
+    }
+
+    function renderPage(articles) {
+        const totalPages = Math.max(1, Math.ceil(articles.length / state.pageSize));
+        if (state.page > totalPages) state.page = totalPages;
+        const start = (state.page - 1) * state.pageSize;
+        render(articles.slice(start, start + state.pageSize));
+        renderPagination(articles.length, totalPages);
+    }
+
+    function renderPagination(total, totalPages) {
+        const el = document.getElementById('pagination-controls');
+        if (!el) return;
+        el.innerHTML = `
+            <button type="button" data-page-prev ${state.page <= 1 ? 'disabled' : ''}>上一页</button>
+            <span>${total ? state.page : 0} / ${total ? totalPages : 0} 页 · ${total} 条</span>
+            <button type="button" data-page-next ${state.page >= totalPages ? 'disabled' : ''}>下一页</button>
+        `;
     }
 
     function loadFavoriteIds() {
@@ -145,6 +173,39 @@
         filterArticles();
     }
 
+    function loadHiddenIds() {
+        try {
+            return new Set(JSON.parse(localStorage.getItem(HIDDEN_KEY) || '[]').map(String));
+        } catch (_) {
+            return new Set();
+        }
+    }
+
+    function saveHiddenIds() {
+        localStorage.setItem(HIDDEN_KEY, JSON.stringify([...hiddenIds]));
+    }
+
+    function toggleHidden(articleId) {
+        const id = String(articleId);
+        if (hiddenIds.has(id)) {
+            hiddenIds.delete(id);
+        } else {
+            hiddenIds.add(id);
+        }
+        saveHiddenIds();
+        state.page = 1;
+        filterArticles();
+    }
+
+    function loadPageSize() {
+        const size = parseInt(localStorage.getItem(PAGE_SIZE_KEY), 10);
+        return [10, 20, 50, 100].includes(size) ? size : 20;
+    }
+
+    function savePageSize() {
+        localStorage.setItem(PAGE_SIZE_KEY, String(state.pageSize));
+    }
+
     function escapeHtml(str) {
         return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
     }
@@ -154,6 +215,7 @@
         if (searchBox) {
             searchBox.addEventListener('input', debounce(e => {
                 state.query = e.target.value;
+                state.page = 1;
                 filterArticles();
             }, 200));
         }
@@ -178,6 +240,7 @@
             });
             sourceFilter.addEventListener('change', e => {
                 state.source = e.target.value;
+                state.page = 1;
                 filterArticles();
             });
         }
@@ -192,6 +255,18 @@
             });
             tagFilter.addEventListener('change', e => {
                 state.tag = e.target.value;
+                state.page = 1;
+                filterArticles();
+            });
+        }
+
+        const pageSizeFilter = document.getElementById('page-size-filter');
+        if (pageSizeFilter) {
+            pageSizeFilter.value = String(state.pageSize);
+            pageSizeFilter.addEventListener('change', e => {
+                state.pageSize = parseInt(e.target.value, 10) || 20;
+                state.page = 1;
+                savePageSize();
                 filterArticles();
             });
         }
@@ -201,15 +276,18 @@
                 document.querySelectorAll('.date-filters button').forEach(b => b.classList.remove('active'));
                 btn.classList.add('active');
                 state.days = parseInt(btn.dataset.days) || 0;
+                state.page = 1;
                 filterArticles();
             });
         });
 
-        document.querySelectorAll('[data-favorite-filter]').forEach(btn => {
+        document.querySelectorAll('[data-view-filter]').forEach(btn => {
             btn.addEventListener('click', () => {
-                document.querySelectorAll('[data-favorite-filter]').forEach(b => b.classList.remove('active'));
+                document.querySelectorAll('[data-view-filter]').forEach(b => b.classList.remove('active'));
                 btn.classList.add('active');
-                state.favoritesOnly = btn.dataset.favoriteFilter === 'favorites';
+                state.view = btn.dataset.viewFilter;
+                state.favoritesOnly = state.view === 'favorites';
+                state.page = 1;
                 filterArticles();
             });
         });
@@ -219,6 +297,24 @@
             if (!btn) return;
             event.preventDefault();
             toggleFavorite(btn.dataset.articleId);
+        });
+
+        document.addEventListener('click', event => {
+            const btn = event.target.closest('[data-hide-toggle]');
+            if (!btn) return;
+            event.preventDefault();
+            toggleHidden(btn.dataset.articleId);
+        });
+
+        document.addEventListener('click', event => {
+            if (event.target.closest('[data-page-prev]') && state.page > 1) {
+                state.page -= 1;
+                filterArticles();
+            }
+            if (event.target.closest('[data-page-next]')) {
+                state.page += 1;
+                filterArticles();
+            }
         });
 
         // default: show active button

@@ -5,9 +5,16 @@
     <input type="search" id="search-box" placeholder="搜索... (FTS5)">
     <select id="source-filter"><option value="">全部来源</option></select>
     <select id="tag-filter"><option value="">全部标签</option></select>
-    <div class="favorite-filters" aria-label="收藏筛选">
-        <button type="button" class="active" data-favorite-filter="all">全部</button>
-        <button type="button" data-favorite-filter="favorites">收藏</button>
+    <select id="page-size-filter" aria-label="每页条数">
+        <option value="10">每页 10 条</option>
+        <option value="20" selected>每页 20 条</option>
+        <option value="50">每页 50 条</option>
+        <option value="100">每页 100 条</option>
+    </select>
+    <div class="favorite-filters" aria-label="文章视图">
+        <button type="button" class="active" data-view-filter="all">全部</button>
+        <button type="button" data-view-filter="favorites">收藏</button>
+        <button type="button" data-view-filter="hidden">已屏蔽</button>
     </div>
     <div class="date-filters">
         <button data-days="7">近 7 天</button>
@@ -38,6 +45,7 @@
             <div class="tags">{% for tag in article_tags %}<span class="tag">{{ tag }}</span>{% endfor %}</div>
             {% endif %}
             <button type="button" class="favorite-btn" data-favorite-toggle data-article-id="{{ article.id }}" aria-label="收藏文章" aria-pressed="false">☆</button>
+            <button type="button" class="hide-btn" data-hide-toggle data-article-id="{{ article.id }}">屏蔽</button>
         </div>
         <h3><a href="/article.html?id={{ article.id }}" data-article-link data-article-id="{{ article.id }}">{{ article.title }}</a></h3>
         <p>{{ article.list_summary }}</p>
@@ -49,6 +57,7 @@
     </div>
     {% endfor %}
 </div>
+<div id="pagination-controls" class="pagination-controls" aria-label="分页"></div>
 <aside id="article-detail-drawer" class="article-detail-drawer" hidden aria-label="文章详情">
     <button class="article-drawer-backdrop" type="button" data-article-drawer-close aria-label="关闭文章详情"></button>
     <section class="article-drawer-panel" role="dialog" aria-modal="true" aria-labelledby="article-drawer-title">
