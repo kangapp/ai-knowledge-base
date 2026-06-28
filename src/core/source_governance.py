@@ -14,11 +14,16 @@ def calculate_health_score(metrics: dict) -> float | None:
     new_items = metrics.get("new_items", 0) or 0
     approved = metrics.get("approved", 0) or 0
     cost = metrics.get("cost", 0.0) or 0.0
+    request_failed = bool(metrics.get("request_failed"))
+
+    if not request_failed and new_items == 0:
+        return None
 
     request_success = float(metrics.get("request_success_rate", 0) or 0)
     fresh_rate = new_items / collected if collected else 0
     approved_rate = approved / new_items if new_items else 0
-    avg_score_norm = float(metrics.get("avg_score") or 0) / 100
+    avg_score = metrics.get("avg_score")
+    avg_score_norm = (float(avg_score) / 100) if avg_score is not None else approved_rate
     cost_efficiency = min((approved / cost) / 200, 1.0) if cost else 0
 
     score = (
@@ -88,8 +93,8 @@ async def apply_governance(db: Database, source_id: str) -> str | None:
         if current["status"] == "quarantined":
             return await _change_status(db, source_id, "disabled", "连续低分隔离后仍不达标")
         return await _change_status(db, source_id, "quarantined", "连续3次健康分低于30")
-    if latest < 50 and current["status"] == "active":
-        return await _change_status(db, source_id, "degraded", "健康分低于50")
+    if len(scores) == 3 and sum(scores) / len(scores) < 50 and current["status"] == "active":
+        return await _change_status(db, source_id, "degraded", "最近3次平均健康分低于50")
     return current["status"]
 
 
@@ -169,6 +174,7 @@ async def rollup_source_health_daily(db: Database, run_id: str) -> None:
         budget_blocked = 1 if row["analysis_failed"] and row["cost"] == 0 else 0
         metrics = {
             "request_success_rate": request_success_rate,
+            "request_failed": attempts > 0 and row["collected"] == 0,
             "collected": row["collected"],
             "new_items": row["new_items"],
             "approved": row["approved"],

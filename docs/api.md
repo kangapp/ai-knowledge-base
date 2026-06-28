@@ -682,7 +682,7 @@
   - `healthy`：最近一次正常推进到后续阶段。
 - `last_run_at/last_error` 返回最近运行时间和最近采集错误；`last_collected/last_new_items/last_dedup_skipped/last_analyzed/last_analysis_failed/last_inserted` 返回最近一次漏斗。
 - `governance_status` 返回自动治理状态：`candidate/trial/active/degraded/quarantined/disabled/rejected`。
-- `health_score` 返回自动治理健康分；预算阻断轮次不更新该分数。
+- `health_score` 返回自动治理健康分；预算阻断和采集成功但无新条目的轮次不更新该分数。`active` 源按最近 3 次可评分记录的平均分低于 50 才降权。
 - `budget_blocked` 表示最近治理汇总是否被预算硬熔断阻断。
 - `last_governance_reason` 返回最近一次自动治理动作原因。
 - GitHub repo 的审核策略与普通文章不同：系统会按 repo-aware 维度裁决，因此 `approved/retry/discarded` 不能直接与 RSS 新闻按同一内容深度标准比较。

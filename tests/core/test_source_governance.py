@@ -60,6 +60,16 @@ def test_health_score_uses_quality_freshness_and_cost():
     assert score == 66.0
 
 
+def test_dedup_only_run_does_not_score_source():
+    assert calculate_health_score({
+        "request_success_rate": 1.0,
+        "collected": 10,
+        "new_items": 0,
+        "approved": 0,
+        "cost": 0,
+    }) is None
+
+
 @pytest.mark.asyncio
 async def test_low_scores_progress_to_quarantine(tmp_path):
     db = Database(
@@ -88,6 +98,78 @@ async def test_low_scores_progress_to_quarantine(tmp_path):
 
         status = await apply_governance(db, "rss_low")
         assert status == "quarantined"
+    finally:
+        await db.close()
+
+
+@pytest.mark.asyncio
+async def test_single_low_score_does_not_degrade_active_source(tmp_path):
+    db = Database(
+        tmp_path / "governance.db",
+        migrations_dir=Path(__file__).parents[2] / "src" / "db" / "migrations",
+    )
+    await db.initialize()
+    try:
+        await db.execute(
+            """
+            INSERT INTO source_registry
+            (id, name, type, status, enabled, priority, cron, max_items, config_json)
+            VALUES ('rss_low_once', 'Low Once', 'rss', 'active', 1, 2, '0 1 * * *', 10, '{}')
+            """
+        )
+        for day, score in [
+            ("2026-06-25", 80),
+            ("2026-06-26", 80),
+            ("2026-06-27", 20),
+        ]:
+            await db.execute(
+                """
+                INSERT INTO source_health_daily
+                (source_id, date, health_score)
+                VALUES ('rss_low_once', ?, ?)
+                """,
+                (day, score),
+            )
+        await db.commit()
+
+        status = await apply_governance(db, "rss_low_once")
+        assert status == "active"
+    finally:
+        await db.close()
+
+
+@pytest.mark.asyncio
+async def test_three_run_average_degrades_active_source(tmp_path):
+    db = Database(
+        tmp_path / "governance.db",
+        migrations_dir=Path(__file__).parents[2] / "src" / "db" / "migrations",
+    )
+    await db.initialize()
+    try:
+        await db.execute(
+            """
+            INSERT INTO source_registry
+            (id, name, type, status, enabled, priority, cron, max_items, config_json)
+            VALUES ('rss_low_average', 'Low Average', 'rss', 'active', 1, 2, '0 1 * * *', 10, '{}')
+            """
+        )
+        for day, score in [
+            ("2026-06-25", 40),
+            ("2026-06-26", 45),
+            ("2026-06-27", 49),
+        ]:
+            await db.execute(
+                """
+                INSERT INTO source_health_daily
+                (source_id, date, health_score)
+                VALUES ('rss_low_average', ?, ?)
+                """,
+                (day, score),
+            )
+        await db.commit()
+
+        status = await apply_governance(db, "rss_low_average")
+        assert status == "degraded"
     finally:
         await db.close()
 
