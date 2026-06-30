@@ -356,7 +356,7 @@ UNIQUE(source_id, date)
 
 UNIQUE(source_id, date)
 
-预算阻断轮次只记录 `budget_blocked`，不降低 `health_score`。采集成功但没有新条目的轮次不计算健康分，避免把全量重复误判为低质量源。`active` 源只有最近 3 次可评分记录的平均健康分低于 50 时才自动转为 `degraded`；最近 3 次均低于 30 时转为 `quarantined`。
+预算阻断轮次只记录 `budget_blocked`，不降低 `health_score`。采集成功但没有新条目的轮次不计算健康分，避免把全量重复误判为低质量源。同一天多轮运行会先累计指标，再按当天累计值重算 `health_score`。`active` 源只有最近 3 次可评分记录的平均健康分低于 50 时才自动转为 `degraded`；最近 3 次均低于 30 时转为 `quarantined`。
 
 `trial` 源最近 3 次健康记录全部满足请求成功率 >= 0.8、有新增、健康分 >= 50 且非预算阻断时，自动转为 `active`；否则转为 `rejected`。
 

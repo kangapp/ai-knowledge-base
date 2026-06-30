@@ -34,7 +34,7 @@ async def test_initialize_and_migrate(tmp_path):
 
         # 验证迁移版本
         v = await db.fetch_one("SELECT version FROM schema_version")
-        assert v["version"] == 12
+        assert v["version"] == 13
 
         deep_report_columns = await db.fetch_all("PRAGMA table_info(deep_reports)")
         deep_report_column_names = {row["name"] for row in deep_report_columns}
@@ -61,6 +61,20 @@ async def test_initialize_and_migrate(tmp_path):
         assert "collection_items" in names
         assert "pipeline_source_runs" in names
         assert "pipeline_events" in names
+
+        indexes = {
+            row["name"]
+            for row in await db.fetch_all(
+                "SELECT name FROM sqlite_master WHERE type='index'"
+            )
+        }
+        assert {
+            "idx_cost_logs_created_at",
+            "idx_pipeline_runs_status_started",
+            "idx_pipeline_source_runs_run_id",
+            "idx_pipeline_source_runs_updated_at",
+            "idx_articles_status_collected",
+        } <= indexes
     finally:
         await db.close()
 

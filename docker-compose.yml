@@ -2,6 +2,8 @@ services:
   pipeline:
     image: ${PIPELINE_IMAGE:-ghcr.io/kangapp/ai-knowledge-base:latest}
     env_file: .env
+    environment:
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
     volumes:
       - ./data:/app/data
       - ./output:/app/output

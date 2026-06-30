@@ -185,7 +185,7 @@
   - `days=N` 查询窗口统一为含今天的 N 个自然日，成本汇总、运行状态与质量新鲜度比较同步修正
 - [x] 资源消耗趋势窗口独立传参
   - `/api/stats/consumption-detail` 新增 `trend_window`，KPI 窗口继续由 `period` 控制
-  - 默认趋势窗口：day=14d、week=12w、month=12m
+  - 默认趋势窗口：day=14d、week=4w、month=12m
   - `trend/source_trend/provider_trend` 使用同一个趋势窗口，避免选日时趋势只剩今天
 - [x] 统一项目业务时间为北京时间
   - 新增 `src/core/time.py` 作为 Python 业务时间唯一入口

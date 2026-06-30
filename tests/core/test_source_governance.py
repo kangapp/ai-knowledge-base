@@ -10,6 +10,7 @@ from src.core.source_governance import (
     calculate_health_score,
     evaluate_trial_sources,
     promote_candidates_to_trial,
+    rollup_source_health_daily,
 )
 
 
@@ -170,6 +171,58 @@ async def test_three_run_average_degrades_active_source(tmp_path):
 
         status = await apply_governance(db, "rss_low_average")
         assert status == "degraded"
+    finally:
+        await db.close()
+
+
+@pytest.mark.asyncio
+async def test_daily_rollup_recalculates_score_from_accumulated_metrics(tmp_path):
+    db = Database(
+        tmp_path / "governance.db",
+        migrations_dir=Path(__file__).parents[2] / "src" / "db" / "migrations",
+    )
+    await db.initialize()
+    try:
+        await db.execute(
+            """
+            INSERT INTO source_registry
+            (id, name, type, status, enabled, priority, cron, max_items, config_json)
+            VALUES ('rss_mixed', 'Mixed', 'rss', 'active', 1, 2, '0 1 * * *', 10, '{}')
+            """
+        )
+        for run_id, approved in [("run_low", 0), ("run_high", 10)]:
+            await db.execute(
+                """
+                INSERT INTO pipeline_runs (id, started_at, status, trigger)
+                VALUES (?, datetime('now', '+8 hours'), 'completed', 'test')
+                """,
+                (run_id,),
+            )
+            await db.execute(
+                """
+                INSERT INTO pipeline_source_runs
+                (run_id, source_id, source, source_detail, collected, new_items,
+                 analyzed, approved, discarded, failed, cost, tokens)
+                VALUES (?, 'rss_mixed', 'rss', 'Mixed', 10, 10, 10, ?, ?, 0, 0.01, 1000)
+                """,
+                (run_id, approved, 10 - approved),
+            )
+            await rollup_source_health_daily(db, run_id)
+
+        row = await db.fetch_one(
+            """
+            SELECT collected, new_items, approved, discarded, cost, health_score
+            FROM source_health_daily
+            WHERE source_id = 'rss_mixed'
+            """
+        )
+
+        assert row["collected"] == 20
+        assert row["new_items"] == 20
+        assert row["approved"] == 10
+        assert row["discarded"] == 10
+        assert row["cost"] == 0.02
+        assert row["health_score"] == 77.5
     finally:
         await db.close()
 

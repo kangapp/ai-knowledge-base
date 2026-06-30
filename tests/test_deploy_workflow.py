@@ -56,6 +56,12 @@ def test_deploy_uses_commit_image_and_rolls_back_on_failure():
     assert "docker compose pull failed after 2 attempts\"\n                false" in workflow
 
 
+def test_pipeline_defaults_to_info_logging_in_compose():
+    compose = (ROOT / "docker-compose.yml").read_text()
+
+    assert "LOG_LEVEL: ${LOG_LEVEL:-INFO}" in compose
+
+
 def test_deploy_supports_manual_ref_and_serializes_deployments():
     workflow = (ROOT / ".github/workflows/deploy.yml").read_text()
 

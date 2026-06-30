@@ -688,11 +688,11 @@ async def search_articles(db: Database, query: str, source: str = "", days: int 
     params.extend([limit, offset])
     if query:
         rows = await db.fetch_all(
-            f"SELECT a.* FROM articles a JOIN articles_fts fts ON a.rowid = fts.rowid WHERE {where_sql} ORDER BY a.collected_at DESC LIMIT ? OFFSET ?",
+            f"SELECT a.* FROM articles a JOIN articles_fts fts ON a.rowid = fts.rowid WHERE {where_sql} ORDER BY a.collected_at DESC, a.id ASC LIMIT ? OFFSET ?",
             tuple(params))
     else:
         rows = await db.fetch_all(
-            f"SELECT a.* FROM articles a WHERE {where_sql} ORDER BY a.collected_at DESC LIMIT ? OFFSET ?",
+            f"SELECT a.* FROM articles a WHERE {where_sql} ORDER BY a.collected_at DESC, a.id ASC LIMIT ? OFFSET ?",
             tuple(params))
 
     # 查询标签
@@ -934,11 +934,11 @@ async def get_consumption_detail_stats(
     资源消耗详细统计（Phase 2）
     period 表示日期窗口：
     day = 今天；week = 近 7 个自然日；month = 近 30 个自然日。
-    trend_window 表示趋势回看窗口：day 默认 14d，week 默认 12w，month 默认 12m。
+    trend_window 表示趋势回看窗口：day 默认 14d，week 默认 4w，month 默认 12m。
     """
     window_map = {"day": "-0 days", "week": "-6 days", "month": "-29 days"}
     window = window_map.get(period, "-6 days")
-    trend_window = trend_window or {"day": "14d", "week": "12w", "month": "12m"}.get(period, "12w")
+    trend_window = trend_window or {"day": "14d", "week": "4w", "month": "12m"}.get(period, "4w")
     trend_cutoff = _trend_window_modifier(trend_window)
 
     # 1. 周期总花费和日均

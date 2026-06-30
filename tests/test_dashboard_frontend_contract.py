@@ -83,6 +83,7 @@ def test_dashboard_consumption_passes_trend_window_separately():
     main_js = (ROOT / "src/site/static/js/dashboard/main.js").read_text()
 
     assert "trendWindow" in state_js
+    assert "week: { days: 7, label: '近 7 天', trendWindow: '4w' }" in state_js
     assert "currentTrendWindow" in state_js
     assert "loadConsumption(period, trendWindow)" in api_js
     assert "trend_window=${trendWindow}" in api_js

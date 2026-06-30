@@ -1,7 +1,7 @@
 (function() {
     const periods = {
         day: { days: 1, label: '今日', trendWindow: '14d' },
-        week: { days: 7, label: '近 7 天', trendWindow: '12w' },
+        week: { days: 7, label: '近 7 天', trendWindow: '4w' },
         month: { days: 30, label: '近 30 天', trendWindow: '12m' },
     };
 

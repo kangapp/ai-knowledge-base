@@ -36,6 +36,19 @@ def calculate_health_score(metrics: dict) -> float | None:
     return round(score, 1)
 
 
+def _metrics_from_daily_row(row, request_failed: bool = False) -> dict:
+    return {
+        "request_success_rate": row["request_success_rate"],
+        "request_failed": request_failed,
+        "collected": row["collected"],
+        "new_items": row["new_items"],
+        "approved": row["approved"],
+        "avg_score": row["avg_score"],
+        "cost": row["cost"],
+        "budget_blocked": row["budget_blocked"],
+    }
+
+
 async def _change_status(db: Database, source_id: str, status: str, reason: str) -> str:
     row = await db.fetch_one(
         "SELECT status, manual_override FROM source_registry WHERE id = ?",
@@ -199,7 +212,6 @@ async def rollup_source_health_daily(db: Database, run_id: str) -> None:
                 discarded=source_health_daily.discarded + excluded.discarded,
                 cost=source_health_daily.cost + excluded.cost,
                 tokens=source_health_daily.tokens + excluded.tokens,
-                health_score=excluded.health_score,
                 budget_blocked=MAX(source_health_daily.budget_blocked, excluded.budget_blocked),
                 updated_at=datetime('now', '+8 hours')
             """,
@@ -219,5 +231,31 @@ async def rollup_source_health_daily(db: Database, run_id: str) -> None:
                 budget_blocked,
             ),
         )
+        daily = await db.fetch_one(
+            """
+            SELECT *
+            FROM source_health_daily
+            WHERE source_id = ? AND date = ?
+            """,
+            (row["source_id"], date),
+        )
+        if daily:
+            await db.execute(
+                """
+                UPDATE source_health_daily
+                SET health_score = ?, updated_at = datetime('now', '+8 hours')
+                WHERE source_id = ? AND date = ?
+                """,
+                (
+                    calculate_health_score(
+                        _metrics_from_daily_row(
+                            daily,
+                            request_failed=attempts > 0 and row["collected"] == 0,
+                        )
+                    ),
+                    row["source_id"],
+                    date,
+                ),
+            )
         await apply_governance(db, row["source_id"])
     await db.commit()
