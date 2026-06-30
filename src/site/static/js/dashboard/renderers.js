@@ -61,7 +61,7 @@
 
     function sourceErrorText(source) {
         if (source.budget_blocked) return '预算阻断';
-        return source.last_error || source.last_governance_reason || '-';
+        return source.last_error || '-';
     }
 
     function sourceLastRun(value) {

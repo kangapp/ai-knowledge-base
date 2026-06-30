@@ -162,6 +162,9 @@ async def test_analyze_items_records_cost_when_parse_fails():
     assert costs[0].ref_url == "https://github.com/org/repo"
     assert costs[0].source_id == "github_trending"
     assert sum(record.cost for record in costs) > 0
+    assert mock_client.chat.completions.create.call_args.kwargs["extra_body"] == {
+        "thinking": {"type": "disabled"}
+    }
 
 
 @pytest.mark.asyncio

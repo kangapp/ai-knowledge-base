@@ -74,3 +74,11 @@ def test_calc_cost(llm_cfg, agents_cfg):
     cost = registry.calc_cost("minimax", "MiniMax-M3", 1000, 500)
     # 1000/1000 * 0.0003 + 500/1000 * 0.0012 = 0.0003 + 0.0006 = 0.0009
     assert cost == pytest.approx(0.0009, rel=1e-6)
+
+
+def test_minimax_m3_disables_thinking_for_json_tasks(llm_cfg, agents_cfg):
+    registry = LLMRegistry(llm_cfg, agents_cfg)
+
+    assert registry.extra_body_for("minimax", "MiniMax-M3") == {
+        "thinking": {"type": "disabled"}
+    }

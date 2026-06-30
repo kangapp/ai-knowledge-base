@@ -72,9 +72,14 @@ def test_dashboard_renders_source_governance_fields():
     assert "governance_status" in renderers
     assert "health_score" in renderers
     assert "budget_blocked" in renderers
-    assert "last_governance_reason" in renderers
     assert "治理状态" in renderers
     assert "健康分" in renderers
+
+
+def test_dashboard_error_column_does_not_show_governance_reason_as_error():
+    renderers = (ROOT / "src/site/static/js/dashboard/renderers.js").read_text()
+
+    assert "source.last_error || source.last_governance_reason" not in renderers
 
 
 def test_dashboard_consumption_passes_trend_window_separately():

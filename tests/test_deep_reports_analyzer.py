@@ -189,6 +189,11 @@ class _FakeRegistry:
         assert provider_name == "minimax"
         return self._supports_json_mode
 
+    def extra_body_for(self, provider_name: str, model_id: str) -> dict:
+        assert provider_name == "minimax"
+        assert model_id == "MiniMax-M3"
+        return {"thinking": {"type": "disabled"}}
+
     def calc_cost(self, provider: str, model_id: str, tokens_in: int, tokens_out: int) -> float:
         assert provider == "minimax"
         assert model_id == "MiniMax-M3"
@@ -482,6 +487,7 @@ async def test_analyze_deep_report_success_skips_json_mode_when_unsupported():
     assert report is not None
     assert len(cost_records) == 1
     assert "response_format" not in registry.last_kwargs
+    assert registry.last_kwargs["extra_body"] == {"thinking": {"type": "disabled"}}
 
 
 @pytest.mark.asyncio

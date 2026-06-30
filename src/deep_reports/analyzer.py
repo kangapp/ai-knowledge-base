@@ -167,6 +167,9 @@ async def analyze_deep_report(
             )
             if registry.supports_json_mode(provider):
                 kwargs["response_format"] = {"type": "json_object"}
+            extra_body = registry.extra_body_for(provider, model_id)
+            if extra_body:
+                kwargs["extra_body"] = extra_body
 
             response = await client.chat.completions.create(**kwargs)
             latency_ms = int((time.perf_counter() - started) * 1000)

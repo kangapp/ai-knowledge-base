@@ -289,6 +289,9 @@ async def test_reviewer_node_mocked():
     assert reviewed.verdict == "approved"
     assert reviewed.total_score == 88
     assert len(result["cost_records"]) == 1
+    assert mock_client.chat.completions.create.call_args.kwargs["extra_body"] == {
+        "thinking": {"type": "disabled"}
+    }
 
 
 @pytest.mark.asyncio

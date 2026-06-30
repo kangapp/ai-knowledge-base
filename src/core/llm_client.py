@@ -53,6 +53,11 @@ class LLMRegistry:
         cfg = self._llm_cfg.providers.get(provider_name)
         return cfg.supports_json_mode if cfg else False
 
+    def extra_body_for(self, provider_name: str, model_id: str) -> dict:
+        if provider_name == "minimax" and model_id == "MiniMax-M3":
+            return {"thinking": {"type": "disabled"}}
+        return {}
+
     def get_prompt_path(self, agent_name: str) -> str:
         """返回 agent 配置的 prompt 文件路径"""
         return self._agents[agent_name].prompt

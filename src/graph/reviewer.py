@@ -242,6 +242,9 @@ async def _review_one_item(
                 )
                 if registry.supports_json_mode(provider):
                     kwargs["response_format"] = {"type": "json_object"}
+                extra_body = registry.extra_body_for(provider, model_id)
+                if extra_body:
+                    kwargs["extra_body"] = extra_body
 
                 response = await asyncio.wait_for(
                     client.chat.completions.create(**kwargs),
