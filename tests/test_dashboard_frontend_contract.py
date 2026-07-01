@@ -127,6 +127,21 @@ def test_deep_report_templates_script_builder_and_nav_exist():
     assert "/api/deep-reports/${safeId}" in script
 
 
+def test_deep_report_detail_uses_adoption_focused_sections():
+    script = (ROOT / "src/site/static/js/deep-reports.js").read_text()
+
+    assert "function renderAdoptionSummary" in script
+    assert "function renderImplementation" in script
+    assert "function renderReusableDesigns" in script
+    assert "是否值得采用" in script
+    assert "快速验证" in script
+    assert "源码结构" in script
+    assert "可复用设计" in script
+    assert "${listSection('应用场景', report.use_cases)}" not in script
+    assert "${renderFlow('部署运行', report.deployment)}" not in script
+    assert "${renderFlow('运行时数据流', { steps: report.runtime_data_flow })}" not in script
+
+
 def test_dag_page_uses_three_layer_runtime_view():
     html = (ROOT / "src/site/templates/dag.html").read_text()
     script = (ROOT / "src/site/static/js/dag.js").read_text()

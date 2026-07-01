@@ -350,22 +350,22 @@ def test_prompt_template_contains_required_placeholders():
     assert "采用决策" in rendered
     assert "快速上手" in rendered
     assert "部署运行" in rendered
-    assert "节点数量 4-10" in rendered
-    assert "步骤数量 3-8" in rendered
+    assert "节点数量 4-6" in rendered
+    assert "步骤数量 3-5" in rendered
     assert "证据不足时" in rendered
     assert "limitations" in rendered
     assert "边只能引用" in rendered
     assert "已有的节点 id" in rendered
     assert "源码证据不用于前台展示" in rendered
     assert "不得输出 schema 之外的额外字段" in rendered
-    assert "每个数组最多 8 项" in rendered
+    assert "core_modules 最多 5 项" in rendered
     assert "输出语言必须是中文" in rendered
     assert "只能输出合法 JSON" in rendered
     assert '"recommendation": "string"' in rendered
     assert '"nodes": [' in rendered
     assert '"quick_start"' in rendered
     assert '"deployment"' in rendered
-    assert "总长度不超过 5000 个中文字符" in rendered
+    assert "总长度不超过 3500 个中文字符" in rendered
 
 
 def test_deep_report_schema_desc_matches_v2_output_contract():

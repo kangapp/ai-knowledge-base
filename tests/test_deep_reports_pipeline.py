@@ -300,7 +300,7 @@ async def test_deep_report_stage_clone_failure_persists_failed_row_and_event(tmp
             ("deep.failed", "failed"),
         ]
         selector_payload = json.loads(events[1]["payload"])
-        assert selector_payload["candidate_score"] == 82
+        assert selector_payload["candidate_score"] == 90
         assert selector_payload["project_type"] == "coding_tool"
         assert selector_payload["diagnostics"]["eligible"] == 1
         assert events[-1]["message"] == "clone exploded"

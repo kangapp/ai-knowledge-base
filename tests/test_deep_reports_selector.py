@@ -131,8 +131,6 @@ async def test_selector_accepts_production_coding_tools(
 @pytest.mark.parametrize(
     "project_type",
     [
-        "ai_infrastructure",
-        "framework",
         "research",
         "dataset",
         "benchmark",
@@ -154,7 +152,7 @@ async def test_selector_rejects_non_coding_project_types(db, project_type):
 
 
 @pytest.mark.parametrize("project_type", [None, "", "unknown"])
-async def test_selector_rejects_missing_or_unknown_project_type(db, project_type):
+async def test_selector_accepts_missing_project_type_when_adoption_value_is_high(db, project_type):
     url = "https://github.com/acme/project"
 
     result = await _select(
@@ -163,20 +161,16 @@ async def test_selector_rejects_missing_or_unknown_project_type(db, project_type
         analyzed=_analyzed(url, project_type=project_type),
     )
 
-    assert result.candidate is None
-    assert result.diagnostics["rejected"]["project_type_missing"] == 1
+    assert result.candidate is not None
+    assert result.diagnostics["eligible"] == 1
 
 
 @pytest.mark.parametrize(
     ("reviewed", "reason"),
     [
         (_reviewed("https://github.com/acme/project", verdict="retry"), "not_approved"),
-        (_reviewed("https://github.com/acme/project", score=84), "reviewer_score"),
+        (_reviewed("https://github.com/acme/project", score=79), "reviewer_score"),
         (_reviewed("https://github.com/acme/project", ai_score=27), "ai_relevance"),
-        (
-            _reviewed("https://github.com/acme/project", utility_score=23),
-            "developer_utility",
-        ),
         (
             _reviewed(
                 "https://github.com/acme/project",
@@ -288,8 +282,49 @@ async def test_candidate_score_is_ranking_only_and_uses_source_bonus(db):
 
     assert result.candidate is not None
     assert result.candidate.repo_url == first_url
-    assert result.candidate.candidate_score == 79
+    assert result.candidate.candidate_score == 86
     assert result.diagnostics["eligible"] == 2
+
+
+async def test_selector_uses_adoption_value_for_ranking(db):
+    utility_url = "https://github.com/acme/context-tool"
+    generic_url = "https://github.com/acme/generic-ai"
+
+    result = await select_deep_report_candidate(
+        db,
+        [
+            _raw(utility_url, source_id="github_ai_devtools"),
+            _raw(generic_url, source_id="github_trending_hot"),
+        ],
+        [
+            _analyzed(
+                utility_url,
+                project_type=None,
+                source_id="github_ai_devtools",
+            ).model_copy(update={
+                "title": "Context Tool",
+                "summary": "MCP hooks CLI for Claude Code and Cursor context optimization",
+                "tags": ["MCP", "CLI", "Coding Agent"],
+            }),
+            _analyzed(
+                generic_url,
+                project_type="framework",
+                source_id="github_trending_hot",
+            ).model_copy(update={
+                "title": "Generic AI Framework",
+                "summary": "General AI framework",
+                "tags": ["AI"],
+            }),
+        ],
+        [
+            _reviewed(utility_url, score=88, ai_score=32, utility_score=26),
+            _reviewed(generic_url, score=92, ai_score=32, utility_score=24),
+        ],
+    )
+
+    assert result.candidate is not None
+    assert result.candidate.repo_url == utility_url
+    assert result.candidate.metadata["score_parts"]["adoption_value"] > result.candidate.metadata["score_parts"]["analyzability"]
 
 
 async def test_selector_preserves_input_order_for_equal_scores(db):
@@ -312,7 +347,7 @@ async def test_selector_diagnostics_count_each_review_once(db):
         "retry": "https://github.com/acme/retry",
         "low": "https://github.com/acme/low",
         "rss": "https://example.com/article",
-        "framework": "https://github.com/acme/framework",
+        "research": "https://github.com/acme/research",
         "eligible": "https://github.com/acme/tool",
     }
 
@@ -322,21 +357,21 @@ async def test_selector_diagnostics_count_each_review_once(db):
             _raw(urls["retry"]),
             _raw(urls["low"]),
             _raw(urls["rss"], source="rss"),
-            _raw(urls["framework"]),
+            _raw(urls["research"]),
             _raw(urls["eligible"]),
         ],
         [
             _analyzed(urls["retry"]),
             _analyzed(urls["low"]),
             _analyzed(urls["rss"]),
-            _analyzed(urls["framework"], project_type="framework"),
+            _analyzed(urls["research"], project_type="research"),
             _analyzed(urls["eligible"]),
         ],
         [
             _reviewed(urls["retry"], verdict="retry"),
-            _reviewed(urls["low"], score=84),
+            _reviewed(urls["low"], score=79),
             _reviewed(urls["rss"]),
-            _reviewed(urls["framework"]),
+            _reviewed(urls["research"]),
             _reviewed(urls["eligible"]),
         ],
     )
@@ -350,10 +385,11 @@ async def test_selector_diagnostics_count_each_review_once(db):
             "reviewer_score": 1,
             "not_github": 1,
             "invalid_repo_url": 0,
-            "project_type_missing": 0,
             "project_type": 1,
             "ai_relevance": 0,
             "developer_utility": 0,
+            "adoption_value": 0,
+            "analyzability": 0,
             "recent_report": 0,
         },
     }

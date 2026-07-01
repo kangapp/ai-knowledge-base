@@ -3,7 +3,7 @@ from urllib.parse import urlparse
 
 from src.core.database import Database
 from src.deep_reports.models import DeepReportCandidate, DeepReportSelection
-from src.graph.state import PROJECT_TYPES, AnalyzedItem, RawItem, ReviewedItem
+from src.graph.state import AnalyzedItem, RawItem, ReviewedItem
 
 PREFERRED_SOURCES = {
     "github_ai_devtools",
@@ -11,10 +11,54 @@ PREFERRED_SOURCES = {
     "github_trending_hot",
     "github_trending",
 }
-MIN_REVIEWER_SCORE = 85
+MIN_REVIEWER_SCORE = 80
 MIN_AI_RELEVANCE_SCORE = 28
-MIN_DEVELOPER_UTILITY_SCORE = 24
-VALID_PROJECT_TYPES = set(PROJECT_TYPES)
+MIN_DEVELOPER_UTILITY_SCORE = 20
+MIN_ADOPTION_VALUE = 55
+MIN_ANALYZABILITY = 40
+EXCLUDED_PROJECT_TYPES = {
+    "research",
+    "dataset",
+    "benchmark",
+    "resource_collection",
+    "other",
+}
+ADOPTION_TERMS = {
+    "agent",
+    "coding",
+    "claude",
+    "codex",
+    "context",
+    "cursor",
+    "devtool",
+    "developer",
+    "hook",
+    "ide",
+    "mcp",
+    "plugin",
+    "skill",
+    "vscode",
+    "workflow",
+    "自动化",
+    "上下文",
+    "代码",
+    "开发",
+    "插件",
+}
+ANALYZABILITY_TERMS = {
+    "api",
+    "cli",
+    "core",
+    "extension",
+    "hook",
+    "mcp",
+    "package",
+    "plugin",
+    "server",
+    "service",
+    "skill",
+    "src",
+}
 AI_DEVTOOLS_SOURCE_TERMS = {"ai", "devtools", "agent", "rag", "code", "mcp", "developer"}
 SOURCE_DETAIL_PHRASES = {
     "github_trending_velocity": "github_trending_velocity",
@@ -29,10 +73,11 @@ REJECTION_REASONS = (
     "reviewer_score",
     "not_github",
     "invalid_repo_url",
-    "project_type_missing",
     "project_type",
     "ai_relevance",
     "developer_utility",
+    "adoption_value",
+    "analyzability",
     "recent_report",
 )
 
@@ -79,17 +124,29 @@ class DeepCandidateSelector:
 
             if reason is None:
                 diagnostics["approved_github"] += 1
-                if analyzed.project_type not in VALID_PROJECT_TYPES:
-                    reason = "project_type_missing"
-                elif analyzed.project_type != "coding_tool":
+                if analyzed.project_type in EXCLUDED_PROJECT_TYPES:
                     reason = "project_type"
 
             ai_relevance = _dimension_score(reviewed, "ai_relevance")
             developer_utility = _dimension_score(reviewed, "developer_utility")
+            adoption_value = (
+                _adoption_value(raw, analyzed, developer_utility)
+                if raw is not None and analyzed is not None
+                else 0
+            )
+            analyzability = (
+                _analyzability(raw, analyzed)
+                if raw is not None and analyzed is not None
+                else 0
+            )
             if reason is None and ai_relevance < MIN_AI_RELEVANCE_SCORE:
                 reason = "ai_relevance"
             if reason is None and developer_utility < MIN_DEVELOPER_UTILITY_SCORE:
                 reason = "developer_utility"
+            if reason is None and adoption_value < MIN_ADOPTION_VALUE:
+                reason = "adoption_value"
+            if reason is None and analyzability < MIN_ANALYZABILITY:
+                reason = "analyzability"
 
             if reason is None:
                 repo_name, repo_url = repo_info
@@ -110,6 +167,8 @@ class DeepCandidateSelector:
                     repo_url,
                     ai_relevance,
                     developer_utility,
+                    adoption_value,
+                    analyzability,
                 )
             )
 
@@ -151,14 +210,18 @@ def _build_candidate(
     repo_url: str,
     ai_relevance: int,
     developer_utility: int,
+    adoption_value: int,
+    analyzability: int,
 ) -> DeepReportCandidate:
     source_id = analyzed.source_id or str(raw.raw_metadata.get("source_id") or "")
     source_detail = analyzed.source_detail or raw.source_detail
     source_key = _source_key(source_id, source_detail)
     source_bonus = 5 if source_key == "github_ai_devtools" else 0
     score_parts = {
-        "reviewer": reviewed.total_score * 0.7,
-        "developer_utility": developer_utility * 0.6,
+        "ai_relevance": _normalize_score(ai_relevance, 35) * 0.30,
+        "developer_utility": _normalize_score(developer_utility, 30) * 0.30,
+        "adoption_value": adoption_value * 0.25,
+        "analyzability": analyzability * 0.15,
         "source": source_bonus,
     }
     candidate_score = round(sum(score_parts.values()))
@@ -173,13 +236,16 @@ def _build_candidate(
         reviewer_score=reviewed.total_score,
         candidate_score=candidate_score,
         trigger_reason=(
-            f"project_type=coding_tool; reviewer={reviewed.total_score}; "
-            f"ai_relevance={ai_relevance}; developer_utility={developer_utility}"
+            f"reviewer={reviewed.total_score}; ai_relevance={ai_relevance}; "
+            f"developer_utility={developer_utility}; adoption_value={adoption_value}; "
+            f"analyzability={analyzability}"
         ),
         metadata={
             "project_type": analyzed.project_type,
             "ai_relevance": ai_relevance,
             "developer_utility": developer_utility,
+            "adoption_value": adoption_value,
+            "analyzability": analyzability,
             "score_parts": score_parts,
             "source_key": source_key,
             "raw_metadata": raw.raw_metadata,
@@ -195,6 +261,44 @@ def _dimension_score(reviewed: ReviewedItem, name: str) -> int:
         return int(value.get("score", 0))
     except (TypeError, ValueError):
         return 0
+
+
+def _normalize_score(value: int, maximum: int) -> float:
+    return min(max(value, 0), maximum) / maximum * 100
+
+
+def _term_hits(raw: RawItem, analyzed: AnalyzedItem, terms: set[str]) -> int:
+    metadata = raw.raw_metadata or {}
+    topics = " ".join(str(topic) for topic in metadata.get("topics", []))
+    text = " ".join(
+        [
+            raw.title,
+            raw.description,
+            raw.source_detail,
+            analyzed.title,
+            analyzed.summary,
+            " ".join(analyzed.tags),
+            topics,
+        ]
+    ).lower()
+    return sum(1 for term in terms if term.lower() in text)
+
+
+def _adoption_value(raw: RawItem, analyzed: AnalyzedItem, developer_utility: int) -> int:
+    utility = _normalize_score(developer_utility, 30)
+    term_bonus = min(_term_hits(raw, analyzed, ADOPTION_TERMS) * 6, 30)
+    type_bonus = 10 if analyzed.project_type in {"coding_tool", "ai_infrastructure", "framework"} else 0
+    return round(min(100, utility * 0.65 + term_bonus + type_bonus))
+
+
+def _analyzability(raw: RawItem, analyzed: AnalyzedItem) -> int:
+    score = 35
+    if raw.description or analyzed.summary:
+        score += 20
+    if "/" in raw.source_detail:
+        score += 20
+    score += min(_term_hits(raw, analyzed, ANALYZABILITY_TERMS) * 5, 25)
+    return min(score, 100)
 
 
 def _repo_info(url: str) -> tuple[str, str] | None:

@@ -473,6 +473,148 @@
         `;
     }
 
+    function renderAdoptionSummary(report) {
+        const decision = asObject(report.decision);
+        const recommendation = asString(decision.recommendation);
+        const reasons = asStringList(decision.reasons).slice(0, 3);
+        const bestFor = asStringList(decision.best_for).slice(0, 3);
+        const notFor = asStringList(decision.not_for).slice(0, 3);
+        const useCases = asStringList(report.use_cases).slice(0, 3);
+        const strengths = asStringList(report.strengths).slice(0, 3);
+        const limitations = asStringList(report.limitations).slice(0, 3);
+
+        return `
+            <section class="deep-band deep-decision">
+                <h2>是否值得采用</h2>
+                ${recommendation ? `<p class="deep-recommendation">${escapeHtml(recommendation)}</p>` : ''}
+                ${reasons.length ? `
+                    <ul class="deep-bullets deep-reason-list">
+                        ${reasons.map(item => `<li>${escapeHtml(item)}</li>`).join('')}
+                    </ul>
+                ` : ''}
+                <div class="deep-decision-grid">
+                    ${bestFor.length || useCases.length ? `
+                        <div class="deep-decision-card deep-decision-best">
+                            <h3>适合</h3>
+                            <ul>${bestFor.concat(useCases).slice(0, 4).map(item => `<li>${escapeHtml(item)}</li>`).join('')}</ul>
+                        </div>
+                    ` : ''}
+                    ${notFor.length || limitations.length ? `
+                        <div class="deep-decision-card deep-decision-not">
+                            <h3>不适合 / 风险</h3>
+                            <ul>${notFor.concat(limitations).slice(0, 4).map(item => `<li>${escapeHtml(item)}</li>`).join('')}</ul>
+                        </div>
+                    ` : ''}
+                    ${strengths.length ? `
+                        <div class="deep-decision-card">
+                            <h3>主要价值</h3>
+                            <ul>${strengths.map(item => `<li>${escapeHtml(item)}</li>`).join('')}</ul>
+                        </div>
+                    ` : ''}
+                </div>
+            </section>
+        `;
+    }
+
+    function renderImplementation(report) {
+        const architecture = normalizeArchitecture(report.architecture);
+        const modules = Array.isArray(report.core_modules)
+            ? report.core_modules
+                .map(asObject)
+                .map(module => ({
+                    name: asString(module.name),
+                    responsibility: asString(module.responsibility),
+                    dependsOn: asStringList(module.depends_on),
+                }))
+                .filter(module => module.name || module.responsibility)
+                .slice(0, 5)
+            : [];
+        const flow = Array.isArray(report.runtime_data_flow)
+            ? report.runtime_data_flow
+                .map(asObject)
+                .map(step => ({
+                    title: asString(step.title),
+                    description: asString(step.description),
+                }))
+                .filter(step => step.title || step.description)
+                .slice(0, 5)
+            : [];
+        if (!architecture.summary && !modules.length && !flow.length) {
+            return '';
+        }
+
+        return `
+            <section class="deep-band">
+                <h2>源码结构</h2>
+                ${architecture.pattern ? `<p class="deep-architecture-pattern">模式：${escapeHtml(architecture.pattern)}</p>` : ''}
+                ${architecture.summary ? `<p class="deep-section-summary">${escapeHtml(architecture.summary)}</p>` : ''}
+                ${modules.length ? `
+                    <div class="deep-module-grid">
+                        ${modules.map(module => `
+                            <article class="deep-module-card">
+                                <h3>${escapeHtml(module.name)}</h3>
+                                <p>${escapeHtml(module.responsibility)}</p>
+                                ${module.dependsOn.length ? `<span>依赖：${module.dependsOn.map(escapeHtml).join('、')}</span>` : ''}
+                            </article>
+                        `).join('')}
+                    </div>
+                ` : ''}
+                ${flow.length ? `
+                    <div class="deep-flow">
+                        ${flow.map((step, index) => `
+                            <article class="deep-flow-step">
+                                <span class="deep-flow-index">${index + 1}</span>
+                                <h3>${escapeHtml(step.title)}</h3>
+                                ${step.description ? `<p>${escapeHtml(step.description)}</p>` : ''}
+                            </article>
+                        `).join('')}
+                    </div>
+                ` : ''}
+            </section>
+        `;
+    }
+
+    function renderReusableDesigns(report) {
+        const items = asStringList(report.actionable_takeaways).slice(0, 5);
+        if (!items.length) {
+            return '';
+        }
+
+        return `
+            <section class="deep-band">
+                <h2>可复用设计</h2>
+                <ul class="deep-bullets">
+                    ${items.map(item => `<li>${escapeHtml(item)}</li>`).join('')}
+                </ul>
+            </section>
+        `;
+    }
+
+    function renderDeploymentSupplement(value) {
+        const deployment = normalizeFlow(value);
+        const notes = deployment.operations.slice(0, 3);
+        if (!deployment.prerequisites.length && !notes.length) {
+            return '';
+        }
+
+        return `
+            <section class="deep-band">
+                <h2>运行补充</h2>
+                ${deployment.prerequisites.length ? `
+                    <div class="deep-prerequisites">
+                        <strong>部署前提</strong>
+                        <span>${deployment.prerequisites.slice(0, 4).map(escapeHtml).join(' · ')}</span>
+                    </div>
+                ` : ''}
+                ${notes.length ? `
+                    <ul class="deep-bullets">
+                        ${notes.map(item => `<li>${escapeHtml(item)}</li>`).join('')}
+                    </ul>
+                ` : ''}
+            </section>
+        `;
+    }
+
     function renderStructuredReport(item) {
         const report = asObject(item.report_json);
         const repoLink = safeExternalLink(item.repo_url, 'GitHub 仓库', 'deep-inline-link');
@@ -497,8 +639,9 @@
                 </div>
                 ${summary ? `<p class="deep-overview">${escapeHtml(summary)}</p>` : ''}
             </section>
-            ${renderDecision(report.decision)}
-            ${listSection('应用场景', report.use_cases)}
+            ${renderAdoptionSummary(report)}
+            ${renderFlow('快速验证', report.quick_start)}
+            ${renderDeploymentSupplement(report.deployment)}
             ${stack.length ? `
                 <section class="deep-band">
                     <h2>技术栈</h2>
@@ -507,12 +650,8 @@
                     </div>
                 </section>
             ` : ''}
-            ${renderArchitectureDiagram(report.architecture)}
-            ${renderFlow('快速上手', report.quick_start)}
-            ${renderFlow('部署运行', report.deployment)}
-            ${renderCoreModules(report.core_modules)}
-            ${renderFlow('运行时数据流', { steps: report.runtime_data_flow })}
-            ${renderAdoptionNotes(report.strengths, report.limitations, report.actionable_takeaways)}
+            ${renderImplementation(report)}
+            ${renderReusableDesigns(report)}
         `;
     }
 
