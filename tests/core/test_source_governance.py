@@ -45,6 +45,70 @@ async def test_discovered_source_is_candidate_only(tmp_path):
         await db.close()
 
 
+@pytest.mark.asyncio
+async def test_approved_article_domain_becomes_rss_candidate(tmp_path):
+    db = Database(
+        tmp_path / "governance.db",
+        migrations_dir=Path(__file__).parents[2] / "src" / "db" / "migrations",
+    )
+    await db.initialize()
+    try:
+        await db.execute(
+            """
+            INSERT INTO articles
+            (title, url, description, summary, source, source_detail, status, collected_at)
+            VALUES ('Good AI Post', 'https://new-ai-lab.example/blog/post', 'desc', 'summary',
+                    'rss', 'New AI Lab', 'approved', datetime('now', '+8 hours'))
+            """
+        )
+        await db.commit()
+
+        discovered = await SourceDiscovery(db).discover_from_approved_articles()
+
+        assert [source.id for source in discovered] == ["rss_54d79fa21d6f"]
+        row = await db.fetch_one(
+            "SELECT status, enabled, config_json FROM source_registry WHERE id = ?",
+            ("rss_54d79fa21d6f",),
+        )
+        assert row["status"] == "candidate"
+        assert row["enabled"] == 0
+        assert "https://new-ai-lab.example/feed" in row["config_json"]
+    finally:
+        await db.close()
+
+
+@pytest.mark.asyncio
+async def test_approved_github_repo_owner_becomes_github_candidate(tmp_path):
+    db = Database(
+        tmp_path / "governance.db",
+        migrations_dir=Path(__file__).parents[2] / "src" / "db" / "migrations",
+    )
+    await db.initialize()
+    try:
+        await db.execute(
+            """
+            INSERT INTO articles
+            (title, url, description, summary, source, source_detail, status, collected_at)
+            VALUES ('Good Repo', 'https://github.com/new-ai-org/agent-kit', 'desc', 'summary',
+                    'github', 'new-ai-org/agent-kit', 'approved', datetime('now', '+8 hours'))
+            """
+        )
+        await db.commit()
+
+        discovered = await SourceDiscovery(db).discover_from_approved_articles()
+
+        assert [source.id for source in discovered] == ["github_owner_new_ai_org"]
+        row = await db.fetch_one(
+            "SELECT status, enabled, config_json FROM source_registry WHERE id = ?",
+            ("github_owner_new_ai_org",),
+        )
+        assert row["status"] == "candidate"
+        assert row["enabled"] == 0
+        assert '"owner": "new-ai-org"' in row["config_json"]
+    finally:
+        await db.close()
+
+
 def test_budget_blocked_does_not_score_source():
     assert calculate_health_score({"budget_blocked": 1}) is None
 

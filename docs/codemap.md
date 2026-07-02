@@ -98,6 +98,11 @@
   - 预算阻断只记录 `budget_blocked`，不降低源质量分。
   - 候选源自动进入 trial；trial 最近 3 次健康记录达标后转 active，否则转 rejected。
 
+- `src/core/source_discovery.py`
+  - 每周维护入口使用的数据源发现器；候选只写入 `discovered_sources` 和 `source_registry(candidate)`。
+  - 发现来源包括 GitHub Trending topic、RSS 邻居，以及从最近已通过文章反推 RSS 域名 / GitHub owner。
+  - 不做递归爬取、不调用 LLM、不直接上线新源；上线仍由 trial 健康机制裁决。
+
 - `src/core/time.py`
   - 项目业务时间统一入口，当前使用北京时间（Asia/Shanghai / UTC+8）。
   - 常见改动入口：日志时间、run_id、采集入库时间、站点构建更新时间。
@@ -138,7 +143,7 @@
 
 - `src/graph/collector.py`
   - 多源采集和 DB 查重。
-  - GitHub 采集将 `topics`/`keywords` 拆成最多 5 个单条件 Search 请求，每个请求获取扩大后的候选池；合并和阈值过滤后优先返回 DB 中未出现的 repo。
+  - GitHub 采集将 `topics`/`keywords` 拆成最多 5 个单条件 Search 请求，每个请求获取扩大后的候选池；合并和阈值过滤后优先返回 DB 中未出现的 repo。自动发现的 GitHub owner 候选会追加 `user:<owner>` qualifier。
   - `github_ai_devtools` 用于抓取 Coding Agent、AI 编程助手、代码生成/审查和 AI IDE 类仓库，并在采集阶段过滤教程、课程、writeup 和资源合集等明显噪音；关键词在 `config/sources.yaml` 维护。
   - `github_agent_infra` 复用 GitHub collector，抓取 Agent 联网、浏览器/MCP、视频字幕和社交平台采集相关工具仓库；关键词在 `config/sources.yaml` 维护。
   - RSS 采集先用 `httpx.AsyncClient(timeout=30)` 拉取 feed 文本，再交给 `feedparser` 解析；先过滤关键词再限制数量，关键词过滤使用 `_matches_rss_keywords()`。

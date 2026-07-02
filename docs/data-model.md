@@ -296,10 +296,12 @@ UNIQUE(source_id, date)
 
 ### discovered_sources — 已发现待审核的数据源
 
+候选来源包括：现有自动发现（GitHub Trending topic、RSS 邻居）以及从最近已通过文章反推的 RSS 域名 / GitHub owner。发现结果只进入候选池和 `source_registry(candidate)`，后续是否上线由 trial 健康机制决定。
+
 | 列 | 类型 | 说明 |
 |----|------|------|
 | id | INTEGER PK | |
-| url | TEXT UNIQUE | 数据源 URL |
+| url | TEXT UNIQUE | 数据源 URL；非 URL 候选使用稳定 key（如 `github:<source_id>`） |
 | name | TEXT | 数据源名称 |
 | type | TEXT | 类型（github / rss / hotlist / hn / feishu / arxiv） |
 | discovered_at | TEXT | 发现时间 |

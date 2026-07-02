@@ -4,6 +4,7 @@ import json
 import httpx
 import feedparser
 import hashlib
+from urllib.parse import urlparse
 from .source_manager import SourceManager
 from .config import SourceConfig
 
@@ -13,6 +14,7 @@ GITHUB_TRENDING_URL = "https://github.com/trending"
 RSS_NEIGHBOR_HEADERS = {
     "User-Agent": "Mozilla/5.0 (compatible; SourceDiscoveryBot/1.0)"
 }
+SKIP_DISCOVERY_DOMAINS = {"github.com", "arxiv.org", "news.ycombinator.com"}
 
 
 def _stable_rss_id(url: str) -> str:
@@ -21,11 +23,103 @@ def _stable_rss_id(url: str) -> str:
     return f"rss_{slug}"
 
 
+def _github_owner_id(owner: str) -> str:
+    slug = re.sub(r"\W+", "_", owner.lower()).strip("_")
+    return f"github_owner_{slug}"
+
+
+def _discovery_key(source: SourceConfig) -> str:
+    return source.config.get("url") or f"{source.type}:{source.id}"
+
+
 class SourceDiscovery:
     """数据源发现：GitHub Topic 扩展 + RSS 友链扫描"""
 
     def __init__(self, db=None):
         self._db = db
+
+    async def discover_from_approved_articles(self, limit: int = 100) -> list[SourceConfig]:
+        """从已通过内容反推候选源：RSS 域名 + GitHub owner。"""
+        if self._db is None:
+            return []
+
+        rows = await self._db.fetch_all(
+            """
+            SELECT url
+            FROM articles
+            WHERE status = 'approved' AND url IS NOT NULL AND url != ''
+            ORDER BY collected_at DESC
+            LIMIT ?
+            """,
+            (limit,),
+        )
+        existing_rows = await self._db.fetch_all("SELECT id, config_json FROM source_registry")
+        existing_ids = {row["id"] for row in existing_rows}
+        existing_domains = set()
+        for row in existing_rows:
+            try:
+                url = json.loads(row["config_json"] or "{}").get("url", "")
+            except json.JSONDecodeError:
+                url = ""
+            domain = urlparse(url).netloc.lower()
+            if domain:
+                existing_domains.add(domain)
+
+        discovered: list[SourceConfig] = []
+        seen_ids: set[str] = set()
+        for row in rows:
+            parsed = urlparse(row["url"])
+            domain = parsed.netloc.lower()
+            if not domain:
+                continue
+
+            source: SourceConfig | None = None
+            if domain == "github.com":
+                parts = [part for part in parsed.path.split("/") if part]
+                if len(parts) < 2:
+                    continue
+                owner = parts[0]
+                source_id = _github_owner_id(owner)
+                source = SourceConfig(
+                    id=source_id,
+                    name=f"GitHub {owner}",
+                    type="github",
+                    enabled=True,
+                    priority=2,
+                    cron="0 */6 * * *",
+                    max_items=10,
+                    config={
+                        "owner": owner,
+                        "keywords": ["AI", "LLM", "agent", "RAG", "MCP"],
+                        "lookback_type": "pushed",
+                        "lookback_days": 90,
+                        "min_stars": 50,
+                    },
+                )
+            elif domain not in SKIP_DISCOVERY_DOMAINS and domain not in existing_domains:
+                feed_url = f"{parsed.scheme or 'https'}://{domain}/feed"
+                source = SourceConfig(
+                    id=_stable_rss_id(feed_url),
+                    name=domain[:50],
+                    type="rss",
+                    enabled=True,
+                    priority=2,
+                    cron="0 */4 * * *",
+                    max_items=10,
+                    config={
+                        "url": feed_url,
+                        "filter_keywords": ["AI", "LLM", "artificial intelligence", "machine learning"],
+                    },
+                )
+
+            if source is None or source.id in existing_ids or source.id in seen_ids:
+                continue
+            await self._write_discovered_source(source)
+            discovered.append(source)
+            seen_ids.add(source.id)
+
+        logger.info("discovery.approved_articles", extra={"found": len(discovered)})
+        return discovered
 
     async def discover_github_topics(self) -> list[SourceConfig]:
         """
@@ -174,7 +268,7 @@ class SourceDiscovery:
             await self._db.execute("""
                 INSERT OR IGNORE INTO discovered_sources (url, name, type, status, discovered_at)
                 VALUES (?, ?, ?, 'candidate', datetime('now', '+8 hours'))
-            """, (source.config.get("url", ""), source.name, source.type))
+            """, (_discovery_key(source), source.name, source.type))
             await self._db.execute(
                 """
                 INSERT INTO source_registry
@@ -201,6 +295,7 @@ class SourceDiscovery:
         """
         执行完整发现流程，返回所有发现的数据源。
         """
+        approved_sources = await self.discover_from_approved_articles()
         github_sources = await self.discover_github_topics()
         rss_sources = await self.scan_rss_neighbors()
-        return github_sources + rss_sources
+        return approved_sources + github_sources + rss_sources

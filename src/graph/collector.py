@@ -39,7 +39,9 @@ def _build_github_queries(cfg: dict, now: datetime | None = None) -> list[str]:
     lookback_type = cfg.get("lookback_type", "created")  # "created" 或 "pushed"
     current_time = now or now_bj()
     since = (current_time - timedelta(days=lookback_days)).strftime("%Y-%m-%d")
-    return [f"{term} {lookback_type}:>{since}" for term in include_terms]
+    owner = cfg.get("owner")
+    owner_prefix = f"user:{owner} " if owner else ""
+    return [f"{owner_prefix}{term} {lookback_type}:>{since}" for term in include_terms]
 
 
 def _build_github_query(cfg: dict, now: datetime | None = None) -> str:

@@ -45,6 +45,23 @@ def test_build_github_queries_do_not_or_topic_qualifiers():
     assert all(" NOT " not in query for query in queries)
 
 
+def test_build_github_queries_support_owner_qualifier():
+    queries = _build_github_queries(
+        {
+            "owner": "new-ai-org",
+            "keywords": ["agent"],
+            "lookback_type": "pushed",
+            "lookback_days": 30,
+        },
+        now=datetime(2026, 6, 1, tzinfo=timezone.utc),
+    )
+
+    assert queries == [
+        "user:new-ai-org topic:ai pushed:>2026-05-02",
+        "user:new-ai-org agent pushed:>2026-05-02",
+    ]
+
+
 def test_matches_rss_keywords_does_not_match_ai_inside_words():
     assert not _matches_rss_keywords("Rocket startup raises $24M", ["AI"])
     assert _matches_rss_keywords("AI startup raises $24M", ["AI"])
