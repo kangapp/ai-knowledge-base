@@ -1,10 +1,19 @@
 from fastapi import APIRouter, HTTPException
 from pathlib import Path
-from ..core.config import load_llm_config, load_sources_config, load_agents_config
+import yaml
 
 router = APIRouter(prefix="/api/config")
 
 CONFIG_DIR = Path(__file__).parent.parent.parent / "config"
+
+
+def _mask_config(config_type: str, parsed: dict) -> dict:
+    if config_type != "llm":
+        return parsed
+    for provider in parsed.get("providers", {}).values():
+        if "api_key" in provider:
+            provider["api_key"] = "***"
+    return parsed
 
 
 @router.get("/{config_type}")
@@ -12,26 +21,24 @@ async def get_config(config_type: str):
     if config_type not in ("llm", "sources", "agents"):
         raise HTTPException(400, "无效的配置类型")
 
-    loaders = {
-        "llm": (load_llm_config, CONFIG_DIR / "llm.yaml"),
-        "sources": (load_sources_config, CONFIG_DIR / "sources.yaml"),
-        "agents": (load_agents_config, CONFIG_DIR / "agents.yaml"),
+    paths = {
+        "llm": CONFIG_DIR / "llm.yaml",
+        "sources": CONFIG_DIR / "sources.yaml",
+        "agents": CONFIG_DIR / "agents.yaml",
     }
 
-    loader, path = loaders[config_type]
+    path = paths[config_type]
     try:
-        config = loader(path)
+        raw = path.read_text()
+        parsed = yaml.safe_load(raw) or {}
     except Exception as e:
         raise HTTPException(500, f"加载配置失败: {e}")
-
-    with open(path) as f:
-        raw = f.read()
 
     return {
         "code": 0,
         "data": {
             "raw": raw,
-            "parsed": config.model_dump(),
+            "parsed": _mask_config(config_type, parsed),
         },
         "message": "ok"
     }
