@@ -34,7 +34,7 @@ async def test_initialize_and_migrate(tmp_path):
 
         # 验证迁移版本
         v = await db.fetch_one("SELECT version FROM schema_version")
-        assert v["version"] == 13
+        assert v["version"] == 14
 
         deep_report_columns = await db.fetch_all("PRAGMA table_info(deep_reports)")
         deep_report_column_names = {row["name"] for row in deep_report_columns}
@@ -93,6 +93,11 @@ async def test_source_governance_tables_exist(tmp_path):
         assert "source_registry" in tables
         assert "source_health_daily" in tables
         assert "source_governance_events" in tables
+        health_cols = {
+            row["name"]
+            for row in await db.fetch_all("PRAGMA table_info(source_health_daily)")
+        }
+        assert "failed" in health_cols
 
         registry_cols = {
             row["name"]

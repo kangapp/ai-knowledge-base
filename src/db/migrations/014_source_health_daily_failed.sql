@@ -1,0 +1,2 @@
+ALTER TABLE source_health_daily
+ADD COLUMN failed INTEGER NOT NULL DEFAULT 0;

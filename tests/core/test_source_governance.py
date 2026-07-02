@@ -176,6 +176,57 @@ async def test_three_run_average_degrades_active_source(tmp_path):
 
 
 @pytest.mark.asyncio
+async def test_degraded_source_recovers_after_three_good_scores(tmp_path):
+    db = Database(
+        tmp_path / "governance.db",
+        migrations_dir=Path(__file__).parents[2] / "src" / "db" / "migrations",
+    )
+    await db.initialize()
+    try:
+        await db.execute(
+            """
+            INSERT INTO source_registry
+            (id, name, type, status, enabled, priority, cron, max_items, config_json)
+            VALUES ('rss_recovered', 'Recovered', 'rss', 'degraded', 1, 2, '0 1 * * *', 10, '{}')
+            """
+        )
+        for day, score in [
+            ("2026-06-25", 60),
+            ("2026-06-26", 65),
+            ("2026-06-27", 70),
+        ]:
+            await db.execute(
+                """
+                INSERT INTO source_health_daily
+                (source_id, date, health_score)
+                VALUES ('rss_recovered', ?, ?)
+                """,
+                (day, score),
+            )
+        await db.commit()
+
+        status = await apply_governance(db, "rss_recovered")
+        row = await db.fetch_one(
+            "SELECT status FROM source_registry WHERE id = 'rss_recovered'"
+        )
+        event = await db.fetch_one(
+            """
+            SELECT from_status, to_status, reason
+            FROM source_governance_events
+            WHERE source_id = 'rss_recovered'
+            """
+        )
+
+        assert status == "active"
+        assert row["status"] == "active"
+        assert event["from_status"] == "degraded"
+        assert event["to_status"] == "active"
+        assert event["reason"] == "最近3次平均健康分恢复到60以上"
+    finally:
+        await db.close()
+
+
+@pytest.mark.asyncio
 async def test_daily_rollup_recalculates_score_from_accumulated_metrics(tmp_path):
     db = Database(
         tmp_path / "governance.db",
@@ -223,6 +274,61 @@ async def test_daily_rollup_recalculates_score_from_accumulated_metrics(tmp_path
         assert row["discarded"] == 10
         assert row["cost"] == 0.02
         assert row["health_score"] == 77.5
+    finally:
+        await db.close()
+
+
+@pytest.mark.asyncio
+async def test_daily_rollup_recalculates_request_success_from_accumulated_attempts(tmp_path):
+    db = Database(
+        tmp_path / "governance.db",
+        migrations_dir=Path(__file__).parents[2] / "src" / "db" / "migrations",
+    )
+    await db.initialize()
+    try:
+        await db.execute(
+            """
+            INSERT INTO source_registry
+            (id, name, type, status, enabled, priority, cron, max_items, config_json)
+            VALUES ('rss_flaky', 'Flaky', 'rss', 'active', 1, 2, '0 1 * * *', 10, '{}')
+            """
+        )
+        for run_id, collected, failed in [
+            ("run_success", 10, 0),
+            ("run_failed", 0, 1),
+        ]:
+            await db.execute(
+                """
+                INSERT INTO pipeline_runs (id, started_at, status, trigger)
+                VALUES (?, datetime('now', '+8 hours'), 'completed', 'test')
+                """,
+                (run_id,),
+            )
+            await db.execute(
+                """
+                INSERT INTO pipeline_source_runs
+                (run_id, source_id, source, source_detail, collected, new_items,
+                 analyzed, approved, discarded, failed, cost, tokens)
+                VALUES (?, 'rss_flaky', 'rss', 'Flaky', ?, ?, ?, ?, 0, ?, 0.01, 1000)
+                """,
+                (run_id, collected, collected, collected, collected, failed),
+            )
+            await rollup_source_health_daily(db, run_id)
+
+        row = await db.fetch_one(
+            """
+            SELECT request_success_rate, collected, failed, new_items, approved, health_score
+            FROM source_health_daily
+            WHERE source_id = 'rss_flaky'
+            """
+        )
+
+        assert row["collected"] == 10
+        assert row["failed"] == 1
+        assert row["request_success_rate"] == pytest.approx(10 / 11)
+        assert row["new_items"] == 10
+        assert row["approved"] == 10
+        assert row["health_score"] == 97.7
     finally:
         await db.close()
 

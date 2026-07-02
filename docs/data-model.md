@@ -347,6 +347,7 @@ UNIQUE(source_id, date)
 | analysis_failed | INTEGER | 分析失败数 |
 | approved | INTEGER | 审核通过数 |
 | discarded | INTEGER | 审核丢弃数 |
+| failed | INTEGER | 请求失败次数 |
 | avg_score | REAL | 平均分 |
 | cost | REAL | LLM 成本 |
 | tokens | INTEGER | Token 数 |
