@@ -209,6 +209,7 @@
 
     function renderSources(data) {
         const sources = data.sources || [];
+        const chartSources = sources.filter(s => !['disabled', 'rejected', 'quarantined'].includes(s.governance_status));
         const activeStatuses = new Set(['healthy', 'dedup_only', 'success_zero', 'analysis_failed']);
         const activeSources = sources.filter(s => activeStatuses.has(s.health_status));
         const ratedSources = sources.filter(s => (s.total_collected || 0) > 0);
@@ -226,8 +227,8 @@
         text('src-total-collected', totalCollected);
         text('src-avg-score', avgScore == null ? '-' : avgScore.toFixed(1));
 
-        DashboardCharts.line('src-approved-rate-chart', sources.map(sourceDisplayName), sources.map(s => (s.approved_rate || 0) * 100), '#22c55e');
-        DashboardCharts.bar('src-contribution-chart', sources.map(sourceDisplayName), sources.map(s => s.total_collected || 0), '#3b82f6');
+        DashboardCharts.line('src-approved-rate-chart', chartSources.map(sourceDisplayName), chartSources.map(s => (s.approved_rate || 0) * 100), '#22c55e');
+        DashboardCharts.bar('src-contribution-chart', chartSources.map(sourceDisplayName), chartSources.map(s => s.total_collected || 0), '#3b82f6');
 
         const table = document.getElementById('src-quality-table');
         if (!table) return;

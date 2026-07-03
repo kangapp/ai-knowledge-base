@@ -46,7 +46,7 @@ def test_dashboard_source_health_uses_display_names_not_storage_ids():
     renderers = (ROOT / "src/site/static/js/dashboard/renderers.js").read_text()
 
     assert "function sourceDisplayName" in renderers
-    assert "sources.map(sourceDisplayName)" in renderers
+    assert "chartSources.map(sourceDisplayName)" in renderers
     assert "escapeHtml(sourceDisplayName(s))" in renderers
     assert "sources.map(s => s.id)" not in renderers
 
@@ -64,6 +64,15 @@ def test_dashboard_source_health_shows_stage_status_and_recent_funnel():
     assert "last_error" in renderers
     assert "sources.filter(s => (s.total_collected || 0) > 0)" in renderers
     assert ".source-health-status" in styles
+
+
+def test_dashboard_source_charts_exclude_disabled_sources():
+    renderers = (ROOT / "src/site/static/js/dashboard/renderers.js").read_text()
+
+    assert "const chartSources = sources.filter" in renderers
+    assert "!['disabled', 'rejected', 'quarantined'].includes(s.governance_status)" in renderers
+    assert "DashboardCharts.line('src-approved-rate-chart', chartSources.map(sourceDisplayName)" in renderers
+    assert "DashboardCharts.bar('src-contribution-chart', chartSources.map(sourceDisplayName)" in renderers
 
 
 def test_dashboard_renders_source_governance_fields():
