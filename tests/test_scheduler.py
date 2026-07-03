@@ -174,3 +174,9 @@ def test_weekly_source_maintenance_uses_beijing_timezone():
     source_scheduler.setup_source_scheduler(scheduler)
 
     assert str(scheduler.job["trigger"].timezone) == "Asia/Shanghai"
+
+
+def test_source_maintenance_runs_twice_weekly():
+    from src.scheduler.source_scheduler import SOURCE_DISCOVERY_CRON
+
+    assert SOURCE_DISCOVERY_CRON == {"day_of_week": "mon,thu", "hour": 9, "minute": 0}

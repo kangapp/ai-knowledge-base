@@ -401,6 +401,46 @@ async def test_source_stats_include_governance_fields(api_client, api_db, monkey
     assert source["last_governance_reason"] == "健康分低于50"
 
 
+@pytest.mark.asyncio
+async def test_source_stats_exposes_discovery_metadata(api_client, api_db, monkeypatch):
+    await api_db.execute(
+        """
+        INSERT INTO source_registry
+        (id, name, type, status, enabled, priority, cron, max_items, config_json)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        (
+            "rss_discovered",
+            "Discovered RSS",
+            "rss",
+            "candidate",
+            0,
+            2,
+            "0 */4 * * *",
+            10,
+            json.dumps({
+                "url": "https://example.com/feed",
+                "discovered_by": "github_search",
+                "discovery_query": "ai radar",
+                "discovery_repo": "owner/radar",
+            }),
+        ),
+    )
+    await api_db.commit()
+    monkeypatch.setattr("src.api.sources.SourceManager.load", lambda: [])
+    monkeypatch.setattr("src.api.sources._today", lambda: "2026-06-27")
+
+    response = api_client.get("/api/sources/stats?period=day")
+
+    assert response.status_code == 200
+    row = response.json()["data"]["sources"][0]
+    assert row["id"] == "rss_discovered"
+    assert row["governance_status"] == "candidate"
+    assert row["discovered_by"] == "github_search"
+    assert row["discovery_query"] == "ai radar"
+    assert row["discovery_repo"] == "owner/radar"
+
+
 @pytest.mark.parametrize(
     ("enabled", "latest", "expected"),
     [

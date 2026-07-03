@@ -8,11 +8,12 @@ from ..core.database import Database
 from ..core.time import BEIJING_TZ
 
 logger = logging.getLogger("pipeline")
+SOURCE_DISCOVERY_CRON = {"day_of_week": "mon,thu", "hour": 9, "minute": 0}
 
 
 async def run_weekly_source_maintenance():
     """
-    每周执行的维护任务：
+    每周两次执行的维护任务：
     1. 发现新数据源，写入候选池
     2. 候选源进入小流量试跑
     3. 试跑源按健康数据自动上线或拒绝
@@ -36,13 +37,13 @@ async def run_weekly_source_maintenance():
 
 
 def setup_source_scheduler(scheduler: AsyncIOScheduler):
-    """将每周维护任务注册到 scheduler"""
+    """将数据源维护任务注册到 scheduler"""
     scheduler.add_job(
         run_weekly_source_maintenance,
-        CronTrigger(day_of_week="mon", hour=9, minute=0, timezone=BEIJING_TZ),
+        CronTrigger(**SOURCE_DISCOVERY_CRON, timezone=BEIJING_TZ),
         id="source_weekly_maintenance",
-        name="数据源健康维护（发现+淘汰）",
+        name="数据源健康维护（发现+淘汰，每周两次）",
         max_instances=1,
         misfire_grace_time=3600,
     )
-    logger.info("scheduler.registered", extra={"job": "source_weekly_maintenance", "trigger": "每周一 09:00"})
+    logger.info("scheduler.registered", extra={"job": "source_weekly_maintenance", "trigger": "每周一/四 09:00"})

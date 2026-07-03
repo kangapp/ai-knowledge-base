@@ -64,6 +64,12 @@
         return source.last_error || '-';
     }
 
+    function sourceDiscoveryText(source) {
+        if (source.discovered_by !== 'github_search' || !source.discovery_query) return '';
+        const repo = source.discovery_repo ? ` / ${source.discovery_repo}` : '';
+        return `GitHub Search: ${source.discovery_query}${repo}`;
+    }
+
     function sourceLastRun(value) {
         if (!value) return '-';
         return String(value).replace('T', ' ').slice(0, 16);
@@ -239,9 +245,14 @@
                     </tr>
                 </thead>
                 <tbody>
-                    ${rows.map(s => `
+                    ${rows.map(s => {
+                        const discoveryText = sourceDiscoveryText(s);
+                        return `
                         <tr>
-                            <td>${escapeHtml(sourceDisplayName(s))}</td>
+                            <td>
+                                ${escapeHtml(sourceDisplayName(s))}
+                                ${discoveryText ? `<div class="source-discovery-meta">${escapeHtml(discoveryText)}</div>` : ''}
+                            </td>
                             <td><span class="source-health-status ${escapeHtml(s.health_status)}">${sourceHealthLabel(s.health_status)}</span></td>
                             <td><span class="source-governance-status ${escapeHtml(s.governance_status || '')}">${governanceLabel(s.governance_status)}</span></td>
                             <td>${s.health_score == null ? '-' : Number(s.health_score).toFixed(1)}</td>
@@ -254,7 +265,7 @@
                             <td>${escapeHtml(sourceLastRun(s.last_run_at))}</td>
                             <td class="source-health-error" title="${escapeHtml(sourceErrorText(s))}">${escapeHtml(sourceErrorText(s))}</td>
                         </tr>
-                    `).join('')}
+                    `}).join('')}
                 </tbody>
             </table>
         `;

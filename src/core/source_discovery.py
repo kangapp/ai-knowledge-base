@@ -4,13 +4,24 @@ import json
 import httpx
 import feedparser
 import hashlib
-from urllib.parse import urlparse
+from urllib.parse import urljoin, urlparse
 from .source_manager import SourceManager
 from .config import SourceConfig
 
 logger = logging.getLogger("pipeline")
 
 GITHUB_TRENDING_URL = "https://github.com/trending"
+GITHUB_SEARCH_API_URL = "https://api.github.com/search/repositories"
+GITHUB_SEARCH_QUERIES = [
+    "ai knowledge base",
+    "ai radar",
+    "llm radar",
+    "agent radar",
+    "awesome ai tools",
+    "ai newsletter",
+    "llm news",
+]
+FEED_PATHS = ("/feed", "/rss.xml", "/atom.xml")
 RSS_NEIGHBOR_HEADERS = {
     "User-Agent": "Mozilla/5.0 (compatible; SourceDiscoveryBot/1.0)"
 }
@@ -30,6 +41,22 @@ def _github_owner_id(owner: str) -> str:
 
 def _discovery_key(source: SourceConfig) -> str:
     return source.config.get("url") or f"{source.type}:{source.id}"
+
+
+def _source_with_discovery_metadata(source: SourceConfig, query: str, repo: str) -> SourceConfig:
+    source.config["discovered_by"] = "github_search"
+    source.config["discovery_query"] = query
+    source.config["discovery_repo"] = repo
+    return source
+
+
+def _extract_urls(text: str) -> list[str]:
+    return re.findall(r"https?://[^\s)>'\"]+", text or "")
+
+
+def _looks_like_feed_url(url: str) -> bool:
+    lowered = url.lower()
+    return any(part in lowered for part in ("/feed", "rss", "atom"))
 
 
 class SourceDiscovery:
@@ -189,6 +216,109 @@ class SourceDiscovery:
 
         return discovered
 
+    async def discover_github_search(self, limit_per_query: int = 10) -> list[SourceConfig]:
+        """从 GitHub 搜索 AI 资讯聚合类项目，提取候选数据源。"""
+        discovered: list[SourceConfig] = []
+        seen_ids: set[str] = set()
+
+        try:
+            async with httpx.AsyncClient(timeout=20, headers=RSS_NEIGHBOR_HEADERS) as client:
+                for query in GITHUB_SEARCH_QUERIES:
+                    resp = await client.get(
+                        GITHUB_SEARCH_API_URL,
+                        params={"q": query, "sort": "stars", "order": "desc", "per_page": limit_per_query},
+                    )
+                    resp.raise_for_status()
+                    for repo in resp.json().get("items", []):
+                        sources = await self._sources_from_github_search_repo(client, repo, query)
+                        for source in sources:
+                            if source.id in seen_ids:
+                                continue
+                            await self._write_discovered_source(source)
+                            discovered.append(source)
+                            seen_ids.add(source.id)
+        except Exception as e:
+            logger.warning("discovery.github_search.error", extra={"error": str(e)})
+
+        logger.info("discovery.github_search", extra={"found": len(discovered)})
+        return discovered
+
+    async def _sources_from_github_search_repo(self, client, repo: dict, query: str) -> list[SourceConfig]:
+        full_name = repo.get("full_name") or ""
+        repo_api_url = repo.get("url") or ""
+        if not full_name or not repo_api_url:
+            return []
+
+        repo_resp = await client.get(repo_api_url)
+        repo_resp.raise_for_status()
+        repo_data = repo_resp.json()
+        urls = _extract_urls(repo_data.get("homepage") or "")
+
+        readme_resp = await client.get(f"{repo_api_url}/readme")
+        if readme_resp.status_code < 400:
+            readme_url = readme_resp.json().get("download_url")
+            if readme_url:
+                raw = await client.get(readme_url)
+                urls.extend(_extract_urls(raw.text))
+
+        sources: list[SourceConfig] = []
+        for url in await self._feed_urls_from_links(client, urls):
+            source = SourceConfig(
+                id=_stable_rss_id(url),
+                name=urlparse(url).netloc[:50],
+                type="rss",
+                enabled=True,
+                priority=2,
+                cron="0 */4 * * *",
+                max_items=10,
+                config={"url": url, "filter_keywords": ["AI", "LLM", "agent", "RAG"]},
+            )
+            sources.append(_source_with_discovery_metadata(source, query, full_name))
+
+        owner = (repo_data.get("owner") or {}).get("login") or full_name.split("/")[0]
+        if owner:
+            source = SourceConfig(
+                id=_github_owner_id(owner),
+                name=f"GitHub {owner}",
+                type="github",
+                enabled=True,
+                priority=2,
+                cron="0 */6 * * *",
+                max_items=10,
+                config={
+                    "owner": owner,
+                    "keywords": ["AI", "LLM", "agent", "RAG", "MCP"],
+                    "lookback_type": "pushed",
+                    "lookback_days": 90,
+                    "min_stars": 50,
+                },
+            )
+            sources.append(_source_with_discovery_metadata(source, query, full_name))
+        return sources
+
+    async def _feed_urls_from_links(self, client, urls: list[str]) -> list[str]:
+        feed_urls: list[str] = []
+        seen: set[str] = set()
+        for url in urls:
+            candidates = [url] if _looks_like_feed_url(url) else [urljoin(url, path) for path in FEED_PATHS]
+            for candidate in candidates:
+                if _looks_like_feed_url(url):
+                    if candidate in seen:
+                        continue
+                    seen.add(candidate)
+                    feed_urls.append(candidate)
+                    continue
+                try:
+                    resp = await client.get(candidate)
+                    if resp.status_code < 400:
+                        if candidate in seen:
+                            continue
+                        seen.add(candidate)
+                        feed_urls.append(candidate)
+                except Exception:
+                    continue
+        return feed_urls
+
     async def scan_rss_neighbors(self) -> list[SourceConfig]:
         """
         扫描已配置 RSS 源的友链，发现新 RSS 源。
@@ -297,5 +427,6 @@ class SourceDiscovery:
         """
         approved_sources = await self.discover_from_approved_articles()
         github_sources = await self.discover_github_topics()
+        github_search_sources = await self.discover_github_search()
         rss_sources = await self.scan_rss_neighbors()
-        return approved_sources + github_sources + rss_sources
+        return approved_sources + github_sources + github_search_sources + rss_sources

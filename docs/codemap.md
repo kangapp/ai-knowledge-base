@@ -100,7 +100,7 @@
 
 - `src/core/source_discovery.py`
   - 每周维护入口使用的数据源发现器；候选只写入 `discovered_sources` 和 `source_registry(candidate)`。
-  - 发现来源包括 GitHub Trending topic、RSS 邻居，以及从最近已通过文章反推 RSS 域名 / GitHub owner。
+  - 发现来源包括 GitHub Trending topic、GitHub 搜索 AI 知识库/雷达类项目、RSS 邻居，以及从最近已通过文章反推 RSS 域名 / GitHub owner。
   - 不做递归爬取、不调用 LLM、不直接上线新源；上线仍由 trial 健康机制裁决。
 
 - `src/core/time.py`
@@ -164,7 +164,7 @@
   - LangGraph DAG 编排、phase log 记录、Analyzer/Reviewer item 级事件记录。
 
 - `src/scheduler/source_scheduler.py`
-  - 每周数据源维护：发现候选源、候选转小流量 trial、评估 trial 自动上线或拒绝。
+  - 每周两次数据源维护：发现候选源、候选转小流量 trial、评估 trial 自动上线或拒绝。
   - 使用 `data/kb.db` 并显式初始化数据库连接；维护 Cron 使用 `Asia/Shanghai`。
 
 - `src/graph/router.py`

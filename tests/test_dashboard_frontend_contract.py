@@ -47,7 +47,7 @@ def test_dashboard_source_health_uses_display_names_not_storage_ids():
 
     assert "function sourceDisplayName" in renderers
     assert "sources.map(sourceDisplayName)" in renderers
-    assert "<td>${escapeHtml(sourceDisplayName(s))}</td>" in renderers
+    assert "escapeHtml(sourceDisplayName(s))" in renderers
     assert "sources.map(s => s.id)" not in renderers
 
 
@@ -74,6 +74,17 @@ def test_dashboard_renders_source_governance_fields():
     assert "budget_blocked" in renderers
     assert "治理状态" in renderers
     assert "健康分" in renderers
+
+
+def test_dashboard_renders_source_discovery_metadata():
+    renderers = (ROOT / "src/site/static/js/dashboard/renderers.js").read_text()
+    styles = (ROOT / "src/site/static/css/style.css").read_text()
+
+    assert "function sourceDiscoveryText" in renderers
+    assert "discovery_query" in renderers
+    assert "discovery_repo" in renderers
+    assert "GitHub Search:" in renderers
+    assert ".source-discovery-meta" in styles
 
 
 def test_dashboard_error_column_does_not_show_governance_reason_as_error():

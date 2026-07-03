@@ -1,4 +1,5 @@
 # src/api/sources.py
+import json
 import logging
 from datetime import date, timedelta
 from fastapi import APIRouter, HTTPException
@@ -31,6 +32,46 @@ def _source_to_dict(source: SourceConfig, health: dict | None = None) -> dict:
         result["recent_total"] = health.get("recent_total", 0)
         result["avg_score"] = health.get("avg_score")
     return result
+
+
+def _source_from_registry_row(row) -> SourceConfig:
+    try:
+        config = json.loads(row["config_json"] or "{}")
+    except json.JSONDecodeError:
+        config = {}
+    return SourceConfig(
+        id=row["id"],
+        name=row["name"],
+        type=row["type"],
+        enabled=bool(row["enabled"]),
+        priority=row["priority"],
+        cron=row["cron"],
+        max_items=row["max_items"],
+        config=config,
+    )
+
+
+async def _load_sources_with_registry(db: Database) -> list[SourceConfig]:
+    sources = SourceManager.load()
+    known_ids = {source.id for source in sources}
+    rows = await db.fetch_all(
+        """
+        SELECT *
+        FROM source_registry
+        WHERE id NOT IN ({})
+        ORDER BY status ASC, priority ASC, id ASC
+        """.format(",".join("?" for _ in known_ids) or "''"),
+        tuple(known_ids),
+    )
+    return sources + [_source_from_registry_row(row) for row in rows]
+
+
+def _discovery_metadata(source: SourceConfig) -> dict:
+    return {
+        "discovered_by": source.config.get("discovered_by"),
+        "discovery_query": source.config.get("discovery_query"),
+        "discovery_repo": source.config.get("discovery_repo"),
+    }
 
 
 async def _get_request_db() -> tuple[Database, bool]:
@@ -225,7 +266,7 @@ async def list_sources():
     """数据源列表（含状态）"""
     db, should_close = await _get_request_db()
     try:
-        sources = SourceManager.load()
+        sources = await _load_sources_with_registry(db)
         tracker = SourceHealthTracker(db)
         health_data = await tracker.get_all_sources_health()
         health_map = {h["source_id"]: h for h in health_data}
@@ -250,7 +291,7 @@ async def get_source_stats(period: str = "week"):
         tracker = SourceHealthTracker(db)
         health_data = await tracker.get_all_sources_health(start_date=start_date)
 
-        sources = SourceManager.load()
+        sources = await _load_sources_with_registry(db)
         source_run_metrics = await _get_source_run_metrics(db, start_date)
         latest_source_runs = await _get_latest_source_runs(db)
         latest_source_errors = await _get_latest_source_errors(db)
@@ -298,6 +339,7 @@ async def get_source_stats(period: str = "week"):
                 "name": source.name,
                 "type": source.type,
                 "enabled": source.enabled,
+                **_discovery_metadata(source),
                 "health_status": health_status,
                 "governance_status": governance.get("governance_status"),
                 "health_score": governance.get("health_score"),
