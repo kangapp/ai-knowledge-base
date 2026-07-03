@@ -70,6 +70,33 @@
         return `GitHub Search: ${source.discovery_query}${repo}`;
     }
 
+    function isFoldedSource(source) {
+        return ['candidate', 'disabled', 'rejected', 'quarantined'].includes(source.governance_status);
+    }
+
+    function sourceRowHtml(s) {
+        const discoveryText = sourceDiscoveryText(s);
+        return `
+            <tr>
+                <td>
+                    ${escapeHtml(sourceDisplayName(s))}
+                    ${discoveryText ? `<div class="source-discovery-meta">${escapeHtml(discoveryText)}</div>` : ''}
+                </td>
+                <td><span class="source-health-status ${escapeHtml(s.health_status)}">${sourceHealthLabel(s.health_status)}</span></td>
+                <td><span class="source-governance-status ${escapeHtml(s.governance_status || '')}">${governanceLabel(s.governance_status)}</span></td>
+                <td>${s.health_score == null ? '-' : Number(s.health_score).toFixed(1)}</td>
+                <td>${s.total_collected || 0}</td>
+                <td>${s.last_new_items || 0}</td>
+                <td>${s.last_dedup_skipped || 0}</td>
+                <td>${s.last_analysis_failed || 0}</td>
+                <td>${((s.approved_rate || 0) * 100).toFixed(1)}%</td>
+                <td>${s.avg_score == null ? '-' : Number(s.avg_score).toFixed(1)}</td>
+                <td>${escapeHtml(sourceLastRun(s.last_run_at))}</td>
+                <td class="source-health-error" title="${escapeHtml(sourceErrorText(s))}">${escapeHtml(sourceErrorText(s))}</td>
+            </tr>
+        `;
+    }
+
     function sourceLastRun(value) {
         if (!value) return '-';
         return String(value).replace('T', ' ').slice(0, 16);
@@ -236,39 +263,33 @@
             if (a.enabled !== b.enabled) return a.enabled ? -1 : 1;
             return (b.last_run_at || '').localeCompare(a.last_run_at || '');
         });
+        const visibleRows = rows.filter(s => !isFoldedSource(s));
+        const foldedRows = rows.filter(isFoldedSource);
+        const sourceTableHead = `
+            <thead>
+                <tr>
+                    <th>数据源</th><th>状态</th><th>治理状态</th><th>健康分</th><th>窗口采集</th><th>本轮新增</th>
+                    <th>本轮去重</th><th>分析失败</th><th>通过率</th><th>平均分</th>
+                    <th>最近运行</th><th>错误</th>
+                </tr>
+            </thead>
+        `;
         table.innerHTML = `
             <table class="log-table">
-                <thead>
-                    <tr>
-                        <th>数据源</th><th>状态</th><th>治理状态</th><th>健康分</th><th>窗口采集</th><th>本轮新增</th>
-                        <th>本轮去重</th><th>分析失败</th><th>通过率</th><th>平均分</th>
-                        <th>最近运行</th><th>错误</th>
-                    </tr>
-                </thead>
+                ${sourceTableHead}
                 <tbody>
-                    ${rows.map(s => {
-                        const discoveryText = sourceDiscoveryText(s);
-                        return `
-                        <tr>
-                            <td>
-                                ${escapeHtml(sourceDisplayName(s))}
-                                ${discoveryText ? `<div class="source-discovery-meta">${escapeHtml(discoveryText)}</div>` : ''}
-                            </td>
-                            <td><span class="source-health-status ${escapeHtml(s.health_status)}">${sourceHealthLabel(s.health_status)}</span></td>
-                            <td><span class="source-governance-status ${escapeHtml(s.governance_status || '')}">${governanceLabel(s.governance_status)}</span></td>
-                            <td>${s.health_score == null ? '-' : Number(s.health_score).toFixed(1)}</td>
-                            <td>${s.total_collected || 0}</td>
-                            <td>${s.last_new_items || 0}</td>
-                            <td>${s.last_dedup_skipped || 0}</td>
-                            <td>${s.last_analysis_failed || 0}</td>
-                            <td>${((s.approved_rate || 0) * 100).toFixed(1)}%</td>
-                            <td>${s.avg_score == null ? '-' : Number(s.avg_score).toFixed(1)}</td>
-                            <td>${escapeHtml(sourceLastRun(s.last_run_at))}</td>
-                            <td class="source-health-error" title="${escapeHtml(sourceErrorText(s))}">${escapeHtml(sourceErrorText(s))}</td>
-                        </tr>
-                    `}).join('')}
+                    ${visibleRows.map(sourceRowHtml).join('')}
                 </tbody>
             </table>
+            ${foldedRows.length ? `
+                <details class="source-folded-group">
+                    <summary>候选 / 已停用（${foldedRows.length}）</summary>
+                    <table class="log-table">
+                        ${sourceTableHead}
+                        <tbody>${foldedRows.map(sourceRowHtml).join('')}</tbody>
+                    </table>
+                </details>
+            ` : ''}
         `;
     }
 

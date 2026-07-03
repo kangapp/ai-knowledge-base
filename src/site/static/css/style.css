@@ -321,6 +321,8 @@ body.article-drawer-open { overflow: hidden; }
 .source-governance-status.quarantined, .source-governance-status.disabled, .source-governance-status.rejected { background: #fee2e2; color: #991b1b; }
 .source-governance-status.active, .source-governance-status.trial { background: #dcfce7; color: #166534; }
 .source-discovery-meta { margin-top: 0.2rem; color: #64748b; font-size: 0.72rem; }
+.source-folded-group { margin-top: 0.75rem; }
+.source-folded-group summary { cursor: pointer; color: #475569; font-size: 0.85rem; font-weight: 600; padding: 0.35rem 0; }
 .source-health-error { max-width: 16rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #991b1b; }
 
 @media (max-width: 900px) {

@@ -75,6 +75,16 @@ def test_dashboard_source_charts_exclude_disabled_sources():
     assert "DashboardCharts.bar('src-contribution-chart', chartSources.map(sourceDisplayName)" in renderers
 
 
+def test_dashboard_source_table_folds_candidate_and_disabled_sources_by_default():
+    renderers = (ROOT / "src/site/static/js/dashboard/renderers.js").read_text()
+
+    assert "function isFoldedSource" in renderers
+    assert "['candidate', 'disabled', 'rejected', 'quarantined'].includes(source.governance_status)" in renderers
+    assert "const visibleRows = rows.filter(s => !isFoldedSource(s));" in renderers
+    assert "const foldedRows = rows.filter(isFoldedSource);" in renderers
+    assert "<details class=\"source-folded-group\">" in renderers
+
+
 def test_dashboard_renders_source_governance_fields():
     renderers = (ROOT / "src/site/static/js/dashboard/renderers.js").read_text()
 
