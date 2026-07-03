@@ -1,4 +1,5 @@
 import re
+import time
 import logging
 import json
 import httpx
@@ -22,6 +23,8 @@ GITHUB_SEARCH_QUERIES = [
     "llm news",
 ]
 FEED_PATHS = ("/feed", "/rss.xml", "/atom.xml")
+GITHUB_SEARCH_TIMEOUT_SECONDS = 90
+GITHUB_SEARCH_MAX_CANDIDATES_PER_REPO = 2
 RSS_NEIGHBOR_HEADERS = {
     "User-Agent": "Mozilla/5.0 (compatible; SourceDiscoveryBot/1.0)"
 }
@@ -216,21 +219,31 @@ class SourceDiscovery:
 
         return discovered
 
-    async def discover_github_search(self, limit_per_query: int = 10) -> list[SourceConfig]:
+    async def discover_github_search(
+        self,
+        limit_per_query: int = 10,
+        timeout_seconds: int = GITHUB_SEARCH_TIMEOUT_SECONDS,
+        max_candidates_per_repo: int = GITHUB_SEARCH_MAX_CANDIDATES_PER_REPO,
+    ) -> list[SourceConfig]:
         """从 GitHub 搜索 AI 资讯聚合类项目，提取候选数据源。"""
         discovered: list[SourceConfig] = []
         seen_ids: set[str] = set()
+        deadline = time.monotonic() + timeout_seconds
 
         try:
             async with httpx.AsyncClient(timeout=20, headers=RSS_NEIGHBOR_HEADERS) as client:
                 for query in GITHUB_SEARCH_QUERIES:
+                    if time.monotonic() >= deadline:
+                        break
                     resp = await client.get(
                         GITHUB_SEARCH_API_URL,
                         params={"q": query, "sort": "stars", "order": "desc", "per_page": limit_per_query},
                     )
                     resp.raise_for_status()
                     for repo in resp.json().get("items", []):
-                        sources = await self._sources_from_github_search_repo(client, repo, query)
+                        if time.monotonic() >= deadline:
+                            break
+                        sources = await self._sources_from_github_search_repo(client, repo, query, max_candidates_per_repo)
                         for source in sources:
                             if source.id in seen_ids:
                                 continue
@@ -243,7 +256,13 @@ class SourceDiscovery:
         logger.info("discovery.github_search", extra={"found": len(discovered)})
         return discovered
 
-    async def _sources_from_github_search_repo(self, client, repo: dict, query: str) -> list[SourceConfig]:
+    async def _sources_from_github_search_repo(
+        self,
+        client,
+        repo: dict,
+        query: str,
+        max_candidates: int = GITHUB_SEARCH_MAX_CANDIDATES_PER_REPO,
+    ) -> list[SourceConfig]:
         full_name = repo.get("full_name") or ""
         repo_api_url = repo.get("url") or ""
         if not full_name or not repo_api_url:
@@ -262,7 +281,7 @@ class SourceDiscovery:
                 urls.extend(_extract_urls(raw.text))
 
         sources: list[SourceConfig] = []
-        for url in await self._feed_urls_from_links(client, urls):
+        for url in await self._feed_urls_from_links(client, urls, max_candidates):
             source = SourceConfig(
                 id=_stable_rss_id(url),
                 name=urlparse(url).netloc[:50],
@@ -274,9 +293,11 @@ class SourceDiscovery:
                 config={"url": url, "filter_keywords": ["AI", "LLM", "agent", "RAG"]},
             )
             sources.append(_source_with_discovery_metadata(source, query, full_name))
+            if len(sources) >= max_candidates:
+                return sources
 
         owner = (repo_data.get("owner") or {}).get("login") or full_name.split("/")[0]
-        if owner:
+        if owner and len(sources) < max_candidates:
             source = SourceConfig(
                 id=_github_owner_id(owner),
                 name=f"GitHub {owner}",
@@ -296,7 +317,7 @@ class SourceDiscovery:
             sources.append(_source_with_discovery_metadata(source, query, full_name))
         return sources
 
-    async def _feed_urls_from_links(self, client, urls: list[str]) -> list[str]:
+    async def _feed_urls_from_links(self, client, urls: list[str], limit: int) -> list[str]:
         feed_urls: list[str] = []
         seen: set[str] = set()
         for url in urls:
@@ -307,6 +328,8 @@ class SourceDiscovery:
                         continue
                     seen.add(candidate)
                     feed_urls.append(candidate)
+                    if len(feed_urls) >= limit:
+                        return feed_urls
                     continue
                 try:
                     resp = await client.get(candidate)
@@ -315,6 +338,8 @@ class SourceDiscovery:
                             continue
                         seen.add(candidate)
                         feed_urls.append(candidate)
+                        if len(feed_urls) >= limit:
+                            return feed_urls
                 except Exception:
                     continue
         return feed_urls

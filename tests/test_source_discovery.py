@@ -33,6 +33,17 @@ class FakeClient:
         return self.responses[url]
 
 
+class TimeoutClient:
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, *args):
+        return None
+
+    async def get(self, url, **kwargs):
+        raise TimeoutError("slow upstream")
+
+
 @pytest.mark.asyncio
 async def test_discover_github_search_extracts_rss_candidate(monkeypatch):
     written = []
@@ -109,3 +120,46 @@ async def test_discover_github_search_dedupes_same_feed(monkeypatch):
     rss_sources = [source for source in sources if source.type == "rss"]
     assert len(rss_sources) == 1
     assert len([source for source in written if source.type == "rss"]) == 1
+
+
+@pytest.mark.asyncio
+async def test_github_search_limits_candidates_per_repo(monkeypatch):
+    search_url = "https://api.github.com/search/repositories"
+    repo_url = "https://api.github.com/repos/owner/radar"
+    responses = {
+        search_url: FakeResponse({"items": [{"full_name": "owner/radar", "url": repo_url}]}),
+        repo_url: FakeResponse({"homepage": "https://example.com", "owner": {"login": "owner"}}),
+        f"{repo_url}/readme": FakeResponse({"download_url": "https://raw.example/readme.md"}),
+        "https://raw.example/readme.md": FakeResponse(text=" ".join(
+            f"https://example.com/feed{i}" for i in range(5)
+        )),
+    }
+
+    import src.core.source_discovery as module
+
+    monkeypatch.setattr(module, "GITHUB_SEARCH_QUERIES", ["ai radar"])
+    monkeypatch.setattr(module.httpx, "AsyncClient", lambda **kwargs: FakeClient(responses))
+
+    discovery = SourceDiscovery(db=None)
+
+    async def fake_write(source):
+        return None
+
+    discovery._write_discovered_source = fake_write
+
+    sources = await discovery.discover_github_search(limit_per_query=1, max_candidates_per_repo=2)
+
+    assert len(sources) == 2
+    assert all(source.config["discovery_repo"] == "owner/radar" for source in sources)
+
+
+@pytest.mark.asyncio
+async def test_github_search_timeout_returns_without_raising(monkeypatch):
+    import src.core.source_discovery as module
+
+    monkeypatch.setattr(module, "GITHUB_SEARCH_QUERIES", ["ai radar"])
+    monkeypatch.setattr(module.httpx, "AsyncClient", lambda **kwargs: TimeoutClient())
+
+    discovery = SourceDiscovery(db=None)
+
+    assert await discovery.discover_github_search(timeout_seconds=1) == []
