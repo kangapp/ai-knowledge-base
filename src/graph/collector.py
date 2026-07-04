@@ -19,6 +19,20 @@ HOTLIST_HEADERS = {
     "User-Agent": "Mozilla/5.0 (compatible; AIKnowledgeBase/1.0)",
     "Accept": "application/json",
 }
+GITHUB_SEARCH_MIN_INTERVAL_SECONDS = 2.0
+_github_search_lock = asyncio.Lock()
+_last_github_search_at = 0.0
+
+
+async def _github_search_get(client: httpx.AsyncClient, url: str, *, params: dict, headers: dict):
+    global _last_github_search_at
+    async with _github_search_lock:
+        elapsed = time.monotonic() - _last_github_search_at
+        if elapsed < GITHUB_SEARCH_MIN_INTERVAL_SECONDS:
+            await asyncio.sleep(GITHUB_SEARCH_MIN_INTERVAL_SECONDS - elapsed)
+        response = await client.get(url, params=params, headers=headers)
+        _last_github_search_at = time.monotonic()
+        return response
 
 
 def _quote_github_term(term: str) -> str:
@@ -88,7 +102,7 @@ async def collect_github(source: SourceConfig, db=None) -> list[RawItem]:
     async with httpx.AsyncClient(timeout=30, follow_redirects=True) as client:
         for q in _build_github_queries(cfg):
             params = {"q": q, "sort": "stars", "order": "desc", "per_page": candidate_pool_size}
-            resp = await client.get(url, params=params, headers=headers)
+            resp = await _github_search_get(client, url, params=params, headers=headers)
             resp.raise_for_status()
             for repo in resp.json().get("items", []):
                 repos_by_url[repo["html_url"]] = repo

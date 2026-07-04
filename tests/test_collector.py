@@ -16,6 +16,14 @@ from src.graph.state import RawItem
 from src.core.config import SourceConfig
 
 
+@pytest.fixture(autouse=True)
+def disable_github_search_sleep(monkeypatch):
+    import src.graph.collector as collector
+
+    monkeypatch.setattr(collector, "GITHUB_SEARCH_MIN_INTERVAL_SECONDS", 0)
+    monkeypatch.setattr(collector, "_last_github_search_at", 0)
+
+
 def make_source(**kw):
     defaults = {"id": "test", "name": "Test", "type": "github", "enabled": True, "priority": 1, "cron": "0 9 * * *", "max_items": 10, "config": {}}
     defaults.update(kw)
@@ -158,6 +166,34 @@ async def test_collect_github_fetches_larger_candidate_pool():
         await collect_github(source)
 
     assert mock_get.call_args.kwargs["params"]["per_page"] == 30
+
+
+@pytest.mark.asyncio
+async def test_collect_github_search_requests_are_serialized(monkeypatch):
+    import asyncio
+    import src.graph.collector as collector
+
+    active_requests = 0
+    max_active_requests = 0
+    mock_resp = AsyncMock(status_code=200, json=lambda: {"items": []})
+    mock_resp.raise_for_status = lambda: None
+
+    async def fake_get(*args, **kwargs):
+        nonlocal active_requests, max_active_requests
+        active_requests += 1
+        max_active_requests = max(max_active_requests, active_requests)
+        await asyncio.sleep(0.01)
+        active_requests -= 1
+        return mock_resp
+
+    monkeypatch.setattr(collector, "GITHUB_SEARCH_MIN_INTERVAL_SECONDS", 0, raising=False)
+    source_a = make_source(id="github_a", type="github", config={"topics": ["ai"], "lookback_days": 7})
+    source_b = make_source(id="github_b", type="github", config={"topics": ["llm"], "lookback_days": 7})
+
+    with patch("httpx.AsyncClient.get", side_effect=fake_get):
+        await asyncio.gather(collect_github(source_a), collect_github(source_b))
+
+    assert max_active_requests == 1
 
 
 @pytest.mark.asyncio
