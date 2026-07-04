@@ -70,6 +70,7 @@ def test_dashboard_source_charts_exclude_disabled_sources():
     renderers = (ROOT / "src/site/static/js/dashboard/renderers.js").read_text()
 
     assert "const chartSources = sources.filter" in renderers
+    assert "const chartSources = sources.filter(s => (s.total_collected || 0) > 0" in renderers
     assert "!['disabled', 'rejected', 'quarantined'].includes(s.governance_status)" in renderers
     assert "DashboardCharts.line('src-approved-rate-chart', chartSources.map(sourceDisplayName)" in renderers
     assert "DashboardCharts.bar('src-contribution-chart', chartSources.map(sourceDisplayName)" in renderers

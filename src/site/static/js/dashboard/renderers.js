@@ -236,7 +236,7 @@
 
     function renderSources(data) {
         const sources = data.sources || [];
-        const chartSources = sources.filter(s => !['disabled', 'rejected', 'quarantined'].includes(s.governance_status));
+        const chartSources = sources.filter(s => (s.total_collected || 0) > 0 && !['disabled', 'rejected', 'quarantined'].includes(s.governance_status));
         const activeStatuses = new Set(['healthy', 'dedup_only', 'success_zero', 'analysis_failed']);
         const activeSources = sources.filter(s => activeStatuses.has(s.health_status));
         const ratedSources = sources.filter(s => (s.total_collected || 0) > 0);
