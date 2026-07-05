@@ -5,6 +5,136 @@ from ..core.time import now_bj_iso
 from ..graph.state import AnalyzedItem, ReviewedItem, RawItem
 from .common import date_window_modifier, decode_json_field
 
+CATEGORIES = (
+    "模型与基础设施",
+    "Agent 与自动化",
+    "RAG 与知识系统",
+    "开发工具与框架",
+    "研究与评测",
+    "产品与行业应用",
+    "商业与市场",
+    "安全与治理",
+)
+
+TAG_CATEGORY = {
+    "LLM": "模型与基础设施",
+    "多模态": "模型与基础设施",
+    "AI芯片": "模型与基础设施",
+    "Agent": "Agent 与自动化",
+    "Coding Agent": "Agent 与自动化",
+    "自动化": "Agent 与自动化",
+    "RAG": "RAG 与知识系统",
+    "知识库": "RAG 与知识系统",
+    "数据治理": "RAG 与知识系统",
+    "MCP": "开发工具与框架",
+    "Tool": "开发工具与框架",
+    "Framework": "开发工具与框架",
+    "Open Source": "开发工具与框架",
+    "Claude Code": "开发工具与框架",
+    "Codex": "开发工具与框架",
+    "研究": "研究与评测",
+    "Benchmark": "研究与评测",
+    "Dataset": "研究与评测",
+    "医疗AI": "产品与行业应用",
+    "具身智能": "产品与行业应用",
+    "XR": "产品与行业应用",
+    "融资": "商业与市场",
+    "产业趋势": "商业与市场",
+    "监管": "安全与治理",
+    "安全": "安全与治理",
+}
+
+TAG_ALIASES = {
+    "AI": "模型与基础设施",
+    "人工智能": "模型与基础设施",
+    "大模型": "LLM",
+    "OpenAI": "LLM",
+    "ChatGPT": "LLM",
+    "ChatGPT Plus": "LLM",
+    "Claude": "LLM",
+    "GPT-5.5": "LLM",
+    "Cerebras": "AI芯片",
+    "AI硬件": "AI芯片",
+    "摩尔线程": "AI芯片",
+    "Tokenmaxxing": "LLM",
+    "AI Agent": "Agent",
+    "AI/Agent": "Agent",
+    "企业代理": "Agent",
+    "Agentic Coding": "Coding Agent",
+    "AI Editor": "Coding Agent",
+    "Codex Skill": "Codex",
+    "Linter": "Tool",
+    "Markdown": "Tool",
+    "Prompt Engineering": "Tool",
+    "Programming Language": "Framework",
+    "开源": "Open Source",
+    "论文解读": "研究",
+    "论文写作": "研究",
+    "学术诚信": "研究",
+    "ArXiv": "研究",
+    "计算机视觉": "多模态",
+    "AI医疗": "医疗AI",
+    "AI智能影像": "医疗AI",
+    "百度健康": "医疗AI",
+    "大健康": "医疗AI",
+    "物理AI": "具身智能",
+    "机器人芯片": "AI芯片",
+    "低功耗芯片": "AI芯片",
+    "VR眼镜": "XR",
+    "VITURE": "XR",
+    "AI产品": "产品与行业应用",
+    "AI人才": "产品与行业应用",
+    "AI浓度": "产品与行业应用",
+    "AI营销": "产品与行业应用",
+    "AI职场趋势": "产品与行业应用",
+    "HR科技": "产品与行业应用",
+    "人力资源": "产品与行业应用",
+    "人才培养": "产品与行业应用",
+    "人机共生": "产品与行业应用",
+    "业务运营": "产品与行业应用",
+    "企业数字化转型": "产品与行业应用",
+    "场景落地": "产品与行业应用",
+    "工业应用": "产品与行业应用",
+    "转化率优化": "产品与行业应用",
+    "AI投资": "融资",
+    "创业": "融资",
+    "产业转型": "产业趋势",
+    "产品战略": "产业趋势",
+    "科技行业": "产业趋势",
+    "预测市场": "商业与市场",
+    "数字资产": "商业与市场",
+    "内幕交易": "商业与市场",
+    "AI监管": "监管",
+}
+
+
+def normalize_tags(tags: list[str]) -> list[str]:
+    normalized = []
+    seen = set()
+    canonical = [TAG_ALIASES.get(tag.strip(), tag.strip()) for tag in tags if tag.strip()]
+    has_specific_tag = any(tag in TAG_CATEGORY for tag in canonical)
+    has_category = False
+
+    def add(tag: str):
+        if tag and tag not in seen:
+            seen.add(tag)
+            normalized.append(tag)
+
+    for tag in canonical:
+        if tag in CATEGORIES:
+            if has_specific_tag:
+                continue
+            add(tag)
+            continue
+        category = TAG_CATEGORY.get(tag)
+        if not category:
+            continue
+        if not has_category:
+            add(category)
+            has_category = True
+        add(tag)
+    return normalized[:3]
+
 
 async def save_article(
     db: Database,
@@ -57,7 +187,7 @@ async def save_article(
 async def save_tags(db: Database, article_id: int, tags: list[str]):
     # 先清旧标签，再插入新标签（retry 重分析时标签可能变化）
     await db.execute("DELETE FROM article_tags WHERE article_id = ?", (article_id,))
-    for tag_name in tags:
+    for tag_name in normalize_tags(tags):
         await db.execute("INSERT OR IGNORE INTO tags (name) VALUES (?)", (tag_name,))
         row = await db.fetch_one("SELECT id FROM tags WHERE name = ?", (tag_name,))
         if row:
@@ -90,7 +220,23 @@ def _article_filters(query: str = "", source: str = "", days: int = 30) -> tuple
 
 async def get_article_tags(db: Database, article_id: int) -> list[str]:
     rows = await db.fetch_all(
-        "SELECT t.name FROM tags t JOIN article_tags at ON t.id=at.tag_id WHERE at.article_id=? ORDER BY t.name",
+        """
+        SELECT t.name
+        FROM tags t
+        JOIN article_tags at ON t.id=at.tag_id
+        WHERE at.article_id=?
+        ORDER BY CASE t.name
+            WHEN '模型与基础设施' THEN 0
+            WHEN 'Agent 与自动化' THEN 1
+            WHEN 'RAG 与知识系统' THEN 2
+            WHEN '开发工具与框架' THEN 3
+            WHEN '研究与评测' THEN 4
+            WHEN '产品与行业应用' THEN 5
+            WHEN '商业与市场' THEN 6
+            WHEN '安全与治理' THEN 7
+            ELSE 99
+        END, t.name
+        """,
         (article_id,),
     )
     return [r["name"] for r in rows]

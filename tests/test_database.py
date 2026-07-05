@@ -7,6 +7,7 @@ import pytest
 from src.core.database import Database
 from src.db import operations
 from src.db.operations import get_trending_repo_urls
+from src.graph.state import AnalyzedItem, RawItem, ReviewedItem
 
 # 相对测试文件定位到项目根目录下的实际 migrations 目录
 _MIGRATIONS_DIR = Path(__file__).parent.parent / "src" / "db" / "migrations"
@@ -115,6 +116,45 @@ async def test_source_governance_tables_exist(tmp_path):
             "config_json",
             "manual_override",
         } <= registry_cols
+    finally:
+        await db.close()
+
+
+@pytest.mark.asyncio
+async def test_save_tags_normalizes_to_small_taxonomy(tmp_path):
+    db = Database(tmp_path / "tags.db", migrations_dir=_MIGRATIONS_DIR)
+    await db.initialize()
+    try:
+        article_id = await operations.save_article(
+            db,
+            RawItem(
+                url="https://example.com/agent",
+                title="Agent",
+                source="rss",
+                collected_at="2026-07-05T10:00:00",
+            ),
+            AnalyzedItem(
+                ref_url="https://example.com/agent",
+                title="Agent",
+                summary="summary",
+            ),
+            ReviewedItem(total_score=80, dimensions={}, verdict="approved"),
+            cost=0,
+            tokens=0,
+        )
+
+        await operations.save_tags(
+            db,
+            article_id,
+            ["AI", "人工智能", "Agentic Coding", "Claude Code", "FAPO"],
+        )
+        await db.commit()
+
+        assert await operations.get_article_tags(db, article_id) == [
+            "Agent 与自动化",
+            "Claude Code",
+            "Coding Agent",
+        ]
     finally:
         await db.close()
 

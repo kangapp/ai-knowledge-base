@@ -224,5 +224,5 @@ SQLite
 - **Deep Reports 版本切换**：公开 API 只查询 `deep_report_settings.public_version` 对应的 completed 报告；V1/V2 可在重建期间并存，最终切换与 V1 删除原子完成。
 - **DB 访问层拆分**：业务模块继续从 `src/db/operations.py` 导入数据库函数；实现按职责拆到 `articles.py`、`pipeline_ops.py`、`costs.py`、`deep_report_ops.py`，统计和备份等兼容逻辑仍留在 `operations.py`。
 - **Prompt Schema 强制**：`response_format={"type": "json_object"}` + 首个完整 JSON 对象提取（兼容 `<think>`、markdown、尾部解释）+ Pydantic 校验；Deep Reports 首轮解析失败后，第二轮只携带原输出、校验错误和 Schema 做定向 JSON 修复
-- **标签自动生长**：Analyzer 自由建议标签，新标签自动插入 `tags` 表收录（不做强制从池选）
+- **标签受控归一**：Analyzer 从少量受控词表选标签；入库前统一归一化别名、丢弃临时标签，避免标签列表自由生长
 - **原子站点切换**：渲染到 `output.tmp/` → rename 双目录切换，Linux rename 原子操作
