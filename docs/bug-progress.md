@@ -1,5 +1,15 @@
 # Bug 处理记录
 
+## 快速索引
+
+- LLM 输出解析 / JSON / thinking tags：Bug 1、Bug 31、Bug 32、Bug 33、Bug 37。
+- Analyzer / Reviewer / 重试成本：Bug 2、Bug 3、Bug 30、Bug 34、Bug 38、Bug 42。
+- Pipeline / 调度 / 健康状态：Bug 22、Bug 29、Bug 36、Bug 43。
+- API / 静态站 / 前端展示：Bug 7、Bug 9、Bug 12、Bug 13、Bug 14、Bug 25、Bug 27、Bug 35。
+- CI/CD / Docker / VPS 部署：部署远程命令超时、Bug 6、Bug 10、Bug 11、Bug 15、Bug 16、Bug 17、Bug 18、Bug 19、Bug 20、Bug 21、Bug 23、Bug 24、Bug 28、Bug 41 setup-uv。
+- Deep Reports：Bug 39、Bug 40、Bug 41 Deep Reports 候选选择器误杀全部新项目。
+- 环境与配置踩坑：环境变量加载顺序、GitHub API token、LangGraph async 节点、Reviewer prompt fallback。
+
 ## Bug 41: Deep Reports 候选选择器误杀全部新项目（2026-06-21）
 
 **现象**：生产环境自 2026-06-12 后没有自动生成新的深度报告。流水线正常完成，但深度报告阶段持续返回 `no candidate`。
