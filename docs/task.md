@@ -220,7 +220,7 @@
 - [x] 补齐 Deep Reports 正式文档（Task 9）
   - `docs/api.md` 记录 completed-only 列表、latest 空对象和 failed/not-found 详情 404 契约
   - `docs/data-model.md` 记录 `deep_reports` 字段、版本索引、唯一约束、公开版本设置和 schema v11
-  - `docs/architecture.md` 记录 Reviewer/入库后的后置阶段、源码扫描边界、失败隔离和静态页面
+  - `docs/analysis/architecture/architecture.md` 记录 Reviewer/入库后的后置阶段、源码扫描边界、失败隔离和静态页面
   - `docs/codemap.md`、`docs/structure.md` 补齐模块职责、测试入口和常见改动入口
 - [x] Deep Reports 最终验收（Task 10）
   - 非 integration/e2e 测试 185 项通过，Prompt 回归 7 项通过

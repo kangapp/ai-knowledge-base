@@ -50,7 +50,7 @@
 
 ## 5. 改动前读什么
 
-- 改架构、LangGraph pipeline、LLM 管理：读 `docs/architecture.md`。
+- 改架构、LangGraph pipeline、LLM 管理：读 `docs/analysis/architecture/architecture.md`。
 - 改 API 路由、响应、错误码：读 `docs/api.md`。
 - 改数据库 schema、迁移、表关系：读 `docs/data-model.md`。
 - 改部署、CI/CD、VPS、备份恢复：读 `docs/operations.md`。
