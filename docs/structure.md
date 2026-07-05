@@ -86,13 +86,14 @@ ai-knowledge-base/
 │       │   ├── article.html#     JS 读 URL param + fetch /api/articles/{id}
 │       │   ├── dashboard.html # 内联 window.__STATS__ + Chart.js
 │       │   ├── deep.html   #     深度报告列表静态外壳
-│       │   └── deep-report.html # 深度报告详情静态外壳
+│       │   ├── deep-report.html # 深度报告详情静态外壳
+│       │   └── analysis.html # 手工分析 HTML 页面列表
 │       └── static/js/
 │           └── deep-reports.js # 深度报告 API 请求与安全渲染
 │
 ├── data/                   # SQLite + backup/ (volume mount)
 ├── output/                 # 静态站点产物 (volume mount, Caddy serve)
-├── docs/analysis/          # 架构、流程图和技术分析项目
+├── docs/analysis/          # 架构、流程图和技术分析项目（*/index.html 会发布到 /analysis/）
 │   └── architecture/       # 应用架构分析项目
 │       ├── architecture.md # 应用架构、DAG、数据流、LLM 管理
 │       ├── architecture-diagram.md # Mermaid 架构图

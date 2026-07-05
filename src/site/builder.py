@@ -27,11 +27,27 @@ def clean_text(raw: str, length: int = 200) -> str:
         truncated = truncated[:last_space]
     return truncated + "..."
 
+def _html_title(path: Path, fallback: str) -> str:
+    match = re.search(
+        r"<title[^>]*>(.*?)</title>",
+        path.read_text(encoding="utf-8"),
+        re.I | re.S,
+    )
+    return clean_text(match.group(1), 80) if match else fallback
+
+
 class SiteBuilder:
-    def __init__(self, db: Database, output_dir: Path, template_dir: Path):
+    def __init__(
+        self,
+        db: Database,
+        output_dir: Path,
+        template_dir: Path,
+        analysis_dir: Path | None = None,
+    ):
         self.db = db
         self.output_dir = output_dir
         self.template_dir = template_dir
+        self.analysis_dir = analysis_dir or Path(__file__).parents[2] / "docs" / "analysis"
         self.env = Environment(loader=FileSystemLoader(str(template_dir)), autoescape=True)
 
     async def build(self):
@@ -44,6 +60,15 @@ class SiteBuilder:
         static_src = Path(__file__).parent / "static"
         if static_src.exists():
             shutil.copytree(static_src, tmp_dir / "static", dirs_exist_ok=True)
+        analysis_pages = []
+        if self.analysis_dir.exists():
+            shutil.copytree(self.analysis_dir, tmp_dir / "analysis", dirs_exist_ok=True)
+            for index_path in sorted(self.analysis_dir.glob("*/index.html")):
+                slug = index_path.parent.name
+                analysis_pages.append({
+                    "title": _html_title(index_path, slug),
+                    "url": f"/analysis/{slug}/index.html",
+                })
 
         all_articles = await search_articles(self.db, "", days=3650, limit=100000)
         stats = await get_stats(self.db, days=30)
@@ -83,6 +108,8 @@ class SiteBuilder:
         # article.html — 静态外壳，详情内容由 JS 通过 /api/articles/{id} 渲染
         article_html = self.env.get_template("article.html").render()
         (tmp_dir / "article.html").write_text(article_html, encoding="utf-8")
+        analysis_html = self.env.get_template("analysis.html").render(analysis_pages=analysis_pages)
+        (tmp_dir / "analysis.html").write_text(analysis_html, encoding="utf-8")
 
         # stats.json
         (tmp_dir / "stats.json").write_text(json.dumps(stats, ensure_ascii=False), encoding="utf-8")

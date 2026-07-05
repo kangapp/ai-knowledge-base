@@ -132,6 +132,42 @@ async def test_homepage_uses_hotlist_source_detail_as_label(tmp_path, monkeypatc
 
 
 @pytest.mark.asyncio
+async def test_site_builder_publishes_analysis_html_pages(tmp_path, monkeypatch):
+    analysis_dir = tmp_path / "docs" / "analysis"
+    project_dir = analysis_dir / "architecture"
+    project_dir.mkdir(parents=True)
+    (project_dir / "index.html").write_text(
+        "<!doctype html><title>架构分析</title><h1>架构分析</h1>",
+        encoding="utf-8",
+    )
+
+    async def fake_search_articles(*args, **kwargs):
+        return []
+
+    async def fake_get_stats(*args, **kwargs):
+        return {}
+
+    monkeypatch.setattr(builder, "search_articles", fake_search_articles)
+    monkeypatch.setattr(builder, "get_stats", fake_get_stats)
+
+    output_dir = tmp_path / "output"
+    site_builder = builder.SiteBuilder(
+        db=object(),
+        output_dir=output_dir,
+        template_dir=ROOT / "src/site/templates",
+        analysis_dir=analysis_dir,
+    )
+    await site_builder.build()
+
+    analysis_html = (output_dir / "analysis.html").read_text(encoding="utf-8")
+    copied_html = output_dir / "analysis" / "architecture" / "index.html"
+
+    assert 'href="/analysis/architecture/index.html"' in analysis_html
+    assert "架构分析" in analysis_html
+    assert copied_html.read_text(encoding="utf-8").startswith("<!doctype html>")
+
+
+@pytest.mark.asyncio
 async def test_debounced_builder_tracks_superseded_and_completed_runs():
     class FakeBuilder:
         def __init__(self):
