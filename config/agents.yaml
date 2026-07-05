@@ -3,7 +3,7 @@ agents:
     model:
       primary: { provider: minimax, model: MiniMax-M3 }
       fallback: []
-    params: { temperature: 0.3, max_tokens: 2048 }
+    params: { temperature: 0.3, max_tokens: 2048, concurrency: 2 }
     prompt: prompts/github_analyzer.md
     budget_weight: 1.0
 
@@ -11,7 +11,7 @@ agents:
     model:
       primary: { provider: minimax, model: MiniMax-M3 }
       fallback: []
-    params: { temperature: 0.3, max_tokens: 2048 }
+    params: { temperature: 0.3, max_tokens: 2048, concurrency: 2 }
     prompt: prompts/rss_analyzer.md
     budget_weight: 1.0
 
@@ -19,7 +19,7 @@ agents:
     model:
       primary: { provider: minimax, model: MiniMax-M3 }
       fallback: []
-    params: { temperature: 0.3, max_tokens: 2048 }
+    params: { temperature: 0.3, max_tokens: 2048, concurrency: 2 }
     prompt: prompts/feishu_analyzer.md
     budget_weight: 1.0
 
@@ -27,7 +27,7 @@ agents:
     model:
       primary: { provider: minimax, model: MiniMax-M3 }
       fallback: []
-    params: { temperature: 0.3, max_tokens: 4096 }
+    params: { temperature: 0.3, max_tokens: 4096, concurrency: 2 }
     prompt: prompts/arxiv_analyzer.md
     budget_weight: 1.0
 

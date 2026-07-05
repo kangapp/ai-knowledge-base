@@ -1,0 +1,1244 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>AI Knowledge Base 技术原理图</title>
+  <style>
+    :root {
+      --ink: #111827;
+      --muted: #4b5563;
+      --line: #1f2937;
+      --blue: #2563eb;
+      --blue-soft: #eff6ff;
+      --green: #059669;
+      --green-soft: #ecfdf5;
+      --amber: #d97706;
+      --amber-soft: #fffbeb;
+      --panel: #ffffff;
+      --page: #f8fafc;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      background: var(--page);
+      color: var(--ink);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans SC", "PingFang SC", Arial, sans-serif;
+      line-height: 1.38;
+    }
+
+    .poster {
+      width: 1200px;
+      margin: 0 auto;
+      padding: 24px 24px 32px;
+      background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+    }
+
+    header {
+      text-align: center;
+      margin-bottom: 16px;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 42px;
+      letter-spacing: 0;
+      font-weight: 800;
+    }
+
+    .subtitle {
+      margin-top: 8px;
+      font-size: 19px;
+      color: var(--muted);
+      font-weight: 600;
+    }
+
+    section {
+      margin-top: 10px;
+      padding: 12px;
+      border: 2px solid var(--line);
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.9);
+    }
+
+    h2 {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin: 0 0 10px;
+      font-size: 23px;
+      line-height: 1.2;
+    }
+
+    .icon {
+      display: inline-grid;
+      place-items: center;
+      width: 34px;
+      height: 34px;
+      border: 2px solid var(--line);
+      border-radius: 8px;
+      font-size: 20px;
+      background: #fff;
+    }
+
+    .grid { display: grid; gap: 10px; }
+    .cols-2 { grid-template-columns: repeat(2, 1fr); }
+    .cols-3 { grid-template-columns: repeat(3, 1fr); }
+    .cols-4 { grid-template-columns: repeat(4, 1fr); }
+    .flow { display: flex; align-items: stretch; gap: 8px; }
+
+    .card {
+      min-height: 92px;
+      padding: 12px;
+      border: 1.8px solid var(--line);
+      border-radius: 7px;
+      background: var(--panel);
+    }
+
+    .card.blue { background: var(--blue-soft); border-color: var(--blue); }
+    .card.green { background: var(--green-soft); border-color: var(--green); }
+    .card.amber { background: var(--amber-soft); border-color: var(--amber); }
+    .card.clickable { cursor: pointer; transition: box-shadow .15s ease, transform .15s ease; }
+    .card.clickable:hover, .db-table button:hover {
+      box-shadow: 0 6px 18px rgba(15, 23, 42, 0.14);
+      transform: translateY(-1px);
+    }
+    .card.clickable.active, .db-table button.active {
+      outline: 3px solid rgba(37, 99, 235, 0.28);
+      border-color: var(--blue);
+    }
+
+    .card h3 {
+      margin: 0 0 8px;
+      font-size: 17px;
+      line-height: 1.2;
+    }
+
+    .card p {
+      margin: 0;
+      font-size: 14px;
+      color: var(--ink);
+    }
+
+    ul {
+      margin: 0;
+      padding-left: 18px;
+      font-size: 14px;
+    }
+
+    li + li { margin-top: 4px; }
+
+    .arrow {
+      display: grid;
+      place-items: center;
+      min-width: 26px;
+      font-size: 25px;
+      font-weight: 800;
+      color: var(--line);
+    }
+
+    .lane {
+      padding: 10px;
+      border: 1.8px dashed #64748b;
+      border-radius: 8px;
+      background: #f8fafc;
+    }
+
+    .lane-title {
+      margin: 0 0 8px;
+      font-size: 17px;
+      font-weight: 800;
+      text-align: center;
+    }
+
+    .mini-row {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      margin-top: 8px;
+    }
+
+    .pill {
+      display: inline-block;
+      padding: 5px 9px;
+      border: 1.5px solid #94a3b8;
+      border-radius: 999px;
+      background: #fff;
+      font-size: 13px;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+
+    .db-table {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 8px;
+      margin-top: 8px;
+    }
+
+    .db-table button {
+      padding: 7px 8px;
+      border: 1.5px solid #94a3b8;
+      border-radius: 6px;
+      background: #fff;
+      text-align: center;
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--ink);
+      cursor: pointer;
+    }
+
+    .note {
+      padding: 9px 12px;
+      border: 1.8px solid var(--amber);
+      border-radius: 7px;
+      background: var(--amber-soft);
+      font-size: 15px;
+      font-weight: 700;
+      text-align: center;
+    }
+
+    .tight .card { min-height: 76px; }
+    .wide { grid-column: span 2; }
+
+    .detail-backdrop {
+      position: fixed;
+      inset: 0;
+      z-index: 40;
+      background: rgba(15, 23, 42, 0.28);
+    }
+
+    .detail-panel {
+      position: fixed;
+      top: 0;
+      right: 0;
+      bottom: 0;
+      z-index: 41;
+      width: 620px;
+      max-width: calc(100vw - 48px);
+      padding: 18px;
+      border-left: 2px solid var(--blue);
+      background: #fff;
+      box-shadow: -10px 0 30px rgba(15, 23, 42, 0.18);
+      overflow-y: auto;
+      transform: translateX(100%);
+      transition: transform .18s ease;
+    }
+
+    .detail-panel.open { transform: translateX(0); }
+    .detail-backdrop[hidden], .detail-panel[hidden] { display: none; }
+    .detail-panel h2 { margin-bottom: 6px; padding-right: 42px; }
+    .detail-close {
+      position: absolute;
+      top: 14px;
+      right: 14px;
+      width: 34px;
+      height: 34px;
+      border: 1.5px solid #94a3b8;
+      border-radius: 7px;
+      background: #fff;
+      color: var(--ink);
+      font-size: 22px;
+      line-height: 1;
+      cursor: pointer;
+    }
+    .detail-close:hover { background: #f1f5f9; }
+    .detail-summary { margin: 0 0 12px; color: var(--muted); font-size: 15px; }
+    .detail-grid { display: grid; grid-template-columns: 1fr; gap: 12px; }
+    .detail-box {
+      padding: 12px;
+      border: 1.5px solid #cbd5e1;
+      border-radius: 7px;
+      background: #f8fafc;
+    }
+    .detail-box h3 { margin: 0 0 8px; font-size: 16px; }
+    .detail-box p { margin: 0; font-size: 14px; }
+    .detail-box code { font-size: 13px; }
+    .schema-table { width: 100%; border-collapse: collapse; font-size: 13px; background: #fff; }
+    .schema-table th, .schema-table td { border: 1px solid #cbd5e1; padding: 6px 7px; vertical-align: top; }
+    .schema-table th { background: #e0f2fe; text-align: left; }
+    .mapping-table { width: 100%; border-collapse: collapse; font-size: 12.5px; background: #fff; }
+    .mapping-table th, .mapping-table td { border: 1px solid #cbd5e1; padding: 6px 7px; vertical-align: top; }
+    .mapping-table th { background: #fef3c7; text-align: left; }
+    .failure-table { width: 100%; border-collapse: collapse; font-size: 12.5px; background: #fff; }
+    .failure-table th, .failure-table td { border: 1px solid #cbd5e1; padding: 6px 7px; vertical-align: top; }
+    .failure-table th { background: #fee2e2; text-align: left; }
+    .process-chart { display: grid; gap: 6px; }
+    .process-node {
+      padding: 10px;
+      border: 1.5px solid #93c5fd;
+      border-radius: 7px;
+      background: #eff6ff;
+    }
+    .process-node h4 { margin: 0 0 7px; font-size: 15px; }
+    .process-node p { margin-top: 7px; color: var(--muted); }
+    .dataflow-chart { display: grid; gap: 6px; }
+    .flow-node {
+      padding: 10px;
+      border: 1.5px solid #86efac;
+      border-radius: 7px;
+      background: #fff;
+    }
+    .flow-node h4 { margin: 0 0 7px; font-size: 15px; }
+    .flow-meta {
+      display: grid;
+      grid-template-columns: 44px 1fr;
+      gap: 6px;
+      margin-top: 5px;
+      font-size: 12.5px;
+    }
+    .flow-meta b { color: #166534; }
+    .flow-note { margin-top: 7px; font-size: 13px; color: var(--muted); }
+    .flow-example {
+      margin-top: 8px;
+      border-color: #bbf7d0;
+      background: #f0fdf4;
+      color: #111827;
+      font-size: 12px;
+      max-height: 210px;
+    }
+    .flow-arrow {
+      text-align: center;
+      font-size: 21px;
+      font-weight: 800;
+      color: var(--green);
+      line-height: 1;
+    }
+    pre {
+      margin: 0;
+      padding: 10px;
+      border: 1px solid #cbd5e1;
+      border-radius: 6px;
+      background: #0f172a;
+      color: #e5e7eb;
+      white-space: pre-wrap;
+      font-size: 12.5px;
+      line-height: 1.45;
+    }
+
+    @media print {
+      body { background: #fff; }
+      .poster { margin: 0; }
+    }
+  </style>
+</head>
+<body>
+  <main class="poster">
+    <header>
+      <h1>AI Knowledge Base 技术原理图</h1>
+      <div class="subtitle">采集去重、LangGraph 分析审核、LLM 成本控制、Deep Reports 与静态站发布</div>
+    </header>
+
+    <section>
+      <h2><span class="icon">①</span> 系统全景与核心数据流</h2>
+      <div class="flow">
+        <div class="card blue clickable" data-detail="sources">
+          <h3>外部数据源</h3>
+          <p>GitHub、RSS、NewsNow、HN、Feishu、arXiv</p>
+        </div>
+        <div class="arrow">→</div>
+        <div class="card clickable" data-detail="collector">
+          <h3>Collector</h3>
+          <p>并行采集、URL 查重、输出 RawItem</p>
+        </div>
+        <div class="arrow">→</div>
+        <div class="card green clickable" data-detail="langgraph">
+          <h3>LangGraph</h3>
+          <p>Router → Analyzer → Aggregator → Reviewer</p>
+        </div>
+        <div class="arrow">→</div>
+        <div class="card clickable" data-detail="sqlite">
+          <h3>SQLite</h3>
+          <p>articles、tags、cost、events、deep reports</p>
+        </div>
+        <div class="arrow">→</div>
+        <div class="card blue clickable" data-detail="delivery">
+          <h3>展示发布</h3>
+          <p>FastAPI + 静态站 + dashboard + DAG 页面</p>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <h2><span class="icon">②</span> 数据源采集与去重原理</h2>
+      <div class="grid cols-4">
+        <div class="card clickable" data-detail="scheduler">
+          <h3>调度入口</h3>
+          <ul>
+            <li>APScheduler</li>
+            <li>北京时间 Cron</li>
+            <li>同 cron 源合并一次 run</li>
+          </ul>
+        </div>
+        <div class="card blue clickable" data-detail="collector">
+          <h3>并行采集</h3>
+          <ul>
+            <li>httpx + asyncio.gather</li>
+            <li>单源失败隔离</li>
+            <li>trial 源限量试跑</li>
+          </ul>
+        </div>
+        <div class="card clickable" data-detail="source-adapters">
+          <h3>源适配</h3>
+          <ul>
+            <li>GitHub 候选池扩大</li>
+            <li>RSS / HN 关键词过滤</li>
+            <li>hotlist HTTPS 与域名校验</li>
+          </ul>
+        </div>
+        <div class="card green clickable" data-detail="dedupe">
+          <h3>采集后去重</h3>
+          <ul>
+            <li>WHERE url IN (...) 批量查重</li>
+            <li>已入库 URL 不进 LLM</li>
+            <li>GitHub 写 star 快照</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <h2><span class="icon">③</span> LangGraph 分析审核 DAG</h2>
+      <div class="grid cols-3">
+        <div class="lane">
+          <div class="lane-title">Router</div>
+          <div class="card clickable" data-detail="router">
+            <h3>规则路由</h3>
+            <p>100% 按 RawItem.source 分流；hotlist / HN 复用 RSS Analyzer。</p>
+          </div>
+          <div class="mini-row">
+            <span class="pill">github</span>
+            <span class="pill">rss</span>
+            <span class="pill">feishu</span>
+            <span class="pill">arxiv</span>
+          </div>
+        </div>
+        <div class="lane">
+          <div class="lane-title">Analyzer fan-out</div>
+          <div class="card blue clickable" data-detail="analyzers">
+            <h3>共享实现</h3>
+            <p>各 Analyzer 是薄层，复用 base.analyze_items()；按 Agent concurrency 有限并发。</p>
+          </div>
+          <div class="mini-row">
+            <span class="pill">Pydantic</span>
+            <span class="pill">JSON 容错</span>
+            <span class="pill">成本记录</span>
+          </div>
+        </div>
+        <div class="lane">
+          <div class="lane-title">Reviewer</div>
+          <div class="card green clickable" data-detail="reviewer">
+            <h3>四维评分</h3>
+            <p>AI 相关度、内容深度、信息密度、时效性；GitHub repo 使用专属评分锚点。</p>
+          </div>
+          <div class="mini-row">
+            <span class="pill">≥80 approved</span>
+            <span class="pill">50-79 retry</span>
+            <span class="pill">&lt;50 discarded</span>
+          </div>
+        </div>
+      </div>
+      <div class="note" style="margin-top:10px;">retry 轮只重审 Reviewer，不重新进入 Analyzer，避免重复消耗 LLM 成本。</div>
+    </section>
+
+    <section>
+      <h2><span class="icon">④</span> LLM 调用、成本记账与熔断</h2>
+      <div class="grid cols-4 tight">
+        <div class="card clickable" data-detail="llm-config">
+          <h3>配置三层</h3>
+          <p>llm.yaml 注册 provider；agents.yaml 绑定 Agent；.env 保存密钥。</p>
+        </div>
+        <div class="card blue clickable" data-detail="llm-client">
+          <h3>统一客户端</h3>
+          <p>Analyzer 不直接调 OpenAI，统一走 LLMRegistry.get_client()。</p>
+        </div>
+        <div class="card green clickable" data-detail="tracked-client">
+          <h3>TrackedClient</h3>
+          <p>OpenAI 兼容协议、usage 记账、fallback 遍历、错误分类。</p>
+        </div>
+        <div class="card amber clickable" data-detail="circuit-budget">
+          <h3>双熔断</h3>
+          <p>Provider 连续失败熔断；预算 80% 尝试 fallback，100% 停止新请求。</p>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <h2><span class="icon">⑤</span> Deep Reports 源码级后置分析</h2>
+      <div class="flow">
+        <div class="card green clickable" data-detail="deep-selector">
+          <h3>候选选择</h3>
+          <p>从本轮 approved GitHub repo 中最多选 1 个高价值 coding_tool。</p>
+        </div>
+        <div class="arrow">→</div>
+        <div class="card clickable" data-detail="deep-inspector">
+          <h3>受限扫描</h3>
+          <p>临时 shallow clone，只读 README、manifest、入口和关键源码。</p>
+        </div>
+        <div class="arrow">→</div>
+        <div class="card blue clickable" data-detail="deep-summarizer">
+          <h3>证据包</h3>
+          <p>summarizer 压缩文件树、技术栈和源码片段，每文件最多 2,000 字符。</p>
+        </div>
+        <div class="arrow">→</div>
+        <div class="card clickable" data-detail="deep-analyzer">
+          <h3>结构化报告</h3>
+          <p>deep_report Agent 输出 V2 决策、架构节点、上手和部署运行。</p>
+        </div>
+      </div>
+      <div class="note" style="margin-top:10px;">Deep Reports 是图外后置阶段，失败只写 deep.failed，不影响主 pipeline completed。</div>
+    </section>
+
+    <section>
+      <h2><span class="icon">⑥</span> SQLite 数据模型与观测事件</h2>
+      <div class="grid cols-2">
+        <div class="card">
+          <h3>核心业务表</h3>
+          <div class="db-table">
+            <button type="button" data-detail="table-articles">articles</button>
+            <button type="button" data-detail="table-tags">tags</button>
+            <button type="button" data-detail="table-deep-reports">deep_reports</button>
+            <button type="button" data-detail="table-github-repo-snapshots">github_repo_snapshots</button>
+          </div>
+        </div>
+        <div class="card blue">
+          <h3>运行观测表</h3>
+          <div class="db-table">
+            <button type="button" data-detail="table-cost-logs">cost_logs</button>
+            <button type="button" data-detail="table-pipeline-runs">pipeline_runs</button>
+            <button type="button" data-detail="table-pipeline-phase-logs">pipeline_phase_logs</button>
+            <button type="button" data-detail="table-pipeline-events">pipeline_events</button>
+            <button type="button" data-detail="table-pipeline-source-runs">pipeline_source_runs</button>
+            <button type="button" data-detail="table-source-health">source_health</button>
+            <button type="button" data-detail="table-source-registry">source_registry</button>
+            <button type="button" data-detail="table-discovered-sources">discovered_sources</button>
+          </div>
+        </div>
+        <div class="card green wide">
+          <h3>入库合并口径</h3>
+          <p>RawItem 保存来源与原始描述；AnalyzedItem 提供标题、摘要、标签和语言；ReviewedItem 提供总分、verdict 和四维评分。DB 写入经 operations.py 兼容入口分发到 articles、pipeline_ops、costs、deep_report_ops 等子模块。</p>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <h2><span class="icon">⑦</span> 静态站 / FastAPI 展示发布链路</h2>
+      <div class="grid cols-4">
+        <div class="card clickable" data-detail="fastapi">
+          <h3>FastAPI</h3>
+          <ul>
+            <li>/api/articles</li>
+            <li>/api/search FTS5</li>
+            <li>/api/stats 与 dashboard</li>
+            <li>/api/pipeline/dag</li>
+            <li>/api/deep-reports</li>
+          </ul>
+        </div>
+        <div class="card blue clickable" data-detail="site-builder">
+          <h3>Site Builder</h3>
+          <ul>
+            <li>5 分钟去抖合并构建</li>
+            <li>output.tmp 渲染</li>
+            <li>原子 rename 到 output</li>
+          </ul>
+        </div>
+        <div class="card green clickable" data-detail="pages">
+          <h3>页面策略</h3>
+          <ul>
+            <li>首页预渲染 + data.json 扩展</li>
+            <li>详情页 / 抽屉复用 JS</li>
+            <li>DAG 页 5 秒轮询</li>
+            <li>深度报告静态外壳 + API</li>
+          </ul>
+        </div>
+        <div class="card amber clickable" data-detail="frontend-flow">
+          <h3>前端展示逻辑</h3>
+          <ul>
+            <li>静态首屏</li>
+            <li>详情/API 动态加载</li>
+            <li>DAG 轮询</li>
+            <li>搜索去抖</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <h2><span class="icon">⑧</span> 运维、调度与失败隔离原则</h2>
+      <div class="grid cols-4 tight">
+        <div class="card blue clickable" data-detail="pipeline-lock">
+          <h3>串行 pipeline</h3>
+          <p>asyncio.Lock 防止重叠运行；碰撞任务记录 queued 并等待。</p>
+        </div>
+        <div class="card green clickable" data-detail="error-isolation">
+          <h3>错误隔离</h3>
+          <p>单源采集失败不拖垮全局；空数据跳过 Analyzer。</p>
+        </div>
+        <div class="card amber clickable" data-detail="failure-policy">
+          <h3>失败判定</h3>
+          <p>有新条目但 Analyzer 全失败时，pipeline 标记 failed。</p>
+        </div>
+        <div class="card clickable" data-detail="publish-lifecycle">
+          <h3>发布生命周期</h3>
+          <p>pipeline_runs 表示数据流水线；静态构建独立记录状态。</p>
+        </div>
+      </div>
+    </section>
+
+    <button class="detail-backdrop" id="detail-backdrop" type="button" hidden aria-label="关闭详情"></button>
+    <aside class="detail-panel" id="detail-panel" hidden aria-live="polite" aria-label="架构详情">
+      <button class="detail-close" id="detail-close" type="button" aria-label="关闭详情">×</button>
+      <h2><span class="icon">ⓘ</span><span id="detail-title">点击模块或表名查看细节</span></h2>
+      <p class="detail-summary" id="detail-summary">例如点击 Collector 可查看采集运行流程；点击 articles 可查看表结构、样例数据和读写链路。</p>
+      <div id="detail-content"></div>
+    </aside>
+  </main>
+  <script>
+    const DETAIL = {
+      sources: {
+        title: "外部数据源",
+        summary: "所有源从配置进入调度，最终统一转换为 RawItem。",
+        flow: ["sources.yaml / source_registry", "APScheduler 按 cron 分组触发", "Collector 按 type 选择适配器", "RawItem 携带 source/source_id/source_detail"],
+        data: ["输入：GitHub repo、RSS entry、HN story、hotlist item、Feishu 文档、arXiv 条目", "输出：url、title、description、source、published_at、raw_metadata"],
+        files: ["config/sources.yaml", "src/core/source_registry.py", "src/graph/collector.py"],
+        adapters: [
+          ["github", "collect_github", "GitHub Search repositories API", "RawItem.source=github；source_detail=owner/repo；raw_metadata 写 stars/forks/watchers/language/topics/source_id"],
+          ["rss", "collect_rss", "RSS/Atom feed URL", "RawItem.source=rss；source_detail=source.name；raw_metadata.feed/source_id"],
+          ["hotlist", "collect_hotlist", "NewsNow hotlist API", "RawItem.source=hotlist；source_detail=source.name；raw_metadata.rank/platform_id/source_id"],
+          ["hn", "collect_hn", "Hacker News Algolia API", "RawItem.source=hn；source_detail=source.name；raw_metadata.points/num_comments/source_id"],
+          ["feishu", "collect_feishu", "飞书 wiki space/page API", "RawItem.source=feishu；source_detail=space_id；raw_metadata.node_id/space_id/source_id"],
+          ["arxiv", "collect_arxiv", "arXiv export API", "RawItem.source=arxiv；source_detail=category；raw_metadata.categories/source_id"]
+        ],
+        process: [
+          ["配置源", "config/sources.yaml + source_registry", "SourceConfig[]", "例如 active github_ai_devtools 每 6 小时跑一次", { id: "github_ai_devtools", type: "github", enabled: true, cron: "0 */6 * * *", max_items: 10 }],
+          ["调度分组", "SourceConfig.cron", "同 cron 的 source_filter", "APScheduler 按 cron 合并触发，减少重复 pipeline run", { trigger: "cron", source_filter: ["github_ai_devtools", "rss_36kr"] }],
+          ["选择采集器", "SourceConfig.type", "collect_* 函数", "Collector 通过 COLLECTOR_MAP[type] 找适配器", { type: "github", adapter: "collect_github" }],
+          ["统一输出", "第三方 API payload", "RawItem", "后续 Router/Analyzer 不再关心第三方原始结构", { url: "https://github.com/example/agent-runtime", title: "agent-runtime", source: "github", raw_metadata: { source_id: "github_ai_devtools", stars: 1240 } }]
+        ]
+      },
+      scheduler: {
+        title: "调度入口",
+        summary: "同 cron 的多个源合并为一次 pipeline run，重叠运行进入队列。",
+        flow: ["应用 lifespan 初始化 APScheduler", "CronTrigger 使用 Asia/Shanghai", "同步 sources.yaml bootstrap 到 source_registry", "按触发源运行 run_pipeline(source_filter=...)"],
+        data: ["写入 pipeline_runs", "写入 pipeline_source_runs 与 pipeline_events"],
+        files: ["src/main.py", "src/scheduler/source_scheduler.py", "src/core/time.py"]
+      },
+      collector: {
+        title: "Collector 采集层",
+        summary: "并行采集、过滤明显噪音、批量查重，避免重复内容进入 LLM。",
+        flow: ["读取可调度源", "按源并发请求", "源内关键词/域名/HTTPS 校验", "批量查询已存在 URL", "输出新 RawItem"],
+        data: ["RawItem.url 是后续 ref_url 关联键", "GitHub 写 github_repo_snapshots", "collection_items 记录 collected / dedup_skipped"],
+        files: ["src/graph/collector.py", "src/db/operations.py", "src/db/articles.py"],
+        adapters: [
+          ["github", "collect_github(source, db)", "Search API + stars 排序 + exclude_terms", "需要 DB 先查 eligible repo URL，优先返回未入库仓库"],
+          ["rss", "collect_rss(source)", "httpx 拉 feed + feedparser 解析", "filter_keywords 可按 title 或 title_summary 过滤"],
+          ["hotlist", "collect_hotlist(source)", "NewsNow JSON hotlist", "校验 HTTPS 与 expected_domain，避免热榜跳转污染"],
+          ["hn", "collect_hn(source)", "Algolia search_by_date", "points/comments 放入 description/raw_metadata"],
+          ["feishu", "collect_feishu(source)", "tenant token + wiki nodes/pages", "无有效 FEISHU_APP_ID 时直接返回空列表"],
+          ["arxiv", "collect_arxiv(source)", "arXiv category query", "按 categories 拉取，keywords 在 title+summary 中过滤"]
+        ],
+        process: [
+          ["collect_all 接收源列表", "SourceConfig[]", "enabled source tasks", "跳过 enabled=false；用 src.type 从 COLLECTOR_MAP 取函数", { sources: [{ id: "github_ai_devtools", type: "github", enabled: true }, { id: "rss_36kr", type: "rss", enabled: true }] }],
+          ["并发执行适配器", "tasks[src.id] = ensure_future(fn(src))", "RawItem[] 或 Exception", "GitHub 适配器额外传 db，用来优先挑未入库 repo", { tasks: { github_ai_devtools: "collect_github(source, db=db)", rss_36kr: "collect_rss(source)" } }],
+          ["源内过滤", "第三方 payload", "候选 RawItem[]", "不同 type 的过滤不同：GitHub 看星标/排除词；RSS/HN/arXiv 看关键词；hotlist 还校验域名", { github_filter: { min_stars: 100, exclude_terms: ["awesome-list"] }, rss_filter: { filter_scope: "title_summary", filter_keywords: ["LLM", "Agent"] } }],
+          ["统一 RawItem", "候选条目", "RawItem[]", "所有适配器都输出同一个模型，source/source_detail/raw_metadata 保留来源差异", { url: "https://github.com/example/agent-runtime", title: "agent-runtime", source: "github", source_detail: "example/agent-runtime", raw_metadata: { source_id: "github_ai_devtools", stars: 1240 } }],
+          ["采集错误隔离", "Exception", "error_log[]", "单个 source 失败只记录 collector.error 和 health failed，不中断其它 source", { error_log: [{ source: "rss_36kr", error: "timeout", retry_in: "next cron" }] }],
+          ["交给后续查重/路由", "all_items + error_log", "PipelineState.raw_items", "后续用 RawItem.url 做 URL 去重和 ref_url 关联", { raw_items_count: 7, error_log_count: 1 }]
+        ],
+        dataflow: [
+          ["active_sources", "SourceConfig[]", "collect_all()", "从 source_registry 读取；trial 源最多 3 条", { id: "github_ai_devtools", type: "github", cron: "0 */6 * * *", max_items: 10, status: "active" }],
+          ["collect_*", "RawItem[] + error_log[]", "source adapter", "GitHub/RSS/HN/hotlist/Feishu/arXiv 统一产出 RawItem", { url: "https://github.com/example/agent-runtime", title: "example/agent-runtime", source: "github", source_id: "github_ai_devtools", raw_metadata: { stars: 1240, language: "Python" } }],
+          ["batch_check_existing_urls", "existing url set", "DB 查重", "articles.url UNIQUE；已存在 URL 不进入 LLM", { input_urls: ["https://github.com/example/agent-runtime", "https://old.example/post"], existing_urls: ["https://old.example/post"] }],
+          ["new_items", "PipelineState.raw_items", "LangGraph 入口", "只把新 URL 送入 Router", { run_id: "run_20260705_093000", raw_items: [{ url: "https://github.com/example/agent-runtime", source: "github" }] }],
+          ["副作用", "collection_items / pipeline_events / github_repo_snapshots", "DB", "记录 collected、dedup_skipped、collector.source_error、星标快照", { collection_items: { status: "collected", source_id: "github_ai_devtools" }, pipeline_event: "collector.dedup_done", github_repo_snapshots: { repo_name: "example/agent-runtime", stars: 1240 } }]
+        ],
+        failures: [
+          ["单源请求超时", "error_log + source_health.failed + collector.error 日志", "不中断；其它 source 继续", "下次 cron 自动重试"],
+          ["GitHub API 限流", "collector.error，source_id=github_*", "不中断；该源本轮无新增", "降低 max_items/增加 GITHUB_TOKEN/等待限流恢复"],
+          ["Feishu 未配置有效 App ID", "无异常，collect_feishu 返回空列表", "不中断", "配置 FEISHU_APP_ID/FEISHU_APP_SECRET 后下次采集生效"],
+          ["第三方 payload 字段缺失", "适配器内跳过不完整 entry", "不中断", "只影响该条 item；必要时调整适配器字段兼容"]
+        ]
+      },
+      "source-adapters": {
+        title: "源适配",
+        summary: "不同来源保留各自采集口径，但后续统一进入 RawItem。",
+        flow: ["GitHub Search 按 topic/keyword 拆请求", "RSS 先 httpx 拉文本再 feedparser", "HN 使用 Algolia Search API", "NewsNow hotlist 校验 HTTPS 和 expected_domain"],
+        data: ["source=hotlist/hn 仍复用 RSS Analyzer", "raw_metadata.source_id 用于成本和健康归因"],
+        files: ["src/graph/collector.py", "config/sources.yaml"]
+      },
+      dedupe: {
+        title: "采集后去重",
+        summary: "项目明确不做语义去重，只按 URL 防止重复入库。",
+        flow: ["收集本轮 URL", "DB 批量查重 WHERE url IN (...)", "过滤已存在 URL", "记录 dedup_skipped"],
+        data: ["articles.url UNIQUE", "collection_items.status=dedup_skipped"],
+        files: ["src/graph/collector.py", "src/db/articles.py"],
+        process: [
+          ["收集 URL", "RawItem[]", "url[]", "仅按 RawItem.url 做精确匹配，不做语义去重", { urls: ["https://github.com/example/agent-runtime", "https://old.example/post"] }],
+          ["批量查重", "url[]", "existing_urls", "一次 SQL 查询：WHERE url IN (...)", { existing_urls: ["https://old.example/post"] }],
+          ["过滤新条目", "RawItem[] + existing_urls", "new_items", "已存在 URL 不进入 LLM，节省成本", { new_items: [{ url: "https://github.com/example/agent-runtime" }] }],
+          ["记录跳过", "dedup_skipped items", "collection_items / pipeline_events", "保留 source 漏斗统计", { status: "dedup_skipped", url: "https://old.example/post" }]
+        ],
+        dataflow: [
+          ["输入", "Collector all_items", "dedupe step", "包含所有适配器产出的 RawItem", { all_items_count: 12 }],
+          ["查重", "RawItem.url", "articles.url", "DB UNIQUE 约束是最终防线", { sql: "SELECT url FROM articles WHERE url IN (?, ...)" }],
+          ["输出", "new RawItem[]", "PipelineState.raw_items", "只有新 URL 进入 Router", { raw_items_count: 7 }]
+        ],
+        failures: [
+          ["DB 查询失败", "pipeline_events collect failed / pipeline_runs failed", "中断本轮 pipeline", "修复 DB 文件/迁移后手动重跑"],
+          ["同事件不同 URL", "不会被 dedupe 识别", "不中断", "这是当前设计取舍；需要时再加语义聚合"]
+        ]
+      },
+      langgraph: {
+        title: "LangGraph Pipeline",
+        summary: "主图只负责采集、路由、分析、聚合、审核；入库和 Deep Reports 在图外衔接。",
+        flow: ["Collector", "Router 规则分流", "Analyzer fan-out", "Aggregator 校验汇总", "Reviewer 裁决"],
+        data: ["RawItem → AnalyzedItem → ReviewedItem", "ref_url 连接各阶段产物"],
+        files: ["src/graph/pipeline.py", "src/graph/state.py"],
+        process: [
+          ["START", "PipelineState(raw_items)", "router", "Collector 和 DB 查重在图外完成，LangGraph 从 raw_items 开始", { run_id: "run_20260705_093000", raw_items: [{ source: "github", url: "https://github.com/example/agent-runtime" }] }],
+          ["router", "RawItem.source", "routed_* 列表", "按 ROUTE_MAP 分流；未知 source 兜底进 routed_rss", { ROUTE_MAP: { github: "routed_github", rss: "routed_rss", hotlist: "routed_rss", hn: "routed_rss", feishu: "routed_feishu", arxiv: "routed_arxiv" } }],
+          ["continue_to_analyzers", "routed_* 非空判断", "Send(analyzer, state)", "只启动有数据的 analyzer 分支，避免空跑 LLM", { sends: ["github_analyzer", "rss_analyzer"] }],
+          ["4 个 Analyzer 并行", "routed_github/routed_rss/routed_feishu/routed_arxiv", "analyzed_items + cost_records", "每个分支调用对应 analyze_*；operator.add 合并并行结果", { analyzed_items: [{ ref_url: "https://github.com/example/agent-runtime", project_type: "coding_tool" }], cost_records: [{ agent: "github_analyzer", cost: 0.0021 }] }],
+          ["aggregator", "并行分支合并结果", "原 PipelineState", "记录 analyze 汇总，保证后续 reviewer 看到完整 analyzed_items", { aggregate: { analyzed: 1, cost_records: 1 } }],
+          ["reviewer", "AnalyzedItem[] + RawItem 映射", "ReviewedItem[]", "按 ref_url 回查原始来源，四维评分后给 approved/retry/discarded", { reviewed_items: [{ ref_url: "https://github.com/example/agent-runtime", total_score: 88, verdict: "approved" }] }],
+          ["END", "reviewed_items + cost_records", "图外 Persist/Retry/Deep Reports", "retry 和入库不是 LangGraph 节点，在 main/service 层继续处理", { next: ["persist approved articles", "retry reviewer only", "select deep report candidate"] }]
+        ],
+        dataflow: [
+          ["图外 Collector", "new_items: RawItem[]", "PipelineState.raw_items", "run_id/trigger/error_log 同步进入图状态", { run_id: "run_20260705_093000", trigger: "cron", raw_items: [{ url: "https://github.com/example/agent-runtime", source: "github" }] }],
+          ["Router", "raw_items", "routed_github / routed_rss / routed_feishu / routed_arxiv", "按 RawItem.source 规则分流；hotlist/hn 进入 routed_rss", { routed_github: [{ url: "https://github.com/example/agent-runtime" }], routed_rss: [], routed_feishu: [], routed_arxiv: [] }],
+          ["Analyzer fan-out", "routed_*: RawItem[]", "analyzed_items: AnalyzedItem[] + cost_records: CostRecord[]", "并行 Send 到 4 个 analyzer；operator.add reducer 自动合并", { analyzed_items: [{ ref_url: "https://github.com/example/agent-runtime", title: "Agent Runtime", tags: ["Agent", "LLM"], project_type: "coding_tool" }], cost_records: [{ agent: "github_analyzer", cost: 0.0021 }] }],
+          ["Aggregator", "analyzed_items + cost_records", "原状态继续向后", "做汇总和 Pydantic 校验，记录 aggregate phase", { aggregate: { analyzed: 1, failed: 0, cost_records: 1 }, event: "aggregate.done" }],
+          ["Reviewer", "analyzed_items + routed_* 映射", "reviewed_items: ReviewedItem[] + cost_records[]", "ref_url 回查 source/title；写 reviewer.item_done/parse_failed", { reviewed_items: [{ ref_url: "https://github.com/example/agent-runtime", total_score: 88, verdict: "approved" }], cost_records: [{ agent: "reviewer", cost: 0.0018 }] }],
+          ["图外 Retry", "verdict=retry 的 ReviewedItem", "retry_analyzed_items → reviewer_node", "最多 2 轮，只重审 Reviewer，不重新跑 Analyzer", { retry_queue: [{ ref_url: "https://example.com/borderline", retry_count: 1, retry_feedback: "开发者价值证据不足" }] }],
+          ["图外 Persist", "RawItem + AnalyzedItem + ReviewedItem", "articles/tags/article_tags/cost_logs/collection_items", "approved 入库；retry 保留；discarded 只记事件", { articles: { url: "https://github.com/example/agent-runtime", status: "approved" }, tags: ["Agent", "LLM"], cost_logs: 2 }]
+        ]
+      },
+      router: {
+        title: "Router",
+        summary: "不调用 LLM，完全按 RawItem.source 路由。",
+        flow: ["github → github_analyzer", "rss/hotlist/hn → rss_analyzer", "feishu → feishu_analyzer", "arxiv → arxiv_analyzer"],
+        data: ["空数据直接跳过 Analyzer", "路由事件写 pipeline_events"],
+        files: ["src/graph/router.py"],
+        adapters: [
+          ["github", "routed_github", "github_analyzer", "GitHub repo 专用分析 prompt"],
+          ["rss", "routed_rss", "rss_analyzer", "普通资讯 RSS"],
+          ["hotlist", "routed_rss", "rss_analyzer", "热榜条目按资讯处理"],
+          ["hn", "routed_rss", "rss_analyzer", "HN story 按资讯处理"],
+          ["feishu", "routed_feishu", "feishu_analyzer", "内部知识库文档"],
+          ["arxiv", "routed_arxiv", "arxiv_analyzer", "论文条目"]
+        ],
+        process: [
+          ["读取 RawItem", "PipelineState.raw_items", "item.source", "Router 不调 LLM，只做规则分发", { raw_items: [{ source: "github" }, { source: "hn" }, { source: "arxiv" }] }],
+          ["查 ROUTE_MAP", "source", "routed_key", "hotlist/hn 复用 routed_rss，后续走 rss_analyzer", { github: "routed_github", hn: "routed_rss", arxiv: "routed_arxiv" }],
+          ["写回状态", "result dict", "PipelineState.routed_*", "每个列表只包含对应 analyzer 要处理的数据", { routed_github: 1, routed_rss: 1, routed_feishu: 0, routed_arxiv: 1 }],
+          ["记录路由事件", "路由计数", "pipeline_events + phase_logs", "DAG 页面可看到 route 阶段总量和各分支数量", { details: "total:3, github:1, rss:1, arxiv:1" }]
+        ]
+      },
+      analyzers: {
+        title: "Analyzer fan-out",
+        summary: "各 Analyzer 是薄层，共享 base.analyze_items()，按 agents.yaml 的 concurrency 做有限并发。",
+        flow: ["按源加载 prompt", "读取 Agent concurrency", "通过 LLMRegistry 取客户端", "要求 JSON object", "extract_json_object 容错", "Pydantic 校验 AnalyzedItem"],
+        data: ["输出 title、summary、tags、language、relevance_score", "成本写 cost_logs"],
+        files: ["src/graph/analyzers/base.py", "config/agents.yaml", "prompts/github_analyzer.md", "prompts/rss_analyzer.md", "prompts/feishu_analyzer.md", "prompts/arxiv_analyzer.md"],
+        adapters: [
+          ["routed_github", "github_analyzer", "prompts/github_analyzer.md", "输出 project_type，供 Deep Reports 候选选择使用"],
+          ["routed_rss", "rss_analyzer", "prompts/rss_analyzer.md", "RSS / hotlist / HN 共用资讯分析 prompt"],
+          ["routed_feishu", "feishu_analyzer", "prompts/feishu_analyzer.md", "内部文档分析"],
+          ["routed_arxiv", "arxiv_analyzer", "prompts/arxiv_analyzer.md", "论文条目分析"]
+        ],
+        process: [
+          ["接收 routed_*", "RawItem[]", "analyze_items(items, agent_name)", "空列表直接返回，不调用 LLM", { routed_key: "routed_github", count: 1 }],
+          ["加载 prompt", "agent_name", "prompt text", "prompt 路径来自 agents.yaml，不在 Analyzer 内硬编码长 prompt", { agent: "github_analyzer", prompt: "prompts/github_analyzer.md" }],
+          ["限制并发", "params.concurrency", "asyncio.Semaphore", "默认保守；按输入顺序合并结果和 CostRecord", { concurrency: 2, order: "input order" }],
+          ["调用 LLM", "prompt + RawItem", "JSON text + usage", "统一走 LLMRegistry/TrackedClient，记录 tokens/cost", { model: "deepseek-chat", tokens_in: 2100, tokens_out: 520 }],
+          ["解析校验", "JSON text", "AnalyzedItem", "提取首个 JSON object 后用 Pydantic 校验", { ref_url: "https://github.com/example/agent-runtime", tags: ["Agent", "LLM"], project_type: "coding_tool" }],
+          ["写事件", "AnalyzedItem / CostRecord", "pipeline_events + cost_logs", "成功和失败都会留下 item 级诊断", { event: "analyzer.item_done", cost: 0.0021 }]
+        ],
+        dataflow: [
+          ["输入", "routed_* RawItem[]", "Analyzer prompt payload", "保留 url/title/description/source/source_detail/raw_metadata", { source: "github", source_id: "github_ai_devtools", title: "agent-runtime" }],
+          ["输出", "LLM JSON", "AnalyzedItem[]", "ref_url 必须等于 RawItem.url，用于后续 Reviewer/Persist 关联", { ref_url: "https://github.com/example/agent-runtime", summary: "一个面向工具调用 Agent 的运行时..." }],
+          ["成本", "usage", "CostRecord[]", "解析失败也按真实调用记录成本", { agent: "github_analyzer", status: "success", cost: 0.0021 }]
+        ],
+        failures: [
+          ["Provider 网络/超时", "cost_logs.status=request_failed + pipeline_events analyzer.request_failed", "单 item 失败；若全失败则 pipeline failed", "fallback 可用则自动切换，否则下次运行重试"],
+          ["LLM 输出非 JSON", "cost_logs.status=parse_failed + analyzer.parse_failed", "该 item 不进入 Reviewer", "调整 prompt 或模型；解析失败不触发 Provider 熔断"],
+          ["Pydantic 校验失败", "pipeline_events analyzer.parse_failed", "该 item 失败", "对照 AnalyzedItem schema 修 prompt"]
+        ]
+      },
+      reviewer: {
+        title: "Reviewer",
+        summary: "模型只给四维分草稿，代码统一维度 key、重算总分并裁决 verdict。",
+        flow: ["普通文章用 reviewer.md", "GitHub repo 用 github_reviewer.md", "解析四维 score/reason", ">=80 approved；50-79 retry；<50 discarded", "retry 最多 2 轮"],
+        data: ["ReviewedItem.dimensions 写入 articles.extra_data", "Reviewer 成本后续按 ref_url 补齐 source"],
+        files: ["src/graph/reviewer.py", "prompts/reviewer.md", "prompts/github_reviewer.md"],
+        process: [
+          ["接收分析结果", "AnalyzedItem[] + RawItem 映射", "reviewer prompt payload", "通过 ref_url 找回 RawItem.source/source_detail/raw_metadata", { ref_url: "https://github.com/example/agent-runtime", source: "github" }],
+          ["选择 prompt", "review_kind(item)", "reviewer.md / github_reviewer.md", "GitHub repo 用专属维度锚点，普通文章用内容维度", { kind: "github_repo", prompt: "prompts/github_reviewer.md" }],
+          ["LLM 打分", "prompt payload", "dimensions JSON", "要求每个维度包含 score 和 reason", { dimensions: { ai_relevance: { score: 36, reason: "Agent runtime" }, developer_utility: { score: 26, reason: "可直接接入工具调用" } } }],
+          ["代码裁决", "dimensions", "ReviewedItem", "代码统一 key、重算 total_score，不直接信任模型 verdict", { total_score: 88, verdict: "approved" }],
+          ["分支处理", "ReviewedItem.verdict", "approved / retry / discarded", "approved 入库；retry 最多 2 轮重审 Reviewer；discarded 只记事件", { approved: 1, retry: 0, discarded: 0 }]
+        ],
+        dataflow: [
+          ["输入", "AnalyzedItem", "reviewer_node", "ref_url、title、summary、tags、metadata、project_type", { ref_url: "https://github.com/example/agent-runtime", title: "Agent Runtime", relevance_score: 92, project_type: "coding_tool" }],
+          ["上下文补充", "RawItem 映射", "prompt payload", "通过 ref_url 找来源、原始描述、source-aware 审核信息", { prompt_payload: { source: "github", raw_description: "Runtime for building tool-using agents", stars: 1240 } }],
+          ["LLM 输出", "JSON score/reason", "ReviewedItem", "代码规范化维度 key，重算 total_score，不信任模型 verdict", { dimensions: { ai_relevance: 92, developer_value: 88, novelty: 84, credibility: 90 }, total_score: 88 }],
+          ["裁决", "total_score + ai_relevance", "approved/retry/discarded", "retry 附 retry_feedback；超过 MAX_RETRIES 后丢弃", { verdict: "approved", rule: "total_score >= 80 && ai_relevance >= threshold" }],
+          ["副作用", "CostRecord + pipeline_events", "cost_logs / pipeline_events", "每次真实调用都记账；parse_failed 单独记录", { cost_log: { agent: "reviewer", model: "deepseek-chat", cost: 0.0018 }, pipeline_event: "reviewer.item_done" }]
+        ],
+        failures: [
+          ["Reviewer request_failed", "cost_logs + pipeline_events reviewer.request_failed", "该 item 未审核；可能进入 retry 或失败统计", "fallback/下次运行；检查 Provider 健康"],
+          ["Reviewer parse_failed", "pipeline_events reviewer.parse_failed", "该 item 不入库", "调整 reviewer prompt 或解析逻辑"],
+          ["50-79 retry", "ReviewedItem.retry_feedback + pipeline_events", "不中断；最多重审 2 轮", "根据 retry_feedback 改善 prompt 或接受丢弃"],
+          ["低分 discarded", "pipeline_events reviewer.item_done status=discarded", "不中断", "除非评分规则错误，否则不处理"]
+        ]
+      },
+      "llm-config": {
+        title: "LLM 配置三层",
+        summary: "Provider、Agent 绑定和密钥分层，避免业务代码硬编码模型和密钥。",
+        flow: ["llm.yaml 注册 base_url、model、价格", "agents.yaml 绑定 primary/fallback 和参数", ".env 注入密钥", "core.config 加载为 Pydantic 配置"],
+        data: ["Agent 名：github_analyzer/rss_analyzer/reviewer/deep_report", "预算配置也在 agents.yaml"],
+        files: ["config/llm.yaml", "config/agents.yaml", "src/core/config.py"]
+      },
+      "llm-client": {
+        title: "LLMRegistry.get_client()",
+        summary: "Analyzer/Reviewer/Deep Report 都通过注册表拿 TrackedClient。",
+        flow: ["按 Agent 找 primary provider/model", "检查预算与 Provider 熔断", "失败时尝试 fallback", "返回 OpenAI 兼容客户端"],
+        data: ["调用方不直接实例化 openai.AsyncOpenAI"],
+        files: ["src/core/llm_client.py", "src/core/budget.py"]
+      },
+      "tracked-client": {
+        title: "TrackedClient",
+        summary: "包裹 chat.completions.create()，统一记账和错误分类。",
+        flow: ["发送请求", "读取 usage", "按模型价格计算 cost", "写 cost_logs", "请求失败更新 Provider 状态"],
+        data: ["cost_logs.ref_url/source/source_id 用于文章级和 source 级成本归因"],
+        files: ["src/core/llm_client.py", "src/db/costs.py", "src/db/operations.py"]
+      },
+      "circuit-budget": {
+        title: "Provider 与预算熔断",
+        summary: "网络/超时类失败打开 Provider 熔断；预算硬限制停止新 LLM 请求。",
+        flow: ["连续 3 次请求失败 → circuit open", "指数退避 half_open 试探", "日预算来自 monthly / 30", "80% 尝试便宜 fallback；100% 阻断"],
+        data: ["provider_health", "circuit_events", "cost_logs"],
+        files: ["src/core/health.py", "src/core/budget.py", "src/core/llm_client.py"]
+      },
+      "deep-selector": {
+        title: "Deep Reports 候选选择",
+        summary: "只从本轮高价值 GitHub coding_tool 中最多选 1 个。",
+        flow: ["approved GitHub repo", "Reviewer 总分和维度阈值", "project_type=coding_tool", "跳过 7 天内已有 completed 报告", "按候选分排序"],
+        data: ["选择/跳过原因写 deep.selector_* 事件"],
+        files: ["src/deep_reports/selector.py"],
+        dataflow: [
+          ["输入", "本轮 approved Articles + ReviewedItem + AnalyzedItem", "selector", "仅 GitHub repo；要求 project_type=coding_tool", { article_id: 18250, repo_url: "https://github.com/example/agent-runtime", project_type: "coding_tool", verdict: "approved" }],
+          ["准入过滤", "score/dimensions/project_type/history", "Candidate[]", "总分、AI 相关度、开发者实用性、7 天重复窗口", { filters: { total_score: 88, ai_relevance: 92, developer_value: 88, no_completed_report_in_days: 7 }, passed: true }],
+          ["排序", "candidate_score", "最多 1 个 Candidate", "stars 不参与准入；候选分只用于合格项目排序", { candidate_score: 91, selected_rank: 1, selected_limit: 1 }],
+          ["副作用", "selector diagnostics", "pipeline_events", "deep.selector_skipped / deep.selector_done", { event: "deep.selector_done", selected_repo: "example/agent-runtime", skipped: [] }]
+        ]
+      },
+      "deep-inspector": {
+        title: "源码扫描 inspector",
+        summary: "临时 shallow clone，只读受限文本，不执行仓库代码。",
+        flow: ["clone --depth 1", "跳过依赖/构建/二进制/超限文件", "读取 README、manifest、入口文件、关键源码", "记录 commit SHA"],
+        data: ["RepoScanResult", "file_tree_summary", "evidence_json"],
+        files: ["src/deep_reports/inspector.py"]
+      },
+      "deep-summarizer": {
+        title: "summarizer 证据包",
+        summary: "把源码扫描结果压缩到可控上下文，降低 LLM 成本和幻觉。",
+        flow: ["识别技术栈", "裁剪文件树", "提取关键证据", "每个关键文件最多保留 2,000 字符"],
+        data: ["SourcePackage", "tech_stack_json", "evidence_json"],
+        files: ["src/deep_reports/summarizer.py"]
+      },
+      "deep-analyzer": {
+        title: "deep_report analyzer",
+        summary: "用源码证据生成 V2 结构化报告，解析失败时做一次 JSON 修复。",
+        flow: ["加载 prompts/deep_report.md", "调用 deep_report Agent", "Pydantic 校验", "失败时携带原输出和错误做修复", "写 deep_reports"],
+        data: ["report_json: 决策、架构节点/边、快速上手、部署运行、核心模块、运行时数据流"],
+        files: ["src/deep_reports/analyzer.py", "src/deep_reports/service.py"],
+        dataflow: [
+          ["selector", "DeepReportCandidate", "inspector", "repo_url、repo_name、article_id、trigger_reason", { repo_url: "https://github.com/example/agent-runtime", repo_name: "example/agent-runtime", article_id: 18250, trigger_reason: "approved high-value coding_tool" }],
+          ["inspector", "RepoScanResult", "summarizer", "commit_sha、文件树、关键文件内容；不执行仓库代码", { commit_sha: "a1b2c3d", files: ["README.md", "pyproject.toml", "src/runtime.py"], skipped: ["node_modules/", "dist/"] }],
+          ["summarizer", "SourcePackage", "deep_report analyzer", "技术栈、证据列表、压缩源码包", { tech_stack: ["Python", "FastAPI", "OpenAI-compatible API"], evidence_count: 5, excerpt_limit_per_file: 2000 }],
+          ["analyzer", "V2 report_json + CostRecord", "deep_reports", "completed/failed 都持久化；LLM 成本独立写入", { report_json: { decision: "adopt", architecture_nodes: 4, runtime_data_flows: 3 }, cost_record: { agent: "deep_report", cost: 0.018 } }],
+          ["公开 API", "deep_report_settings.public_version", "/api/deep-reports", "只返回当前公开版本的 completed 报告", { endpoint: "/api/deep-reports/latest", status: "completed", report_version: 2 }]
+        ]
+      },
+      sqlite: {
+        title: "SQLite 数据层",
+        summary: "单文件数据库承载文章、运行观测、成本、source 治理和深度报告；DB 访问实现按职责拆分。",
+        flow: ["版本化 SQL 迁移", "db/operations.py 兼容入口", "articles/pipeline_ops/costs/deep_report_ops 分工", "API/Builder 从 operations 查询", "非 db 模块不直接写 SQL"],
+        data: ["核心事实表：articles/cost_logs/pipeline_events/pipeline_source_runs/deep_reports"],
+        files: ["src/core/database.py", "src/db/operations.py", "src/db/articles.py", "src/db/pipeline_ops.py", "src/db/costs.py", "src/db/deep_report_ops.py", "src/db/migrations/"],
+        process: [
+          ["初始化", "DATABASE_URL / SQLite path", "Database connection", "应用启动时连接 SQLite 并执行版本化 SQL 迁移", { db: "data/app.db", migrations: "src/db/migrations/" }],
+          ["兼容入口", "src/db/operations.py", "业务模块 import", "外部调用保持稳定；实现按职责拆到子模块", { re_export: ["articles", "pipeline_ops", "costs", "deep_report_ops"] }],
+          ["写业务事实", "RawItem + AnalyzedItem + ReviewedItem", "articles/tags/article_tags", "articles.py 合并入库；url UNIQUE 防重复", { article: { url: "https://github.com/example/agent-runtime", status: "approved" }, tags: ["Agent", "LLM"] }],
+          ["写运行事实", "pipeline phase/event/source funnel", "pipeline_runs/pipeline_events/pipeline_source_runs", "pipeline_ops.py 供 DAG 页和 source 健康页使用", { run_id: "run_20260705_093000", phase: "review", event: "reviewer.item_done" }],
+          ["写成本事实", "CostRecord", "cost_logs", "costs.py 记录所有真实 LLM 调用", { agent: "reviewer", tokens_in: 1800, tokens_out: 300, cost: 0.0018 }],
+          ["读展示数据", "API / Site Builder", "articles/stats/deep_reports", "静态页和 API 都通过 operations/service 查询", { consumer: "site_builder", output: ["data.json", "stats.json"] }]
+        ],
+        dataflow: [
+          ["写入路径", "Collector/Reviewer/Persist/Deep/Builder", "db.operations re-export", "业务模块不直接拼 SQL 写库", { caller: "persist_approved_item()", operation: "save_article()", direct_sql_outside_db_module: false }],
+          ["文章事实", "RawItem + AnalyzedItem + ReviewedItem", "articles/tags/article_tags", "url 去重；extra_data 保存评分和 raw metadata", { articles: { id: 18250, url: "https://github.com/example/agent-runtime", status: "approved" }, article_tags: ["Agent", "LLM"] }],
+          ["运行事实", "phase/event/source funnel", "pipeline_runs/phase_logs/events/source_runs", "DAG 页面和 source 健康依赖这些表", { pipeline_runs: { id: "run_20260705_093000", status: "completed" }, pipeline_events: ["collector.done", "reviewer.item_done"] }],
+          ["成本事实", "CostRecord", "cost_logs", "Analyzer/Reviewer/Deep Report 每次真实 LLM 调用都写", { cost_logs: [{ agent: "github_analyzer", cost: 0.0021 }, { agent: "reviewer", cost: 0.0018 }] }],
+          ["报告事实", "SourcePackage + V2 report", "deep_reports", "completed 公开；failed 留排障", { deep_reports: { repo_name: "example/agent-runtime", status: "completed", report_version: 2 } }]
+        ],
+        failures: [
+          ["SQLite 文件不可写", "应用启动或写入时报 DB error", "中断相关 pipeline/API 写入", "检查 data/ 挂载权限和磁盘空间"],
+          ["迁移失败", "启动日志 / migration error", "应用启动失败或 schema 不完整", "修复 SQL 迁移后重新启动"],
+          ["UNIQUE url 冲突", "DB 约束防线", "通常不中断；应走 upsert/skip", "检查 dedupe 是否漏查或并发写入"],
+          ["非 db 模块直接 SQL", "代码审查发现", "架构风险", "迁回 src/db/operations.py 或对应 db 子模块"]
+        ]
+      },
+      fastapi: {
+        title: "FastAPI API",
+        summary: "API 统一响应信封，health 除外；复杂统计下沉到 service/db operations。",
+        flow: ["create_app 注册路由", "请求参数校验", "db operations 查询", "envelope() 返回", "异常 handler 统一格式"],
+        data: ["/api/articles", "/api/search", "/api/stats", "/api/pipeline/dag", "/api/sources", "/api/deep-reports"],
+        files: ["src/main.py", "src/api/routes.py", "src/api/stats.py", "src/api/deep_reports.py", "src/api/responses.py"]
+      },
+      "site-builder": {
+        title: "Site Builder",
+        summary: "构建静态站时使用去抖合并和原子目录切换。",
+        flow: ["pipeline 完成触发 DebouncedBuilder", "5 分钟内新 run 合并旧任务", "渲染 output.tmp", "rename 到 output", "记录构建状态"],
+        data: ["data.json", "stats.json", "index/article/dashboard/dag/deep 页面"],
+        files: ["src/site/builder.py", "src/site/templates/"],
+        process: [
+          ["触发构建", "pipeline completed / manual POST", "build job", "自动构建走 5 分钟去抖；手动 build_now 直接执行", { trigger: "pipeline.completed", run_id: "run_20260705_093000" }],
+          ["合并排队", "pending build jobs", "latest run build", "去抖窗口内旧构建可标记 superseded", { queued: ["run_20260705_092500"], latest: "run_20260705_093000" }],
+          ["查询数据", "SQLite", "template context", "读取文章列表、统计、deep report 外壳数据", { recent_articles: 100, stats: { approved_today: 15 }, deep_reports: 1 }],
+          ["渲染临时目录", "Jinja2 templates + static assets", "output.tmp", "先写临时目录，避免半成品被 Caddy 读到", { output_tmp: ["index.html", "data.json", "stats.json", "dag.html"] }],
+          ["原子发布", "output.tmp", "output/", "rename 切换发布目录", { status: "completed", target: "output/" }]
+        ],
+        dataflow: [
+          ["触发", "pipeline completed / manual build", "DebouncedBuilder", "自动构建默认 5 分钟去抖；手动 build_now 跳过", { trigger: "pipeline.completed", run_id: "run_20260705_093000", debounce_seconds: 300 }],
+          ["读取", "articles/stats/deep_reports", "builder queries", "首页列表、stats.json、deep 报告外壳数据", { query_result: { recent_articles: 100, approved_today: 15, deep_reports: 1 } }],
+          ["渲染", "Jinja2 templates + static assets", "output.tmp", "先写临时目录，避免半成品上线", { output_tmp: ["index.html", "data.json", "stats.json", "deep-reports/index.html"] }],
+          ["发布", "output.tmp", "output/", "rename 原子切换；旧构建可标记 superseded", { from: "output.tmp", to: "output", status: "completed", superseded_builds: 1 }],
+          ["消费", "Caddy/static + FastAPI", "浏览器", "静态首屏 + API 动态详情", { page: "/index.html", dynamic_api: "/api/articles/18250", response_envelope: true }]
+        ],
+        failures: [
+          ["模板渲染失败", "pipeline_events build.failed", "不中断已完成的数据 pipeline", "修复模板/脏数据兼容后手动 /api/pipeline/build"],
+          ["output.tmp 写入失败", "build.failed + 日志", "不切换 output，旧站点继续可用", "检查 output/ 权限和磁盘"],
+          ["rename 失败", "build.failed", "旧 output 保留", "检查目标目录占用/权限后重建"],
+          ["去抖窗口有新 run", "旧 build 标记 superseded", "不中断", "等待最新 run 统一构建"]
+        ]
+      },
+      pages: {
+        title: "静态页面策略",
+        summary: "首页预渲染首屏，详情和深度报告通过 API 动态加载。",
+        flow: ["首页 Jinja2 渲染最近数据", "JS 后台加载 data.json 扩展", "详情抽屉和独立页共用 article-detail.js", "DAG 页轮询运行事件"],
+        data: ["data.json 列表摘要", "/api/articles/{id} 详情", "/api/deep-reports/{id} V2 报告"],
+        files: ["src/site/templates/index.html", "src/site/static/js/app.js", "src/site/static/js/article-detail.js", "src/site/static/js/dag.js", "src/site/static/js/deep-reports.js"]
+      },
+      "frontend-flow": {
+        title: "前端展示逻辑",
+        summary: "静态 HTML 承担首屏和外壳，详情、搜索、DAG 和 Deep Reports 通过 FastAPI 动态补数据。",
+        flow: ["SQLite → Site Builder → output/", "Caddy serve 静态文件", "浏览器加载页面外壳", "页面 JS 请求 data.json / stats.json / API", "DOM 安全渲染详情和运行状态"],
+        data: ["静态输入：output/index.html、data.json、stats.json", "动态输入：/api/articles/{id}、/api/search、/api/pipeline/dag、/api/deep-reports", "输出：文章列表、详情抽屉、dashboard、DAG 状态、深度报告页面"],
+        files: ["src/site/builder.py", "src/site/templates/", "src/site/static/js/app.js", "src/site/static/js/article-detail.js", "src/site/static/js/dag.js", "src/site/static/js/deep-reports.js", "src/api/routes.py"],
+        process: [
+          ["构建静态外壳", "SQLite articles/stats/deep_reports", "output/ 静态文件", "Site Builder 预渲染首屏和页面外壳，减少首屏 API 依赖", { output: ["index.html", "article.html", "dashboard.html", "dag.html", "deep.html", "data.json", "stats.json"] }],
+          ["Caddy 服务", "output/", "浏览器 HTML/CSS/JS", "Caddy 直接返回静态文件；/api/* 由反向代理交给 FastAPI", { request: "GET /", static_file: "output/index.html", api_proxy: "/api/* -> FastAPI:8000" }],
+          ["首页渲染", "index.html + data.json", "文章卡片列表", "构建时已有最近文章；JS 后台加载 data.json 扩展全量筛选和搜索字段", { data_json_item: { id: 18250, title: "Agent Runtime", source: "github", summary: "面向工具调用 Agent 的运行时" } }],
+          ["文章详情", "点击文章 id", "/api/articles/{id}", "首页抽屉和独立 article.html 复用 article-detail.js 渲染完整详情", { request: "/api/articles/18250", response: { data: { id: 18250, tags: ["Agent", "LLM"], dimensions: { ai_relevance: 92 } } } }],
+          ["Dashboard", "stats.json + /api/stats", "KPI + 图表", "构建时内联基础统计；需要刷新时可走 API", { stats: { total_articles: 18250, approved_today: 15, cost_today: 0.15 } }],
+          ["DAG 运行页", "dag.html", "/api/pipeline/dag?detail=full", "每 5 秒轮询运行状态、阶段耗时、source 漏斗和 item 事件", { poll_ms: 5000, response: { run_id: "run_20260705_093000", phases: ["collect", "route", "analyze", "review"] } }],
+          ["Deep Reports", "deep.html / deep-report.html", "/api/deep-reports", "列表页请求 completed 报告；详情页按 id 请求 V2 report_json", { list_api: "/api/deep-reports", detail_api: "/api/deep-reports/12" }],
+          ["搜索", "输入关键词", "/api/search?q=xxx", "300ms 去抖后走 FTS5，避免每个按键都请求 API", { query: "agent runtime", debounce_ms: 300, endpoint: "/api/search?q=agent%20runtime" }]
+        ],
+        dataflow: [
+          ["静态首屏", "SQLite → Site Builder", "output/index.html + data.json", "适合公开阅读，Caddy 可直接服务", { index_html: "最近 100 条预渲染", data_json: "列表摘要 + 搜索字段" }],
+          ["动态详情", "文章 id", "FastAPI /api/articles/{id}", "避免把完整 extra_data 和长摘要塞进首屏", { input: { id: 18250 }, output: { title: "Agent Runtime", full_summary: "...", dimensions: { ai_relevance: 92 } } }],
+          ["运行观测", "浏览器轮询", "/api/pipeline/dag?detail=full", "DAG 页面展示 pipeline_runs、phase_logs、events、source_runs", { phase: "analyze", status: "done", duration_ms: 105000 }],
+          ["全文搜索", "q", "/api/search", "后端 FTS5 返回匹配文章，前端替换列表", { q: "RAG", results: [{ id: 18251, title: "RAG eval toolkit" }] }],
+          ["深度报告", "report id/latest", "/api/deep-reports/{id}", "静态外壳只负责布局，报告 JSON 由 API 返回", { report_id: 12, decision: "adopt", architecture_nodes: 4 }]
+        ],
+        failures: [
+          ["静态文件缺失", "Caddy 404 / 浏览器 Network", "影响对应页面", "重新执行 Site Builder"],
+          ["API 请求失败", "页面状态区显示加载失败", "静态首屏仍可看，动态详情不可用", "检查 FastAPI 进程和 /api 路由"],
+          ["data.json 过旧", "页面列表不是最新", "不影响 API 详情", "手动 POST /api/pipeline/build"],
+          ["DAG 轮询失败", "DAG 页显示网络错误", "不影响其它页面", "检查 /api/pipeline/dag 和 DB 观测表"]
+        ]
+      },
+      delivery: {
+        title: "展示发布",
+        summary: "静态站负责公开阅读体验，FastAPI 提供动态详情、搜索和运维观测。",
+        flow: ["SQLite 查询", "Site Builder 生成静态产物", "Caddy serve output", "FastAPI 提供实时 API"],
+        data: ["output/", "data.json/stats.json", "API envelope"],
+        files: ["src/site/builder.py", "src/api/"]
+      },
+      "pipeline-lock": {
+        title: "串行 pipeline",
+        summary: "同一进程内通过 asyncio.Lock 排队，避免多个 pipeline 同时写库。",
+        flow: ["触发 run", "尝试获取 lock", "已有运行则记录 queued", "按触发顺序等待执行"],
+        data: ["pipeline.queued event", "pipeline_runs.status"],
+        files: ["src/main.py"],
+        process: [
+          ["触发", "cron/manual", "run request", "可能来自 APScheduler 或手动 API", { trigger: "manual", endpoint: "POST /api/pipeline/run" }],
+          ["竞争锁", "asyncio.Lock", "running / queued", "已有 pipeline 时记录 queued，不静默丢任务", { current: "run_20260705_093000", incoming: "run_20260705_093010", event: "pipeline.queued" }],
+          ["串行执行", "queued run", "pipeline_runs", "前一个 run 完成后再执行下一个", { status: "running" }],
+          ["释放锁", "completed/failed", "next queued run", "失败也会释放锁", { status: "completed" }]
+        ],
+        failures: [
+          ["同进程并发触发", "pipeline.queued", "不中断", "等待当前 run 完成"],
+          ["多进程部署", "当前 asyncio.Lock 无法跨进程保护", "有并发写库风险", "需要单 worker 或 DB/队列级锁"],
+          ["进程崩溃", "pipeline_runs 可能停在 running", "需要人工判断", "按日志修复后手动重跑"]
+        ]
+      },
+      "error-isolation": {
+        title: "错误隔离",
+        summary: "只处理可恢复错误，单源失败不拖垮整个 pipeline。",
+        flow: ["源级 try/except", "空数据跳过 Analyzer", "Deep Reports best-effort", "构建失败独立记录"],
+        data: ["collector.source_error", "analyzer.*_failed", "deep.failed", "build.failed"],
+        files: ["src/graph/collector.py", "src/graph/pipeline.py", "src/deep_reports/service.py", "src/site/builder.py"],
+        process: [
+          ["Collector 隔离", "单 source exception", "error_log + health failed", "其它 source 继续采集", { source: "rss_36kr", error: "timeout", retry_in: "next cron" }],
+          ["Analyzer 隔离", "单 item request_failed/parse_failed", "pipeline_events + cost_logs", "其它 item 继续；全失败才让 pipeline failed", { event: "analyzer.item_failed", status: "failed" }],
+          ["Deep Reports 隔离", "clone/scan/LLM failed", "deep_reports failed + deep.failed", "主 pipeline 已 completed，不回滚文章", { repo: "example/agent-runtime", status: "failed" }],
+          ["Build 隔离", "template/write/rename failed", "build.failed", "数据 pipeline 不受影响，旧 output 保留", { status: "build.failed" }]
+        ],
+        dataflow: [
+          ["错误输入", "Exception / invalid LLM JSON / build error", "错误分类", "只分类可恢复错误，不裸 except 静默吞掉", { error: "ReadTimeout", phase: "collect" }],
+          ["记录", "错误上下文", "pipeline_events/cost_logs/deep_reports", "记录 source_id/ref_url/agent/provider/model 等排障字段", { source_id: "github_ai_devtools", ref_url: "https://github.com/example/agent-runtime" }],
+          ["恢复", "next cron / manual retry / build_now", "下一轮处理", "绝大多数失败通过下一轮采集或手动构建恢复", { recovery: "POST /api/pipeline/build" }]
+        ],
+        failures: [
+          ["源级失败", "collector.error/source_health.failed", "不中断", "下次 cron"],
+          ["Analyzer 全失败", "pipeline_runs.status=failed", "中断后置阶段", "修复 LLM/Prompt 后重跑"],
+          ["Deep Reports 失败", "deep_reports.status=failed", "不中断主 pipeline", "单 repo 重试或重建"],
+          ["Site Builder 失败", "build.failed", "不中断数据 pipeline", "修复后手动 build"]
+        ]
+      },
+      "failure-policy": {
+        title: "失败判定",
+        summary: "有新条目但 Analyzer 全部失败时，不能伪装成 completed。",
+        flow: ["Collector 有新 item", "Analyzer 产出为 0", "逐条写失败原因", "pipeline 标记 failed", "不继续 Deep Report 或站点构建"],
+        data: ["provider_unavailable/request_failed/parse_failed"],
+        files: ["src/main.py", "src/graph/pipeline.py"],
+        process: [
+          ["采集结果判断", "new_items + error_log", "是否进入 Graph", "无新条目可以正常跳过 LLM；有新条目才要求 Analyzer 有产出", { new_items: 7, error_log: [] }],
+          ["分析结果判断", "analyzed_items", "success/failure", "有新条目但 analyzed_items=0 是硬失败", { raw_items: 7, analyzed_items: 0 }],
+          ["失败归因", "CostRecord.status / error_log", "provider_unavailable/request_failed/parse_failed", "逐条写入 pipeline_events，避免只看到 failed 无原因", { reasons: ["request_failed", "parse_failed"] }],
+          ["终止后置阶段", "pipeline failed", "skip persist/deep/build", "避免没有有效分析结果却发布 completed", { pipeline_status: "failed", skipped: ["deep_reports", "site_builder"] }]
+        ],
+        dataflow: [
+          ["输入", "RawItem[] + CostRecord[]", "failure classifier", "结合是否有新条目和 analyzer 产出判断", { raw_items_count: 7, analyzed_items_count: 0 }],
+          ["输出", "pipeline_runs.status", "failed", "summary 写失败原因和计数", { status: "failed", summary: { request_failed: 5, parse_failed: 2 } }],
+          ["事件", "item-level failures", "pipeline_events", "DAG 页可定位哪个 source/ref_url 失败", { phase: "analyze", event: "analyzer.request_failed", ref_url: "https://example.com/a" }]
+        ],
+        failures: [
+          ["Analyzer 全失败", "pipeline_runs.status=failed", "中断", "修复 Provider/Prompt 后手动重跑"],
+          ["部分失败", "pipeline_events warning", "不中断", "失败 item 下次 URL 已存在与否取决于是否入库"],
+          ["预算 100% 阻断", "cost_logs/provider budget event", "可能导致 analyzer 全失败", "提高预算或等北京时间次日重置"]
+        ]
+      },
+      "publish-lifecycle": {
+        title: "发布生命周期",
+        summary: "数据流水线和静态构建是双生命周期，状态分开记录。",
+        flow: ["pipeline_runs 表示采集分析入库", "build queued/running/completed/failed/superseded", "新 run 完成会合并旧构建", "手动 build_now 可跳过去抖"],
+        data: ["pipeline_runs.summary", "pipeline_events build.*"],
+        files: ["src/site/builder.py", "src/api/routes.py"]
+      }
+    };
+
+    const TABLES = {
+      "table-articles": {
+        title: "articles 表",
+        summary: "文章主表，合并 RawItem、AnalyzedItem、ReviewedItem 后的最终公开内容。",
+        fields: [["id", "INTEGER PK", "文章 ID"], ["title", "TEXT", "Analyzer 标题"], ["url", "TEXT UNIQUE", "去重主键"], ["summary", "TEXT", "AI 摘要"], ["source/source_id", "TEXT", "来源归因"], ["status", "TEXT", "approved/retry/discarded"], ["extra_data", "TEXT JSON", "四维评分、raw metadata、language"], ["analysis_cost/tokens", "REAL/INTEGER", "文章级 LLM 成本汇总"]],
+        sample: { id: 18250, title: "Llama 4 Scout: 17B MoE with 10M context window", source: "github", status: "approved", relevance_score: 85, analysis_cost: 0.0032 }
+      },
+      "table-tags": {
+        title: "tags / article_tags",
+        summary: "标签字典和文章标签关联。Analyzer 可建议新标签，新标签自动收录。",
+        fields: [["tags.id", "INTEGER PK", "标签 ID"], ["tags.name", "TEXT UNIQUE", "标签名称"], ["tags.color", "TEXT", "展示颜色"], ["article_tags.article_id", "INTEGER FK", "文章 ID"], ["article_tags.tag_id", "INTEGER FK", "标签 ID"]],
+        sample: { tags: [{ id: 1, name: "LLM", color: "#10b981" }, { id: 2, name: "Agent", color: "#3b82f6" }], article_tags: [{ article_id: 18250, tag_id: 1 }] }
+      },
+      "table-cost-logs": {
+        title: "cost_logs 表",
+        summary: "每次 LLM 调用的成本事实表。解析失败和 retry 都按真实调用次数计费。",
+        fields: [["run_id", "TEXT FK", "pipeline run"], ["agent", "TEXT", "analyzer/reviewer/deep_report"], ["provider/model", "TEXT", "模型来源"], ["tokens_in/out", "INTEGER", "输入/输出 token"], ["cost", "REAL", "美元成本"], ["ref_url", "TEXT", "关联 RawItem.url"], ["status/error", "TEXT", "success/parse_failed/request_failed"], ["source_id", "TEXT", "成本来源快照"]],
+        sample: { run_id: "run_20260524_090000", agent: "reviewer", provider: "deepseek", model: "deepseek-chat", cost: 0.0048, status: "parse_failed", attempt_no: 2 }
+      },
+      "table-pipeline-runs": {
+        title: "pipeline_runs 表",
+        summary: "一次数据流水线运行的总记录，不代表静态站构建生命周期。",
+        fields: [["id", "TEXT PK", "run_YYYYMMDD_HHMMSS"], ["started_at/ended_at", "TEXT", "北京时间"], ["status", "TEXT", "running/completed/failed"], ["trigger", "TEXT", "cron/manual"], ["summary", "TEXT JSON", "采集、审核、成本、deep_report 摘要"]],
+        sample: { id: "run_20260524_090000", status: "completed", trigger: "cron", summary: { approved: 15, discarded: 3, retry: 2, cost: 0.15 } }
+      },
+      "table-pipeline-phase-logs": {
+        title: "pipeline_phase_logs 表",
+        summary: "阶段级耗时表，用于 DAG 页面展示 collect/analyze/review 等耗时。",
+        fields: [["run_id", "TEXT FK", "pipeline run"], ["phase", "TEXT", "collect/route/analyze/aggregate/review"], ["status", "TEXT", "running/done/failed"], ["duration_ms", "INTEGER", "阶段耗时"], ["details", "TEXT", "阶段摘要"]],
+        sample: { run_id: "run_20260524_090000", phase: "analyze", status: "done", duration_ms: 105000, details: "total:20, succeeded:18, failed:2" }
+      },
+      "table-pipeline-events": {
+        title: "pipeline_events 表",
+        summary: "item 级和阶段级事件流，是 DAG 运行页排障的核心来源。",
+        fields: [["phase/event", "TEXT", "事件位置和名称"], ["level/status", "TEXT", "info/success/warning/error"], ["source_id/ref_url/title", "TEXT", "来源与 item"], ["agent/provider/model", "TEXT", "LLM 调用上下文"], ["cost/tokens/latency_ms", "REAL/INTEGER", "性能与成本"], ["payload", "TEXT JSON", "扩展诊断"]],
+        sample: { phase: "review", event: "reviewer.item_done", status: "approved", source_id: "github_ai_devtools", message: "审核approved" }
+      },
+      "table-pipeline-source-runs": {
+        title: "pipeline_source_runs 表",
+        summary: "单次运行的 source 级漏斗，回答某个源抓了多少、去重多少、通过多少。",
+        fields: [["source_id", "TEXT", "配置源 ID"], ["collected/new_items/dedup_skipped", "INTEGER", "采集与去重"], ["analyzed/analysis_failed", "INTEGER", "分析结果"], ["approved/retry/discarded/inserted", "INTEGER", "审核与入库"], ["cost/tokens", "REAL/INTEGER", "本源成本"]],
+        sample: { source_id: "github_ai_devtools", collected: 10, new_items: 7, analyzed: 7, approved: 5, inserted: 5, cost: 0.032 }
+      },
+      "table-source-health": {
+        title: "source_health / source_health_daily",
+        summary: "数据源历史健康与自动治理指标。当前状态更多看 pipeline_source_runs 最新事实。",
+        fields: [["source_id/date", "TEXT", "配置源和日期"], ["request_success_rate", "REAL", "请求成功率"], ["collected/new_items/analyzed", "INTEGER", "产出质量"], ["approved/discarded/avg_score", "INTEGER/REAL", "审核质量"], ["health_score", "REAL", "治理分"], ["budget_blocked", "INTEGER", "预算阻断不降分"]],
+        sample: { source_id: "rss_36kr", date: "2026-05-23", collected: 10, approved: 9, health_score: 78.3, budget_blocked: 0 }
+      },
+      "table-source-registry": {
+        title: "source_registry 表",
+        summary: "DB-backed 数据源注册表，sources.yaml 只做 bootstrap 和人工兜底。",
+        fields: [["id", "TEXT PK", "配置源 ID"], ["type", "TEXT", "github/rss/hotlist/hn/feishu/arxiv"], ["status", "TEXT", "candidate/trial/active/degraded/quarantined/disabled/rejected"], ["enabled", "INTEGER", "是否调度"], ["cron/max_items", "TEXT/INTEGER", "采集频率与上限"], ["config_json", "TEXT JSON", "源配置"], ["manual_override", "INTEGER", "人工覆盖后自动治理不得恢复"]],
+        sample: { id: "github_ai_devtools", type: "github", status: "active", enabled: 1, cron: "0 */6 * * *", max_items: 10 }
+      },
+      "table-discovered-sources": {
+        title: "discovered_sources 表",
+        summary: "自动发现候选源，只进入候选池，不直接上线。",
+        fields: [["url", "TEXT UNIQUE", "候选 URL 或稳定 key"], ["name/type", "TEXT", "源名称和类型"], ["status", "TEXT", "candidate/enabled/disabled"], ["discovered_at", "TEXT", "发现时间"], ["rejected_at/reject_reason", "TEXT", "拒绝原因"]],
+        sample: { url: "https://example.com/feed.xml", name: "Example RSS", type: "rss", status: "candidate" }
+      },
+      "table-github-repo-snapshots": {
+        title: "github_repo_snapshots 表",
+        summary: "GitHub 仓库星标快照，用于趋势增速计算。",
+        fields: [["repo_url", "TEXT", "仓库 URL"], ["repo_name", "TEXT", "owner/repo"], ["stars/forks/watchers", "INTEGER", "社区信号"], ["snapshot_date", "TEXT", "YYYY-MM-DD"], ["created_at", "TEXT", "写入时间"]],
+        sample: { repo_name: "meta-llama/llama4", stars: 12400, forks: 1800, watchers: 560, snapshot_date: "2026-05-24" }
+      },
+      "table-deep-reports": {
+        title: "deep_reports 表",
+        summary: "GitHub 源码级报告表，completed 公开，failed 保留排障信息。",
+        fields: [["repo_url/repo_name", "TEXT", "仓库身份"], ["article_id/run_id", "FK", "关联文章与触发 run"], ["commit_sha", "TEXT", "扫描版本"], ["status", "TEXT", "completed/failed"], ["report_json", "TEXT JSON", "V2 结构化报告"], ["evidence_json/tech_stack_json", "TEXT JSON", "源码证据和技术栈"], ["analysis_cost/tokens", "REAL/INTEGER", "深度分析成本"], ["report_version", "INTEGER", "公开版本控制"]],
+        sample: { repo_name: "owner/repo", status: "completed", report_version: 2, candidate_score: 91, analysis_tokens: 7200 }
+      }
+    };
+
+    function htmlList(items) {
+      return `<ul>${items.map(item => `<li>${item}</li>`).join("")}</ul>`;
+    }
+
+    function renderFields(fields) {
+      return `<table class="schema-table"><thead><tr><th>字段</th><th>类型</th><th>说明</th></tr></thead><tbody>${fields.map(row => `<tr><td><code>${row[0]}</code></td><td>${row[1]}</td><td>${row[2]}</td></tr>`).join("")}</tbody></table>`;
+    }
+
+    function renderExample(example) {
+      if (example === undefined) return "";
+      const text = typeof example === "string" ? example : JSON.stringify(example, null, 2);
+      return `<pre class="flow-example">${text}</pre>`;
+    }
+
+    function renderMapping(rows) {
+      if (!rows) return "";
+      return `<div class="detail-box"><h3>type / 适配器映射</h3><table class="mapping-table"><thead><tr><th>type</th><th>适配器/目标</th><th>输入来源</th><th>输出说明</th></tr></thead><tbody>${rows.map(row => `<tr><td><code>${row[0]}</code></td><td><code>${row[1]}</code></td><td>${row[2]}</td><td>${row[3]}</td></tr>`).join("")}</tbody></table></div>`;
+    }
+
+    function renderFailures(rows) {
+      if (!rows) return "";
+      return `<div class="detail-box"><h3>失败路径 / 恢复方式</h3><table class="failure-table"><thead><tr><th>失败点</th><th>记录位置</th><th>是否中断</th><th>恢复方式</th></tr></thead><tbody>${rows.map(row => `<tr><td>${row[0]}</td><td>${row[1]}</td><td>${row[2]}</td><td>${row[3]}</td></tr>`).join("")}</tbody></table></div>`;
+    }
+
+    function renderProcess(steps, fallback) {
+      const rows = steps || (fallback ? fallback.map(step => [step, "", "", ""]) : null);
+      if (!rows) return "";
+      const nodes = rows.map((row, index) => `
+        <div class="process-node">
+          <h4>${index + 1}. ${row[0]}</h4>
+          ${row[1] ? `<div class="flow-meta"><b>输入</b><span>${row[1]}</span></div>` : ""}
+          ${row[2] ? `<div class="flow-meta"><b>输出</b><span>${row[2]}</span></div>` : ""}
+          ${row[3] ? `<p>${row[3]}</p>` : ""}
+          ${renderExample(row[4])}
+        </div>
+        ${index < rows.length - 1 ? '<div class="flow-arrow">↓</div>' : ''}
+      `).join("");
+      return `<div class="detail-box"><h3>运行流程图</h3><div class="process-chart">${nodes}</div></div>`;
+    }
+
+    function renderDataflow(rows) {
+      if (!rows) return "";
+      const nodes = rows.map((row, index) => `
+        <div class="flow-node">
+          <h4>${index + 1}. ${row[0]}</h4>
+          <div class="flow-meta"><b>输入</b><span>${row[1]}</span></div>
+          <div class="flow-meta"><b>输出</b><span>${row[2]}</span></div>
+          <p class="flow-note">${row[3]}</p>
+          ${renderExample(row[4])}
+        </div>
+        ${index < rows.length - 1 ? '<div class="flow-arrow">↓</div>' : ''}
+      `).join("");
+      return `<div class="detail-box"><h3>节点级数据流图</h3><div class="dataflow-chart">${nodes}</div></div>`;
+    }
+
+    let detailCloseTimer = null;
+
+    function resetDetailScroll() {
+      const panel = document.getElementById("detail-panel");
+      panel.scrollTop = 0;
+      panel.scrollTo(0, 0);
+    }
+
+    function renderDetail(key) {
+      const data = TABLES[key] || DETAIL[key] || DETAIL.langgraph;
+      const panel = document.getElementById("detail-panel");
+      const backdrop = document.getElementById("detail-backdrop");
+      if (detailCloseTimer) clearTimeout(detailCloseTimer);
+      document.getElementById("detail-title").textContent = data.title;
+      document.getElementById("detail-summary").textContent = data.summary;
+
+      const content = document.getElementById("detail-content");
+      if (TABLES[key]) {
+        content.innerHTML = `<div class="detail-grid">
+          <div class="detail-box"><h3>表结构</h3>${renderFields(data.fields)}</div>
+          <div class="detail-box"><h3>示例数据</h3><pre>${JSON.stringify(data.sample, null, 2)}</pre></div>
+        </div>`;
+      } else {
+        content.innerHTML = `<div class="detail-grid">
+          ${renderProcess(data.process, data.flow)}
+          ${renderMapping(data.adapters)}
+          ${renderDataflow(data.dataflow)}
+          ${renderFailures(data.failures)}
+          <div class="detail-box"><h3>数据流 / 关键文件</h3>${htmlList(data.data)}<h3 style="margin-top:12px;">代码入口</h3>${htmlList(data.files.map(file => `<code>${file}</code>`))}</div>
+        </div>`;
+      }
+
+      document.querySelectorAll("[data-detail]").forEach(el => el.classList.toggle("active", el.dataset.detail === key));
+      panel.hidden = false;
+      backdrop.hidden = false;
+      resetDetailScroll();
+      requestAnimationFrame(() => {
+        panel.classList.add("open");
+        resetDetailScroll();
+      });
+    }
+
+    function closeDetail() {
+      const panel = document.getElementById("detail-panel");
+      const backdrop = document.getElementById("detail-backdrop");
+      panel.classList.remove("open");
+      backdrop.hidden = true;
+      resetDetailScroll();
+      document.querySelectorAll("[data-detail]").forEach(el => el.classList.remove("active"));
+      detailCloseTimer = setTimeout(() => {
+        panel.hidden = true;
+        resetDetailScroll();
+      }, 180);
+    }
+
+    document.addEventListener("click", event => {
+      const target = event.target.closest("[data-detail]");
+      if (!target) return;
+      renderDetail(target.dataset.detail);
+    });
+
+    document.getElementById("detail-close").addEventListener("click", closeDetail);
+    document.getElementById("detail-backdrop").addEventListener("click", closeDetail);
+    document.addEventListener("keydown", event => {
+      if (event.key === "Escape") closeDetail();
+    });
+  </script>
+</body>
+</html>

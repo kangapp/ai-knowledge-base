@@ -240,3 +240,65 @@ async def test_parse_failure_does_not_mark_provider_unhealthy():
     )
 
     registry.health.record_failure.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_analyze_items_preserves_input_order_with_concurrency():
+    llm_cfg = LLMConfig(providers={
+        "minimax": ProviderConfig(
+            base_url="https://api.minimax.chat/v1",
+            api_key="sk-test",
+            models=[
+                ModelInfo(
+                    id="MiniMax-M3",
+                    price_per_1k_in=0.0003,
+                    price_per_1k_out=0.0012,
+                    max_tokens=8192,
+                )
+            ],
+        )
+    })
+    agents_cfg = AgentsConfig(
+        agents={
+            "rss_analyzer": AgentConfig(
+                model=ModelBinding(
+                    primary=ModelRef(provider="minimax", model="MiniMax-M3"),
+                    fallback=[],
+                ),
+                params={"temperature": 0.3, "max_tokens": 2048, "concurrency": 2},
+            )
+        },
+        budget=BudgetConfig(monthly=10.0),
+    )
+    registry = LLMRegistry(llm_cfg, agents_cfg)
+
+    first = MagicMock()
+    first.choices = [MagicMock(message=MagicMock(content='{"title":"one","summary":"摘要一","tags":["AI"],"language":"zh"}'))]
+    first.usage = MagicMock(prompt_tokens=10, completion_tokens=5)
+    second = MagicMock()
+    second.choices = [MagicMock(message=MagicMock(content='{"title":"two","summary":"摘要二","tags":["AI"],"language":"zh"}'))]
+    second.usage = MagicMock(prompt_tokens=20, completion_tokens=6)
+    mock_client = AsyncMock()
+    mock_client.chat.completions.create = AsyncMock(side_effect=[first, second])
+    registry._clients["minimax"] = mock_client
+
+    items = [
+        RawItem(url="https://example.com/1", title="one", description="d1", source="rss", raw_metadata={"source_id": "rss"}),
+        RawItem(url="https://example.com/2", title="two", description="d2", source="rss", raw_metadata={"source_id": "rss"}),
+    ]
+
+    analyzed, costs = await analyze_items(
+        items,
+        "rss_analyzer",
+        registry,
+        "标题:{title}\n描述:{description}\nURL:{url}\n元数据:{metadata}\n{schema}",
+    )
+
+    assert [item.ref_url for item in analyzed] == [
+        "https://example.com/1",
+        "https://example.com/2",
+    ]
+    assert [record.ref_url for record in costs] == [
+        "https://example.com/1",
+        "https://example.com/2",
+    ]

@@ -20,19 +20,19 @@ def _source(source_id: str, *, cron: str = "0 8 * * *", enabled: bool = True) ->
 
 
 def test_source_filter_accepts_multiple_ids():
-    from src.main import _filter_sources
+    from src.services.pipeline_helpers import filter_sources
 
     sources = [_source("rss_a"), _source("rss_b"), _source("rss_c")]
 
-    assert [s.id for s in _filter_sources(sources, None)] == ["rss_a", "rss_b", "rss_c"]
-    assert [s.id for s in _filter_sources(sources, "rss_a")] == ["rss_a"]
-    assert [s.id for s in _filter_sources(sources, ["rss_a", "rss_c"])] == ["rss_a", "rss_c"]
+    assert [s.id for s in filter_sources(sources, None)] == ["rss_a", "rss_b", "rss_c"]
+    assert [s.id for s in filter_sources(sources, "rss_a")] == ["rss_a"]
+    assert [s.id for s in filter_sources(sources, ["rss_a", "rss_c"])] == ["rss_a", "rss_c"]
 
 
 def test_group_sources_by_cron_skips_disabled_and_groups_same_cron():
-    from src.main import _group_enabled_sources_by_cron
+    from src.services.pipeline_helpers import group_enabled_sources_by_cron
 
-    groups = _group_enabled_sources_by_cron([
+    groups = group_enabled_sources_by_cron([
         _source("rss_a", cron="0 8 * * *"),
         _source("rss_b", cron="0 8 * * *"),
         _source("rss_c", cron="0 9 * * *"),
@@ -46,14 +46,14 @@ def test_group_sources_by_cron_skips_disabled_and_groups_same_cron():
 
 
 def test_group_enabled_sources_keeps_only_schedulable_registry_statuses():
-    from src.main import _group_enabled_sources_by_cron
+    from src.services.pipeline_helpers import group_enabled_sources_by_cron
 
     sources = [
         SourceConfig(id="active", name="Active", type="rss", enabled=True, priority=1, cron="0 1 * * *", max_items=10, config={}),
         SourceConfig(id="trial", name="Trial", type="rss", enabled=True, priority=1, cron="0 1 * * *", max_items=10, config={}),
     ]
 
-    grouped = _group_enabled_sources_by_cron(sources)
+    grouped = group_enabled_sources_by_cron(sources)
     assert grouped == {"0 1 * * *": ["active", "trial"]}
 
 

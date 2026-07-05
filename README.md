@@ -44,7 +44,7 @@
 ```mermaid
 flowchart TD
     subgraph Scheduler["定时调度"]
-        A["APScheduler\ncron 触发"] --> B["skip_if_running\n防重叠"]
+        A["APScheduler\ncron 触发"] --> B["asyncio.Lock\n重叠任务排队"]
     end
 
     subgraph Collection["采集阶段"]
@@ -74,15 +74,14 @@ flowchart TD
 
     O --> P["静态站点上线"]
 
-    subgraph Maintenance["数据源健康维护（每周）"]
-        Q["每周一 09:00"] --> R["SourceHealthTracker\n检查并淘汰低质量源"]
-        Q --> S["SourceDiscovery\nGitHub Topic 扩展"]
-        Q --> T["SourceDiscovery\nRSS 友链扫描"]
-        R --> U{"approved率<30%<br/>连续3次?"}
-        U -->|是| V["SourceManager.remove\n自动删除数据源"]
-        U -->|否| W["跳过"]
-        S --> X["新 topic → 添加 github 源"]
-        T --> Y["新 RSS → 添加 rss 源"]
+    subgraph Maintenance["数据源治理维护（每周）"]
+        Q["每周维护"] --> R["SourceDiscovery\n发现候选源"]
+        Q --> S["SourceGovernance\n计算健康分"]
+        R --> T["candidate\n候选源"]
+        T --> U["trial\n小流量试跑"]
+        S --> V["active/degraded/quarantined\n状态流转"]
+        U -->|达标| W["active"]
+        U -->|不达标| X["rejected"]
     end
 ```
 
@@ -95,11 +94,11 @@ flowchart LR
     end
 
     subgraph WeeklyJob["周维护 Job"]
-        J1["淘汰检查"] --> J2{"连续3次\napproved率<30%?"}
-        J2 -->|是| J3["自动删除源"]
-        J2 -->|否| J4["保留"]
-        J5["GitHub Topic 发现"] --> J6["新 topic → 添加源"]
-        J7["RSS 友链扫描"] --> J8["新 RSS → 添加源"]
+        J1["健康评分"] --> J2{"治理状态迁移"}
+        J2 --> J3["active/degraded/quarantined/disabled"]
+        J4["候选发现"] --> J5["candidate"]
+        J5 --> J6["trial"]
+        J6 --> J7["active 或 rejected"]
     end
 
     subgraph Dashboard["仪表盘"]
@@ -110,8 +109,7 @@ flowchart LR
 
     H2 --> J1
     J3 --> D2
-    J6 --> D2
-    J8 --> D2
+    J7 --> D2
 ```
 
 ## 数据流程
@@ -119,7 +117,7 @@ flowchart LR
 ```mermaid
 flowchart TD
     subgraph Scheduler["定时调度"]
-        A["APScheduler\ncron 触发"] --> B["skip_if_running\n防重叠"]
+        A["APScheduler\ncron 触发"] --> B["asyncio.Lock\n重叠任务排队"]
     end
 
     subgraph Collection["采集阶段"]
@@ -185,11 +183,13 @@ ai-knowledge-base/
 │   └── agents.yaml            #   SubAgent 绑定 (primary/fallback model, params)
 │
 ├── prompts/                    # Agent Prompt 模板
-│   ├── github.md / rss.md / feishu.md / arxiv.md
-│   └── reviewer.md            #   四维评分锚点 + retry 格式
+│   ├── github_analyzer.md / rss_analyzer.md / feishu_analyzer.md / arxiv_analyzer.md
+│   ├── reviewer.md            #   文章四维评分锚点 + retry 格式
+│   ├── github_reviewer.md     #   GitHub repo-aware 审核
+│   └── deep_report.md         #   GitHub 源码级深度报告
 │
 ├── src/
-│   ├── main.py                # FastAPI 入口 + APScheduler
+│   ├── main.py                # FastAPI 入口 + APScheduler + pipeline 排队锁
 │   │
 │   ├── core/                  # 基础设施
 │   │   ├── config.py          #   YAML → Pydantic 配置
@@ -210,19 +210,22 @@ ai-knowledge-base/
 │   │   └── analyzers/         #   4 个 Analyzer 节点
 │   │
 │   ├── db/                    # 数据访问层
-│   │   ├── database.py        #   SQLite 连接 + migration
-│   │   ├── articles.py        #   文章 CRUD + FTS5 搜索
-│   │   ├── tags.py           #   标签 CRUD
-│   │   ├── queries.py         #   仪表盘聚合
-│   │   └── migrations/        #   版本化 SQL (001-004)
+│   │   ├── operations.py      #   兼容入口 + 统计/备份/source health/GitHub 快照查询
+│   │   ├── articles.py        #   文章保存、标签、查重、搜索和详情
+│   │   ├── pipeline_ops.py    #   pipeline run/event/source run/collection item 写入
+│   │   ├── costs.py           #   LLM 成本记录和当日花费对账
+│   │   ├── deep_report_ops.py #   Deep Reports CRUD 和公开版本切换
+│   │   ├── common.py          #   DB 子模块共享的小工具
+│   │   └── migrations/        #   版本化 SQL
 │   │
 │   ├── api/                   # FastAPI 路由
-│   │   ├── health.py          #   /api/health
-│   │   ├── search.py          #   /api/search
-│   │   ├── article.py         #   /api/articles/{id}
-│   │   ├── cost.py           #   /api/cost
-│   │   ├── pipeline.py        #   /api/pipeline
-│   │   └── sources.py         #   /api/sources (数据源健康)
+│   │   ├── responses.py       #   统一响应信封 + 错误码
+│   │   ├── routes.py          #   文章/搜索/基础统计/pipeline/health
+│   │   ├── stats.py           #   仪表盘统计接口
+│   │   ├── dashboard.py       #   首屏 KPI 聚合
+│   │   ├── sources.py         #   数据源管理与健康统计
+│   │   ├── deep_reports.py    #   Deep Reports 公开接口
+│   │   └── config.py          #   配置查看接口
 │   │
 │   ├── scheduler/             # 定时任务
 │   │   └── source_scheduler.py #   每周数据源健康维护 Job
@@ -283,7 +286,7 @@ ai-knowledge-base/
 每次采集产生一条 pipeline_runs 记录
     └── cost_logs: 每次 LLM 调用产生一条记录（记录 ref_url 用于追踪来源）
     └── articles: 入库时产生记录，status = approved/retry/discarded，extra_data 存储四维评分
-    └── source_health: 每周一 09:00 汇总上周数据源表现
+    └── source_health / source_health_daily: 记录 source 级健康和每日治理评分
 ```
 
 ### sources.yaml 配置结构
@@ -517,12 +520,13 @@ docker compose restart pipeline
 **手动添加**：编辑 `config/sources.yaml`
 
 **自动发现（每周维护）**：
-1. **GitHub Topic 扩展** — 扫描 Trending 仓库的新 topic，自动添加为 github 类型数据源
-2. **RSS 友链扫描** — 解析已配置 RSS 源的 HTML 首页，发现新的 RSS 链接并自动添加
+1. **GitHub / RSS 候选发现** — 从 GitHub 搜索、Trending topic、RSS 邻居和已通过文章反推候选源
+2. **候选试跑** — 候选源先进入 `candidate`，再转 `trial` 小流量试跑，不直接上线为正式源
 
-**自动淘汰**：
-- 连续 3 次采集 approved 率 < 30% 的数据源会自动删除
-- 新添加的数据源有保护期（前 3 次采集不计入淘汰计算）
+**自动治理**：
+- 数据源按健康分在 `active/degraded/quarantined/disabled` 等状态间流转
+- `trial` 源最近健康记录达标后转 `active`，否则转 `rejected`
+- 预算阻断单独记录为 `budget_blocked`，不降低数据源质量分
 
 ## API 接口
 
@@ -798,7 +802,7 @@ curl -X POST http://localhost:8000/api/pipeline/build
 
 ## 相关文档
 
-- [架构设计](docs/architecture.md) — LangGraph DAG、数据流、LLM 管理
+- [架构设计](docs/analysis/architecture/architecture.md) — LangGraph DAG、数据流、LLM 管理
 - [目录结构](docs/structure.md) — 代码组织规范、核心约定
 - [运维手册](docs/operations.md) — 部署、备份、应急处理
 - [数据模型](docs/data-model.md) — 数据库 Schema、配置文件

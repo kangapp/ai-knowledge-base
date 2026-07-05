@@ -876,7 +876,7 @@ async def test_main_pipeline_passes_retry_article_id_to_deep_report_stage(tmp_pa
     monkeypatch.setattr(main, "batch_save_github_snapshots", AsyncMock())
     monkeypatch.setattr(main, "backup_database", fake_backup_database)
     monkeypatch.setattr(main, "run_deep_report_stage", fake_stage)
-    monkeypatch.setattr(main, "_prepare_retry_review_items", lambda *_args, **_kwargs: [])
+    monkeypatch.setattr(main, "prepare_retry_review_items", lambda *_args, **_kwargs: [])
 
     try:
         await main.run_pipeline(trigger="manual")

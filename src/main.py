@@ -21,7 +21,7 @@ from .core.source_registry import (
 )
 from .core.time import BEIJING_TZ, now_bj_iso, run_id_bj
 from .graph.pipeline import build_pipeline, record_phase_start, record_phase_end, set_pipeline_db, reset_analyzer_counter
-from .graph.state import PipelineState, ReviewedItem
+from .graph.state import PipelineState
 from .graph.collector import collect_all
 from .graph.reviewer import reviewer_node
 from .api.routes import router, set_db, set_run_pipeline, set_builder
@@ -39,6 +39,18 @@ from .db.operations import (
     batch_save_github_snapshots, get_trending_repo_urls,
     record_collection_item, upsert_pipeline_source_run,
     record_pipeline_event, get_today_llm_spend,
+)
+from .services.pipeline_helpers import (
+    apply_github_velocity_filter,
+    build_cost_source_map,
+    build_pipeline_source_summaries,
+    group_enabled_sources_by_cron,
+    merge_retry_review_result,
+    prepare_retry_review_items,
+    source_filter_count,
+    source_filter_label,
+    source_identity,
+    summarize_item_costs,
 )
 from .site.builder import SiteBuilder, DebouncedBuilder
 
@@ -159,43 +171,8 @@ async def _record_skipped_phases(
         await record_phase_end(db, run_id, phase, "skipped", reason)
 
 
-def _filter_sources(sources, source_filter: str | list[str] | tuple[str, ...] | set[str] | None):
-    if source_filter is None:
-        return sources
-    if isinstance(source_filter, str):
-        source_ids = {source_filter}
-    else:
-        source_ids = set(source_filter)
-    return [source for source in sources if source.id in source_ids]
-
-
-def _group_enabled_sources_by_cron(sources) -> dict[str, list[str]]:
-    groups: dict[str, list[str]] = {}
-    for source in sources:
-        if not source.enabled:
-            continue
-        groups.setdefault(source.cron, []).append(source.id)
-    return groups
-
-
-def _source_filter_label(source_filter) -> str:
-    if source_filter is None:
-        return "all"
-    if isinstance(source_filter, str):
-        return source_filter
-    return ",".join(source_filter)
-
-
-def _source_filter_count(source_filter) -> int | None:
-    if source_filter is None:
-        return None
-    if isinstance(source_filter, str):
-        return 1
-    return len(source_filter)
-
-
 def _register_source_jobs(scheduler: AsyncIOScheduler, sources, run_pipeline_cb):
-    for index, (cron, source_ids) in enumerate(_group_enabled_sources_by_cron(sources).items(), start=1):
+    for index, (cron, source_ids) in enumerate(group_enabled_sources_by_cron(sources).items(), start=1):
         parts = cron.strip().split()
         scheduler.add_job(
             partial(run_pipeline_cb, source_filter=source_ids),
@@ -224,193 +201,16 @@ async def _wait_for_pipeline_slot(source_filter) -> asyncio.Lock:
     if _pipeline_lock.locked():
         logger.info("pipeline.queued", extra={
             "reason": "previous run still in progress",
-            "source_filter": _source_filter_label(source_filter),
-            "source_count": _source_filter_count(source_filter),
+            "source_filter": source_filter_label(source_filter),
+            "source_count": source_filter_count(source_filter),
         })
     await _pipeline_lock.acquire()
     return _pipeline_lock
 
 
-def _apply_github_velocity_filter(raw_items: list, source, trending_urls: set[str]) -> list:
-    return [
-        item for item in raw_items
-        if item.source != "github"
-        or item.raw_metadata.get("source_id") != source.id
-        or item.url in trending_urls
-    ]
-
-
-def _build_cost_source_map(items: list) -> dict[str, tuple[str, str, str]]:
-    source_map = {}
-    for item in items:
-        source_id = item.raw_metadata.get("source_id") or item.source_detail or item.source
-        source_map[item.url] = (item.source, item.source_detail, source_id)
-    return source_map
-
-
-def _summarize_item_costs(cost_records: list) -> dict[str, tuple[float, int]]:
-    summary: dict[str, tuple[float, int]] = {}
-    for record in cost_records:
-        if not record.ref_url:
-            continue
-        cost, tokens = summary.get(record.ref_url, (0.0, 0))
-        summary[record.ref_url] = (
-            round(cost + record.cost, 10),
-            tokens + record.tokens_in + record.tokens_out,
-        )
-    return summary
-
-
-def _source_identity(item) -> tuple[str, str, str]:
-    source_id = item.raw_metadata.get("source_id") or item.source_detail or item.source
-    return source_id, item.source, item.source_detail
-
-
-def _build_pipeline_source_summaries(
-    *,
-    run_id: str,
-    raw_items: list,
-    new_items: list,
-    analyzed_items: list,
-    reviewed_items: list,
-    cost_records: list,
-    inserted_urls: set[str],
-    failed_counts: dict[str, int] | None = None,
-    active_sources: list | None = None,
-) -> list[dict]:
-    summaries: dict[str, dict] = {}
-
-    def ensure(source_id: str, source: str, source_detail: str) -> dict:
-        if source_id not in summaries:
-            summaries[source_id] = {
-                "run_id": run_id,
-                "source_id": source_id,
-                "source": source,
-                "source_detail": source_detail,
-                "collected": 0,
-                "new_items": 0,
-                "dedup_skipped": 0,
-                "analyzed": 0,
-                "analysis_failed": 0,
-                "approved": 0,
-                "retry": 0,
-                "discarded": 0,
-                "inserted": 0,
-                "failed": 0,
-                "cost": 0.0,
-                "tokens": 0,
-                "filtered_items": 0,
-                "request_success_rate": 0,
-                "insert_rate": 0,
-            }
-        return summaries[source_id]
-
-    for source in active_sources or []:
-        ensure(source.id, source.type, source.name)
-
-    url_to_source: dict[str, tuple[str, str, str]] = {}
-    for item in raw_items:
-        source_id, source, source_detail = _source_identity(item)
-        url_to_source[item.url] = (source_id, source, source_detail)
-        ensure(source_id, source, source_detail)["collected"] += 1
-
-    new_urls = {item.url for item in new_items}
-    for item in new_items:
-        source_id, source, source_detail = _source_identity(item)
-        ensure(source_id, source, source_detail)["new_items"] += 1
-
-    for item in raw_items:
-        if item.url not in new_urls:
-            source_id, source, source_detail = _source_identity(item)
-            ensure(source_id, source, source_detail)["dedup_skipped"] += 1
-
-    for item in analyzed_items:
-        mapping = url_to_source.get(item.ref_url)
-        if mapping:
-            ensure(*mapping)["analyzed"] += 1
-
-    for item in new_items:
-        if item.url not in {analyzed.ref_url for analyzed in analyzed_items}:
-            source_id, source, source_detail = _source_identity(item)
-            ensure(source_id, source, source_detail)["analysis_failed"] += 1
-
-    for reviewed in reviewed_items:
-        mapping = url_to_source.get(reviewed.ref_url)
-        if not mapping:
-            continue
-        summary = ensure(*mapping)
-        if reviewed.verdict == "approved":
-            summary["approved"] += 1
-        elif reviewed.verdict == "retry":
-            summary["retry"] += 1
-        else:
-            summary["discarded"] += 1
-
-    for url in inserted_urls:
-        mapping = url_to_source.get(url)
-        if mapping:
-            ensure(*mapping)["inserted"] += 1
-
-    for record in cost_records:
-        source_id = record.source_id
-        source = record.source
-        source_detail = record.source_detail
-        if not source_id and record.ref_url in url_to_source:
-            source_id, source, source_detail = url_to_source[record.ref_url]
-        if not source_id:
-            continue
-        summary = ensure(source_id, source or source_id, source_detail or "")
-        summary["cost"] = round(summary["cost"] + record.cost, 10)
-        summary["tokens"] += record.tokens_in + record.tokens_out
-
-    for source_id, count in (failed_counts or {}).items():
-        summary = ensure(source_id, source_id, "")
-        summary["failed"] += count
-
-    for summary in summaries.values():
-        summary["filtered_items"] = summary["retry"] + summary["discarded"]
-        attempts = summary["collected"] + summary["failed"]
-        summary["request_success_rate"] = round(summary["collected"] / attempts, 3) if attempts else 0
-        summary["insert_rate"] = round(summary["inserted"] / summary["new_items"], 3) if summary["new_items"] else 0
-
-    return list(summaries.values())
-
-
-def _prepare_retry_review_items(
-    retry_reviewed: list[ReviewedItem],
-    analyzed_items: list,
-    raw_items: list,
-) -> list:
-    retry_items = []
-    raw_urls = {item.url for item in raw_items}
-    for reviewed in retry_reviewed:
-        if reviewed.ref_url not in raw_urls:
-            continue
-        matched = next((item for item in analyzed_items if item.ref_url == reviewed.ref_url), None)
-        if matched and matched.retry_count < 2:
-            matched.retry_count += 1
-            retry_items.append(matched)
-    return retry_items
-
-
-def _merge_retry_review_result(
-    all_reviewed: list[ReviewedItem],
-    all_costs: list,
-    retry_result: dict,
-) -> list[ReviewedItem]:
-    existing_urls = {item.ref_url for item in all_reviewed}
-    for item in retry_result.get("reviewed_items", []):
-        if item.ref_url in existing_urls:
-            all_reviewed = [current for current in all_reviewed if current.ref_url != item.ref_url]
-        all_reviewed.append(item)
-        existing_urls.add(item.ref_url)
-    all_costs.extend(retry_result.get("cost_records", []))
-    return all_reviewed
-
-
 async def _record_collected_items(db, run_id: str, items: list, status: str, reason: str):
     for item in items:
-        source_id, source, source_detail = _source_identity(item)
+        source_id, source, source_detail = source_identity(item)
         await record_collection_item(
             db,
             run_id=run_id,
@@ -443,7 +243,7 @@ async def _record_source_summaries(
         source_id = error.get("source")
         if source_id:
             failed_counts[source_id] = failed_counts.get(source_id, 0) + 1
-    summaries = _build_pipeline_source_summaries(
+    summaries = build_pipeline_source_summaries(
         run_id=run_id,
         raw_items=raw_items,
         new_items=new_items,
@@ -504,7 +304,7 @@ async def run_pipeline(trigger: str = "cron", source_filter: str | list[str] | t
         logger.info("pipeline.start", extra={
             "run_id": run_id,
             "trigger": trigger,
-            "source_filter": _source_filter_label(source_filter),
+            "source_filter": source_filter_label(source_filter),
             "source_count": len(active_sources),
             "sources": [source.id for source in active_sources],
         })
@@ -547,7 +347,7 @@ async def run_pipeline(trigger: str = "cron", source_filter: str | list[str] | t
             if src.type == "github" and src.config.get("trend_mode"):
                 min_vel = src.config.get("trend_velocity_threshold", 5)
                 trending = await get_trending_repo_urls(_db, min_vel, days=7)
-                raw_items = _apply_github_velocity_filter(raw_items, src, trending)
+                raw_items = apply_github_velocity_filter(raw_items, src, trending)
 
         if not raw_items and error_log:
             await _record_source_summaries(
@@ -578,7 +378,7 @@ async def run_pipeline(trigger: str = "cron", source_filter: str | list[str] | t
         skipped_items = [item for item in raw_items if item.url in existing]
         await _record_collected_items(_db, run_id, skipped_items, "dedup_skipped", "url_exists")
         for item in skipped_items:
-            source_id, source, source_detail = _source_identity(item)
+            source_id, source, source_detail = source_identity(item)
             await record_pipeline_event(
                 _db,
                 run_id=run_id,
@@ -644,7 +444,7 @@ async def run_pipeline(trigger: str = "cron", source_filter: str | list[str] | t
             if not retry_reviewed:
                 break
 
-            retry_analyzed_items = _prepare_retry_review_items(retry_reviewed, all_analyzed, new_items)
+            retry_analyzed_items = prepare_retry_review_items(retry_reviewed, all_analyzed, new_items)
             if not retry_analyzed_items:
                 break
 
@@ -704,7 +504,7 @@ async def run_pipeline(trigger: str = "cron", source_filter: str | list[str] | t
             )
 
             # 合并结果（同一 ref_url 的 reviewed_item 用最新一轮的覆盖）
-            all_reviewed = _merge_retry_review_result(all_reviewed, all_costs, retry_result)
+            all_reviewed = merge_retry_review_result(all_reviewed, all_costs, retry_result)
 
         logger.info("pipeline.graph_done", extra={
             "analyzed": len(all_analyzed),
@@ -719,8 +519,8 @@ async def run_pipeline(trigger: str = "cron", source_filter: str | list[str] | t
         discarded_count = 0
         inserted_urls: set[str] = set()
         article_ids: dict[str, int] = {}
-        cost_source_map = _build_cost_source_map(new_items)
-        item_costs = _summarize_item_costs(all_costs)
+        cost_source_map = build_cost_source_map(new_items)
+        item_costs = summarize_item_costs(all_costs)
 
         for reviewed in all_reviewed:
             raw = next((r for r in new_items if r.url == reviewed.ref_url), None)
@@ -730,7 +530,7 @@ async def run_pipeline(trigger: str = "cron", source_filter: str | list[str] | t
 
             if reviewed.verdict == "approved":
                 analysis_cost, analysis_tokens = item_costs.get(reviewed.ref_url, (0.0, 0))
-                source_id, source, source_detail = _source_identity(raw)
+                source_id, source, source_detail = source_identity(raw)
                 if source_id in trial_source_ids:
                     await record_collection_item(
                         _db,
@@ -808,7 +608,7 @@ async def run_pipeline(trigger: str = "cron", source_filter: str | list[str] | t
                 passed_count += 1
             elif reviewed.verdict == "retry":
                 if analyzed.retry_count >= 2:
-                    source_id, source, source_detail = _source_identity(raw)
+                    source_id, source, source_detail = source_identity(raw)
                     await record_pipeline_event(
                         _db,
                         run_id=run_id,
@@ -827,7 +627,7 @@ async def run_pipeline(trigger: str = "cron", source_filter: str | list[str] | t
                     discarded_count += 1
                 else:
                     analysis_cost, analysis_tokens = item_costs.get(reviewed.ref_url, (0.0, 0))
-                    source_id, source, source_detail = _source_identity(raw)
+                    source_id, source, source_detail = source_identity(raw)
                     if source_id not in trial_source_ids:
                         article_id = await save_article(_db, raw, analyzed, reviewed, analysis_cost, analysis_tokens)
                         if article_id:
@@ -863,7 +663,7 @@ async def run_pipeline(trigger: str = "cron", source_filter: str | list[str] | t
                     )
                     retry_count += 1
             else:  # discarded
-                source_id, source, source_detail = _source_identity(raw)
+                source_id, source, source_detail = source_identity(raw)
                 await record_collection_item(
                     _db,
                     run_id=run_id,
@@ -907,7 +707,7 @@ async def run_pipeline(trigger: str = "cron", source_filter: str | list[str] | t
         for item in new_items:
             if item.url in analyzed_urls:
                 continue
-            source_id, source, source_detail = _source_identity(item)
+            source_id, source, source_detail = source_identity(item)
             failure = failure_by_url.get(item.url)
             await record_collection_item(
                 _db,

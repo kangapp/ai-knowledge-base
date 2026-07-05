@@ -1,3 +1,4 @@
+import asyncio
 import logging
 import time
 from pathlib import Path
@@ -41,6 +42,22 @@ def parse_and_validate(raw: str, ref_url: str = "", source_item: RawItem | None 
     return AnalyzedItem.model_validate(data)
 
 
+def _positive_int(value, default: int) -> int:
+    try:
+        parsed = int(value)
+    except (TypeError, ValueError):
+        return default
+    return max(1, parsed)
+
+
+def _configured_concurrency(registry: LLMRegistry, agent_name: str) -> int:
+    params = getattr(registry, "params", None)
+    if not isinstance(params, dict):
+        agent = getattr(registry, "_agents", {}).get(agent_name)
+        params = getattr(agent, "params", {}) if agent else {}
+    return _positive_int(params.get("concurrency"), 1)
+
+
 async def analyze_items(
     items: list[RawItem], agent_name: str, registry: LLMRegistry,
     prompt_template: str, system_prompt: str = ""
@@ -50,13 +67,17 @@ async def analyze_items(
 
     results = []
     costs = []
+    concurrency = _configured_concurrency(registry, agent_name)
+    semaphore = asyncio.Semaphore(concurrency)
 
-    for item in items:
+    async def analyze_one(index: int, item: RawItem):
+        item_results = []
+        item_costs = []
         try:
             client, provider, model_id, params = registry.get_client(agent_name)
         except Exception as e:
             logger.warning("analyzer.get_client_failed", extra={"agent": agent_name, "url": item.url, "error": str(e)})
-            costs.append(CostRecord(
+            item_costs.append(CostRecord(
                 agent=agent_name,
                 provider="",
                 model="",
@@ -76,7 +97,7 @@ async def analyze_items(
                 prompt_name=agent_name,
                 prompt_version="current",
             ))
-            continue
+            return index, item_results, item_costs
 
         user_prompt = prompt_template.format(
             title=item.title, description=item.description,
@@ -84,108 +105,119 @@ async def analyze_items(
             schema=ANALYZED_SCHEMA_DESC,
         )
 
-        for attempt in range(2):
-            content = ""
-            cost_record = None
-            started = time.perf_counter()
-            try:
-                kwargs = dict(
-                    model=model_id,
-                    messages=[
-                        {"role": "system", "content": system_prompt or f"你是一个技术分析助手。只输出 JSON，格式：{ANALYZED_SCHEMA_DESC}"},
-                        {"role": "user", "content": user_prompt},
-                    ],
-                    temperature=params.get("temperature", 0.3),
-                    max_tokens=params.get("max_tokens", 2048),
-                )
-                # 仅 provider 支持 JSON mode 时才传 response_format
-                if registry.supports_json_mode(provider):
-                    kwargs["response_format"] = {"type": "json_object"}
-                extra_body = registry.extra_body_for(provider, model_id)
-                if extra_body:
-                    kwargs["extra_body"] = extra_body
-
-                response = await client.chat.completions.create(**kwargs)
-                latency_ms = int((time.perf_counter() - started) * 1000)
-                content = response.choices[0].message.content or "{}"
-
-                # 立即提取 tokens 并计算 cost，无论 parse 是否成功都记录
-                tokens_in = response.usage.prompt_tokens if response.usage else 0
-                tokens_out = response.usage.completion_tokens if response.usage else 0
-                cost = registry.calc_cost(provider, model_id, tokens_in, tokens_out)
-
-                # 先更新熔断统计（无论 parse 是否成功）
-                registry.budget.add_cost(provider, cost)
-                registry.health.record_success(provider, 0)
-
-                cost_record = CostRecord(
-                    agent=agent_name,
-                    provider=provider,
-                    model=model_id,
-                    tokens_in=tokens_in,
-                    tokens_out=tokens_out,
-                    cost=cost,
-                    ref_url=item.url,
-                    source=item.source,
-                    source_detail=item.source_detail,
-                    source_id=item.raw_metadata.get("source_id", item.source_detail or item.source),
-                    status="success",
-                    latency_ms=latency_ms,
-                    attempt_no=attempt + 1,
-                    prompt_name=agent_name,
-                    prompt_version="current",
-                )
-
-                # 再 parse，parse 失败会抛出异常
+        async with semaphore:
+            for attempt in range(2):
+                content = ""
+                cost_record = None
+                started = time.perf_counter()
                 try:
-                    analyzed = parse_and_validate(content, ref_url=item.url, source_item=item)
-                except Exception as parse_error:
-                    cost_record.status = "parse_failed"
-                    cost_record.error = str(parse_error)
-                    costs.append(cost_record)
-                    raise
+                    kwargs = dict(
+                        model=model_id,
+                        messages=[
+                            {"role": "system", "content": system_prompt or f"你是一个技术分析助手。只输出 JSON，格式：{ANALYZED_SCHEMA_DESC}"},
+                            {"role": "user", "content": user_prompt},
+                        ],
+                        temperature=params.get("temperature", 0.3),
+                        max_tokens=params.get("max_tokens", 2048),
+                    )
+                    # 仅 provider 支持 JSON mode 时才传 response_format
+                    if registry.supports_json_mode(provider):
+                        kwargs["response_format"] = {"type": "json_object"}
+                    extra_body = registry.extra_body_for(provider, model_id)
+                    if extra_body:
+                        kwargs["extra_body"] = extra_body
 
-                costs.append(cost_record)
+                    response = await client.chat.completions.create(**kwargs)
+                    latency_ms = int((time.perf_counter() - started) * 1000)
+                    content = response.choices[0].message.content or "{}"
 
-                # parse 成功后记录分析结果并 break；费用已按真实 LLM 调用记录
-                results.append(analyzed)
-                logger.debug("analyzer.item", extra={
-                    "agent": agent_name,
-                    "url": item.url,
-                    "input_prompt": user_prompt,
-                    "raw_output": content,
-                })
-                break
+                    # 立即提取 tokens 并计算 cost，无论 parse 是否成功都记录
+                    tokens_in = response.usage.prompt_tokens if response.usage else 0
+                    tokens_out = response.usage.completion_tokens if response.usage else 0
+                    cost = registry.calc_cost(provider, model_id, tokens_in, tokens_out)
 
-            except Exception as e:
-                if cost_record is None:
-                    costs.append(CostRecord(
+                    # 先更新熔断统计（无论 parse 是否成功）
+                    registry.budget.add_cost(provider, cost)
+                    registry.health.record_success(provider, 0)
+
+                    cost_record = CostRecord(
                         agent=agent_name,
                         provider=provider,
                         model=model_id,
-                        tokens_in=0,
-                        tokens_out=0,
-                        cost=0.0,
+                        tokens_in=tokens_in,
+                        tokens_out=tokens_out,
+                        cost=cost,
                         ref_url=item.url,
                         source=item.source,
                         source_detail=item.source_detail,
                         source_id=item.raw_metadata.get("source_id", item.source_detail or item.source),
-                        status="request_failed",
-                        error=str(e),
-                        latency_ms=int((time.perf_counter() - started) * 1000),
+                        status="success",
+                        latency_ms=latency_ms,
                         attempt_no=attempt + 1,
                         prompt_name=agent_name,
                         prompt_version="current",
-                    ))
-                # parse 失败，仍需记录熔断统计（cost 已在上方 try 块记录）
-                if cost_record is None:
-                    registry.health.record_failure(provider, str(e))
-                if attempt == 1:
-                    logger.warning("analyzer.parse_failed", extra={
-                        "agent": agent_name, "url": item.url, "error": str(e),
-                        "input_prompt": user_prompt, "raw_output": content,
+                    )
+
+                    # 再 parse，parse 失败会抛出异常
+                    try:
+                        analyzed = parse_and_validate(content, ref_url=item.url, source_item=item)
+                    except (ValueError, TypeError) as parse_error:
+                        cost_record.status = "parse_failed"
+                        cost_record.error = str(parse_error)
+                        item_costs.append(cost_record)
+                        raise
+
+                    item_costs.append(cost_record)
+
+                    # parse 成功后记录分析结果并 break；费用已按真实 LLM 调用记录
+                    item_results.append(analyzed)
+                    logger.debug("analyzer.item", extra={
+                        "agent": agent_name,
+                        "url": item.url,
+                        "input_prompt": user_prompt,
+                        "raw_output": content,
                     })
-                    continue  # 继续处理下一个 item，而不是 raise
+                    break
+
+                except Exception as e:
+                    if cost_record is None:
+                        item_costs.append(CostRecord(
+                            agent=agent_name,
+                            provider=provider,
+                            model=model_id,
+                            tokens_in=0,
+                            tokens_out=0,
+                            cost=0.0,
+                            ref_url=item.url,
+                            source=item.source,
+                            source_detail=item.source_detail,
+                            source_id=item.raw_metadata.get("source_id", item.source_detail or item.source),
+                            status="request_failed",
+                            error=str(e),
+                            latency_ms=int((time.perf_counter() - started) * 1000),
+                            attempt_no=attempt + 1,
+                            prompt_name=agent_name,
+                            prompt_version="current",
+                        ))
+                    # parse 失败，仍需记录熔断统计（cost 已在上方 try 块记录）
+                    if cost_record is None:
+                        registry.health.record_failure(provider, str(e))
+                    if attempt == 1:
+                        logger.warning("analyzer.parse_failed", extra={
+                            "agent": agent_name, "url": item.url, "error": str(e),
+                            "input_prompt": user_prompt, "raw_output": content,
+                        })
+                        continue  # 继续处理下一个 item，而不是 raise
+
+        return index, item_results, item_costs
+
+    task_results = await asyncio.gather(*[
+        analyze_one(index, item)
+        for index, item in enumerate(items)
+    ])
+    for _, item_results, item_costs in sorted(task_results, key=lambda item: item[0]):
+        results.extend(item_results)
+        costs.extend(item_costs)
 
     total_costs = sum(cost.cost for cost in costs) if costs else 0
     total_tokens_in = sum(cost.tokens_in for cost in costs) if costs else 0

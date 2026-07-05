@@ -1,6 +1,6 @@
 from src.core.config import SourceConfig
 from src.graph.state import RawItem
-from src.main import _apply_github_velocity_filter
+from src.services.pipeline_helpers import apply_github_velocity_filter
 
 
 def make_item(url: str, source_id: str) -> RawItem:
@@ -32,7 +32,7 @@ def test_velocity_filter_only_filters_matching_source_id():
     velocity_drop = make_item("https://github.com/org/slow", "github_trending_velocity")
     rss = RawItem(url="https://example.com/rss", title="rss", source="rss", collected_at="")
 
-    items = _apply_github_velocity_filter(
+    items = apply_github_velocity_filter(
         [regular, velocity_keep, velocity_drop, rss],
         make_source("github_trending_velocity"),
         {"https://github.com/org/fast"},

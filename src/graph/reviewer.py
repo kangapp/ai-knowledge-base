@@ -81,7 +81,7 @@ def _load_reviewer_prompt(registry: LLMRegistry) -> str:
     try:
         path = Path(registry.get_prompt_path("reviewer"))
         return path.read_text(encoding="utf-8")
-    except Exception:
+    except OSError:
         return """你是内容审核员。对文章按四维评分（0-100）:
 - AI相关度(0-40): 核心AI/LLM/Agent/MCP/RAG=35-40, AI基础设施=25-34, 泛技术提及=10-24, 无关=0-9
 - 内容深度(0-30): 深度原创=25-30, 有细节=15-24, 简要=5-14, 空内容=0-4
@@ -98,7 +98,7 @@ def _load_reviewer_prompt_for_item(registry: LLMRegistry, item: AnalyzedItem) ->
         return _load_reviewer_prompt(registry)
     try:
         return Path("prompts/github_reviewer.md").read_text(encoding="utf-8")
-    except Exception:
+    except OSError:
         return GITHUB_REVIEWER_FALLBACK_PROMPT
 
 
@@ -272,7 +272,7 @@ async def _review_one_item(
 
                 try:
                     reviewed = parse_reviewer_output(content, review_kind=kind)
-                except Exception as parse_error:
+                except (ValueError, TypeError) as parse_error:
                     cost_record.status = "parse_failed"
                     cost_record.error = str(parse_error)
                     cost_records.append(cost_record)

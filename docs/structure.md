@@ -58,7 +58,12 @@ ai-knowledge-base/
 │   │   └── rebuild.py      #   V1 批量重建、公开版本切换和失败重试 CLI
 │   │
 │   ├── db/                 # 数据访问层
-│   │   ├── operations.py   #   文章/标签/成本/pipeline/统计 SQL 操作
+│   │   ├── operations.py   #   兼容入口 + 统计/备份/source health/GitHub 快照查询
+│   │   ├── articles.py     #   文章保存、标签、查重、搜索和详情
+│   │   ├── pipeline_ops.py #   pipeline run/event/source run/collection item 写入
+│   │   ├── costs.py        #   LLM 成本记录和当日花费对账
+│   │   ├── deep_report_ops.py # Deep Reports CRUD 和公开版本切换
+│   │   ├── common.py       #   DB 子模块共享的小工具
 │   │   └── migrations/     #   版本化 SQL 文件（001_init.sql, 002_xxx.sql, ...）
 │   │
 │   ├── api/                # FastAPI 路由
@@ -71,7 +76,8 @@ ai-knowledge-base/
 │   │   └── config.py       #   /api/config/{llm|sources|agents}
 │   │
 │   ├── services/           # API-facing 服务层
-│   │   └── dashboard_stats.py # 仪表盘 summary/enhanced 统计口径
+│   │   ├── dashboard_stats.py # 仪表盘 summary/enhanced 统计口径
+│   │   └── pipeline_helpers.py # Pipeline 纯辅助函数
 │   │
 │   └── site/               # 静态站点生成
 │       ├── builder.py      #   去抖合并（5min 计时器）+ output.tmp 原子 rename
@@ -86,6 +92,11 @@ ai-knowledge-base/
 │
 ├── data/                   # SQLite + backup/ (volume mount)
 ├── output/                 # 静态站点产物 (volume mount, Caddy serve)
+├── docs/analysis/          # 架构、流程图和技术分析项目
+│   └── architecture/       # 应用架构分析项目
+│       ├── architecture.md # 应用架构、DAG、数据流、LLM 管理
+│       ├── architecture-diagram.md # Mermaid 架构图
+│       └── index.html      # 交互式技术原理图
 ├── docs/task.md            # 当前任务拆解、优先级和状态
 ├── docs/codemap.md         # 模块职责和常见改动入口
 └── tests/                  # pytest 分层

@@ -14,7 +14,7 @@ APScheduler 北京时间 cron 分组触发 (同 cron 源合并为一个 pipeline
        ▼
    Router ─── 100% 规则匹配 (按 RawItem.source 字段分流)
        │
-       ├──► analyzers/github    (Send fan-out)
+       ├──► analyzers/github    (Send fan-out，base.analyze_items 按 Agent concurrency 有限并发)
        ├──► analyzers/rss       (RSS + hotlist + HN, 并行执行, 空数据跳过)
        ├──► analyzers/feishu    (共享 base.analyze_items())
        └──► analyzers/arxiv     (自动打 1-3 个标签)
@@ -30,6 +30,7 @@ APScheduler 北京时间 cron 分组触发 (同 cron 源合并为一个 pipeline
        │
        ▼
   入库 SQLite ─── articles + tags (新标签自动收录) + cost_logs + pipeline_runs
+       │              └── DB 写入走 db/operations.py 兼容入口，内部拆分 articles/pipeline_ops/costs/deep_report_ops
        │
        ▼
   Deep Reports ─── Reviewer/入库后的图外后置阶段，最多选择 1 个高价值 GitHub repo
@@ -44,6 +45,8 @@ APScheduler 北京时间 cron 分组触发 (同 cron 源合并为一个 pipeline
 横切: pipeline_phase_logs 记录阶段耗时；pipeline_events 记录 source/item/LLM 调用/入库/构建细粒度事件；TrackedClient wrapper 负责每次 LLM 调用记账 + 熔断检查 + fallback
 ```
 
+数据源治理作为周/日维护闭环在主 pipeline 外运行：`SourceDiscovery` 只写候选源，`source_registry` 管理 candidate/trial/active/degraded/quarantined/rejected 等状态，trial 源小流量试跑后由 `SourceGovernance` 根据 `source_health_daily` 健康分自动上线或拒绝。预算阻断记录为 `budget_blocked`，不降低源质量分。
+
 ## 数据流与阶段模型
 
 三个核心 Pydantic 模型，通过 `ref_url` 关联（不继承，解耦采集和分析）：
@@ -55,6 +58,98 @@ APScheduler 北京时间 cron 分组触发 (同 cron 源合并为一个 pipeline
 | 评分 | **ReviewedItem** | ref_url, total_score, dimensions（普通文章：ai_relevance/content_depth/info_density/timeliness；GitHub repo：ai_relevance/developer_utility/project_signal/content_clarity）, verdict, retry_feedback | Reviewer |
 
 最终合并写入 articles 表：`raw.url/description/source` + `analyzed.title/summary/tags/language` + `reviewed.total_score/verdict/dimensions`。四维评分细节存入 `extra_data` JSON。ref_url 未匹配的数据自然丢弃，由 `pipeline_runs.summary` 记录。
+
+## 核心链路细化
+
+### Collector type / adapter 映射
+
+| source type | 采集适配器 | 输入来源 | RawItem 输出特征 |
+|-------------|------------|----------|------------------|
+| `github` | `collect_github(source, db)` | GitHub Search repositories API | `source=github`，`source_detail=owner/repo`，`raw_metadata` 写 stars/forks/watchers/language/topics/source_id |
+| `rss` | `collect_rss(source)` | RSS/Atom feed URL | `source=rss`，`source_detail=source.name`，`raw_metadata.feed/source_id` |
+| `hotlist` | `collect_hotlist(source)` | NewsNow hotlist API | `source=hotlist`，`raw_metadata.rank/platform_id/source_id`，执行 HTTPS 与 expected_domain 校验 |
+| `hn` | `collect_hn(source)` | Hacker News Algolia API | `source=hn`，`description` 写 points/comments，`raw_metadata.points/num_comments/source_id` |
+| `feishu` | `collect_feishu(source)` | 飞书 wiki space/page API | `source=feishu`，`source_detail=space_id`，`raw_metadata.node_id/space_id/source_id` |
+| `arxiv` | `collect_arxiv(source)` | arXiv export API | `source=arxiv`，`source_detail=category`，`raw_metadata.categories/source_id` |
+
+Collector 流程：
+
+```text
+SourceConfig[] → collect_all()
+  → COLLECTOR_MAP[source.type]
+  → collect_* 适配器并发执行
+  → RawItem[]
+  → URL 批量查重
+  → PipelineState.raw_items
+```
+
+示例 `RawItem`：
+
+```json
+{
+  "url": "https://github.com/example/agent-runtime",
+  "title": "agent-runtime",
+  "source": "github",
+  "source_detail": "example/agent-runtime",
+  "raw_metadata": {
+    "source_id": "github_ai_devtools",
+    "stars": 1240,
+    "language": "Python"
+  }
+}
+```
+
+### Router / Analyzer 映射
+
+| RawItem.source | routed key | Analyzer | 说明 |
+|----------------|------------|----------|------|
+| `github` | `routed_github` | `github_analyzer` | GitHub repo 专用 prompt，输出 `project_type` |
+| `rss` | `routed_rss` | `rss_analyzer` | 普通资讯 |
+| `hotlist` | `routed_rss` | `rss_analyzer` | 热榜条目按资讯处理，但入库保留 `source=hotlist` |
+| `hn` | `routed_rss` | `rss_analyzer` | HN story 按资讯处理，但入库保留 `source=hn` |
+| `feishu` | `routed_feishu` | `feishu_analyzer` | 内部知识库文档 |
+| `arxiv` | `routed_arxiv` | `arxiv_analyzer` | 论文条目 |
+
+LangGraph 图内流程：
+
+```text
+START
+  → router
+  → continue_to_analyzers()
+  → Send(github/rss/feishu/arxiv analyzer, state)
+  → aggregator
+  → reviewer
+  → END
+```
+
+LangGraph 图外流程：
+
+```text
+collector / dedupe / retry reviewer / persist / deep_reports / site_builder
+```
+
+示例 `PipelineState` 片段：
+
+```json
+{
+  "run_id": "run_20260705_093000",
+  "raw_items": [{"source": "github", "url": "https://github.com/example/agent-runtime"}],
+  "routed_github": [{"url": "https://github.com/example/agent-runtime"}],
+  "analyzed_items": [{"ref_url": "https://github.com/example/agent-runtime", "project_type": "coding_tool"}],
+  "reviewed_items": [{"ref_url": "https://github.com/example/agent-runtime", "total_score": 88, "verdict": "approved"}]
+}
+```
+
+### 失败路径
+
+| 失败点 | 记录位置 | 是否中断 | 恢复方式 |
+|--------|----------|----------|----------|
+| 单 source 采集超时 | `error_log`、`source_health.failed`、`collector.error` | 不影响其它 source | 下次 cron 自动重试 |
+| Analyzer 单 item 失败 | `pipeline_events`、`cost_logs.status=request_failed/parse_failed` | 不影响其它 item | fallback 或下次运行；parse_failed 调整 prompt |
+| 有新条目但 Analyzer 全失败 | `pipeline_runs.status=failed`、逐条 `pipeline_events` | 中断后置 Deep Reports 和 Site Builder | 修复 Provider/Prompt 后手动重跑 |
+| Reviewer retry | `ReviewedItem.retry_feedback`、`pipeline_events` | 不直接失败，最多重审 2 轮 | 根据 feedback 调整 prompt 或接受丢弃 |
+| Deep Reports 失败 | `deep_reports.status=failed`、`deep.failed` | 不影响主 pipeline completed | 单 repo 重试或重建 |
+| Site Builder 失败 | `build.failed` | 不影响数据 pipeline，旧站点保留 | 修复模板/权限后手动 build |
 
 Reviewer 结果和文章持久化完成后，`run_deep_report_stage()` 作为图外后置阶段运行。GitHub Analyzer 先按仓库主要交付物输出结构化 `project_type`；该阶段只从本轮 `approved`、Reviewer 总分至少 85、`ai_relevance` 至少 28、`developer_utility` 至少 24 且 `project_type=coding_tool` 的 GitHub 仓库中选择最多 1 个候选，并跳过 7 天内已有 completed 报告的仓库。论文、模型权重、数据集、benchmark、资源合集、通用 AI 基础设施和框架均通过结构化类型排除。候选分只用于合格项目之间排序，不再作为第二道准入门槛；stars 不参与候选评分。`deep.selector_skipped` 和 `deep.selector_done` 事件携带汇总诊断，可直接查看各拒绝原因数量。
 
@@ -88,6 +183,19 @@ Reviewer 结果和文章持久化完成后，`run_deep_report_stage()` 作为图
 
 ## 前端渲染策略
 
+展示链路：
+
+```text
+SQLite
+  → Site Builder 生成 output/
+  → Caddy serve 静态 HTML/CSS/JS/data.json/stats.json
+  → 浏览器加载页面外壳
+  → 页面 JS 按需请求 FastAPI /api/*
+  → DOM 渲染详情、搜索结果、DAG 状态和 Deep Reports
+```
+
+前端采用“静态首屏 + 动态详情”的口径：公开阅读所需的首页、仪表盘外壳、DAG 外壳和 Deep Reports 外壳由 Site Builder 生成；文章详情、搜索、运行状态和深度报告正文按需请求 FastAPI。
+
 | 页面 | 策略 | 数据来源 |
 |------|------|---------|
 | 首页 | Jinja2 构建时预渲染最近 100 条 + JS 后台加载 `data.json` 无缝扩展全量；卡片展示不超过 120 字的 Analyzer 中文摘要并限制三行；普通点击在右侧抽屉打开详情，修饰键仍打开独立详情页；筛选（来源/标签/日期/评分）纯客户端过滤 | `data.json`（列表 summary + 原始 description 搜索字段）+ `/api/articles/{id}` |
@@ -102,6 +210,7 @@ Reviewer 结果和文章持久化完成后，`run_deep_report_stage()` 作为图
 
 - **Router 纯规则**：100% 按 `RawItem.source` 字段分流，无需 LLM
 - **Fan-out 并行**：4 个 SubAgent 各自专属 Prompt 和 model，共享通用 `analyze_items()`
+- **Analyzer 有限并发**：`base.analyze_items()` 读取 `agents.yaml` 的 `params.concurrency`，默认保守并保持输入输出顺序稳定。
 - **采集阶段去重**：Collector 后立即 DB 批量查重，已存在 url 不进入 LLM 分析
 - **调度口径**：APScheduler、采集 Cron 和每周维护任务均显式使用 `Asia/Shanghai`；同一进程内 pipeline 使用 `asyncio.Lock` 串行执行，碰撞任务记录 `pipeline.queued` 并等待，不静默漏跑。
 - **双生命周期**：`pipeline_runs.status` 只表示数据流水线；静态构建独立记录 queued/running/completed/failed/superseded。5 分钟去抖期间若有新流水线完成，旧构建标记 superseded，由最新 run 统一发布。
@@ -113,6 +222,7 @@ Reviewer 结果和文章持久化完成后，`run_deep_report_stage()` 作为图
 - **成本记账口径**：只要 LLM 返回 usage 就记录 `cost_logs`；解析失败和 retry 都按真实调用次数计费，文章级成本由同一 `ref_url` 的 Analyzer + Reviewer 成本汇总得到。
 - **Deep Reports 失败隔离**：源码级分析位于 Reviewer/入库后的图外阶段，最多处理一个候选；不执行仓库代码，失败记录保留排障信息但不阻塞主 pipeline。
 - **Deep Reports 版本切换**：公开 API 只查询 `deep_report_settings.public_version` 对应的 completed 报告；V1/V2 可在重建期间并存，最终切换与 V1 删除原子完成。
+- **DB 访问层拆分**：业务模块继续从 `src/db/operations.py` 导入数据库函数；实现按职责拆到 `articles.py`、`pipeline_ops.py`、`costs.py`、`deep_report_ops.py`，统计和备份等兼容逻辑仍留在 `operations.py`。
 - **Prompt Schema 强制**：`response_format={"type": "json_object"}` + 首个完整 JSON 对象提取（兼容 `<think>`、markdown、尾部解释）+ Pydantic 校验；Deep Reports 首轮解析失败后，第二轮只携带原输出、校验错误和 Schema 做定向 JSON 修复
 - **标签自动生长**：Analyzer 自由建议标签，新标签自动插入 `tags` 表收录（不做强制从池选）
 - **原子站点切换**：渲染到 `output.tmp/` → rename 双目录切换，Linux rename 原子操作

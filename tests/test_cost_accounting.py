@@ -1,5 +1,5 @@
 from src.graph.state import CostRecord, RawItem
-from src.main import _build_cost_source_map, _summarize_item_costs
+from src.services.pipeline_helpers import build_cost_source_map, summarize_item_costs
 from src.core.database import Database
 from src.db.operations import save_cost_log
 
@@ -26,7 +26,7 @@ def test_build_cost_source_map_uses_config_source_id_for_all_sources():
         raw_metadata={"source_id": "rss_arxiv"},
     )
 
-    mapping = _build_cost_source_map([rss, arxiv])
+    mapping = build_cost_source_map([rss, arxiv])
 
     assert mapping["https://36kr.com/p/1"] == ("rss", "36氪", "rss_36kr")
     assert mapping["https://arxiv.org/abs/2605.1"] == ("arxiv", "cs.AI", "rss_arxiv")
@@ -39,7 +39,7 @@ def test_summarize_item_costs_groups_by_ref_url():
         CostRecord(agent="reviewer", provider="deepseek", model="m", tokens_in=300, tokens_out=40, cost=0.3, ref_url="u2"),
     ]
 
-    summary = _summarize_item_costs(costs)
+    summary = summarize_item_costs(costs)
 
     assert summary["u1"] == (0.3, 350)
     assert summary["u2"] == (0.3, 340)

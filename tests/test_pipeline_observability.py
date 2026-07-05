@@ -7,6 +7,11 @@ from src.core.database import Database
 from src.graph.state import CostRecord, RawItem, ReviewedItem, AnalyzedItem
 from src.graph.pipeline import record_phase_end, record_phase_start
 from src import main
+from src.services.pipeline_helpers import (
+    build_pipeline_source_summaries,
+    merge_retry_review_result,
+    prepare_retry_review_items,
+)
 
 
 def test_build_pipeline_source_summaries_groups_funnel_by_source_id():
@@ -69,7 +74,7 @@ def test_build_pipeline_source_summaries_groups_funnel_by_source_id():
         ),
     ]
 
-    summaries = main._build_pipeline_source_summaries(
+    summaries = build_pipeline_source_summaries(
         run_id="run_1",
         raw_items=raw_items,
         new_items=new_items,
@@ -130,7 +135,7 @@ def test_build_pipeline_source_summaries_exposes_filtered_items():
         ReviewedItem(ref_url="https://example.com/b", total_score=70, dimensions={}, verdict="retry"),
     ]
 
-    summaries = main._build_pipeline_source_summaries(
+    summaries = build_pipeline_source_summaries(
         run_id="run_1",
         raw_items=raw_items,
         new_items=raw_items,
@@ -160,7 +165,7 @@ def test_build_pipeline_source_summaries_records_successful_zero_source():
         max_items=10,
     )
 
-    summaries = main._build_pipeline_source_summaries(
+    summaries = build_pipeline_source_summaries(
         run_id="run_zero",
         raw_items=[],
         new_items=[],
@@ -216,7 +221,7 @@ def test_prepare_retry_review_items_reuses_existing_analysis():
     )
     reviewed = ReviewedItem(ref_url=raw.url, total_score=60, dimensions={}, verdict="retry")
 
-    retry_items = main._prepare_retry_review_items([reviewed], [analyzed], [raw])
+    retry_items = prepare_retry_review_items([reviewed], [analyzed], [raw])
 
     assert retry_items == [analyzed]
     assert retry_items[0].retry_count == 1
@@ -247,7 +252,7 @@ def test_merge_retry_review_result_accepts_review_only_result():
         ref_url=updated.ref_url,
     )
 
-    reviewed = main._merge_retry_review_result(
+    reviewed = merge_retry_review_result(
         all_reviewed=[original],
         all_costs=[],
         retry_result={"reviewed_items": [updated], "cost_records": [cost]},

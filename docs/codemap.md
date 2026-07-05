@@ -66,13 +66,29 @@
   - 常见改动入口：首屏 KPI、通过率、周期成本、活跃来源统计。
   - 日期窗口按北京时间自然日计算，SQL 使用 `date('now', '+8 hours', ...)`。
 
+- `src/services/pipeline_helpers.py`
+  - Pipeline 纯辅助函数：source filter、source summary、retry review merge、成本汇总。
+  - 常见改动入口：只改无 DB/网络副作用的 pipeline 汇总和归因逻辑。
+
 - `src/db/operations.py`
-  - 数据库操作集合：文章保存、标签保存、成本记录、统计查询、备份等。
+  - 数据库操作兼容入口：re-export articles/pipeline/cost/deep report 子模块函数，并保留统计、备份、source health、GitHub 快照查询。
   - `get_article_detail()` 负责组合文章、标签、标准化四维评分和当前公开深度报告摘要。
   - 常见改动入口：文章查询、统计 SQL、pipeline run 记录、`collection_items` 明细、`pipeline_events` 事件流、`pipeline_source_runs` 漏斗、`cost_logs` 来源归因、GitHub repo 增速快照查询。
   - 费用统计读取 `cost_logs`，资源消耗预算使用 `config/agents.yaml` 的 `budget.monthly`。
   - 所有 `days=N` 查询窗口按北京时间“含今天的 N 个自然日”计算。
   - 目前仍包含较多统计 SQL；后续仪表盘重构时建议逐步拆到 service 层。
+
+- `src/db/articles.py`
+  - 文章保存、标签、查重、列表/搜索和详情组合。
+
+- `src/db/pipeline_ops.py`
+  - pipeline run、collection item、pipeline event、source run 漏斗写入。
+
+- `src/db/costs.py`
+  - LLM 成本记录和当日花费对账。
+
+- `src/db/deep_report_ops.py`
+  - Deep Reports CRUD、公开版本读取/切换和重建批次查询。
 
 - `src/core/database.py`
   - SQLite 连接、迁移执行、基础 fetch/execute/backup API。
@@ -157,7 +173,7 @@
   - 图外入库前按 `ref_url` 汇总 Analyzer + Reviewer 成本，写入文章级 `analysis_cost/analysis_tokens`，并为 Reviewer 成本补齐来源快照。
   - `trial` 源通过审核后只记录试跑事件和健康数据，不写入正式文章。
   - Pipeline 会写入 `collection_items`、`pipeline_source_runs` 和 `pipeline_events`，用于追踪采集、去重、分析、审核、入库的 source 级漏斗和 item 级事件。
-  - Retry 轮复用已有 `AnalyzedItem` 直接重审 Reviewer，不再重新进入 Analyzer；入口为 `_prepare_retry_review_items()`。
+  - Retry 轮复用已有 `AnalyzedItem` 直接重审 Reviewer，不再重新进入 Analyzer；入口为 `src/services/pipeline_helpers.py::prepare_retry_review_items()`。
   - 有新条目但 Analyzer 全部失败时写入失败 item/cost/source funnel，并将 pipeline 标记 failed；不会继续 Deep Report 或站点构建。
 
 - `src/graph/pipeline.py`
@@ -273,7 +289,7 @@
 - `docs/structure.md`
   - 目录职责和核心约定。新增模块或移动职责后同步。
 
-- `docs/architecture.md`
+- `docs/analysis/architecture/architecture.md`
   - 架构设计、DAG、数据流、前端渲染策略。
 
 - `docs/task.md`
