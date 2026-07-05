@@ -176,14 +176,17 @@ jobs:
             phase "5/6 Verify generated pages"
             test -f output/deep.html
             test -f output/deep-report.html
+            test -f output/analysis.html
             curl -fsS http://localhost:8090/deep.html >/dev/null
             curl -fsS http://localhost:8090/deep-report.html >/dev/null
+            curl -fsS http://localhost:8090/analysis.html >/dev/null
 
             phase "6/6 Verify public endpoint"
             if [ -n "$PUBLIC_BASE_URL" ]; then
               curl -fsS "${PUBLIC_BASE_URL%/}/api/health"
               curl -fsS "${PUBLIC_BASE_URL%/}/deep.html" >/dev/null
               curl -fsS "${PUBLIC_BASE_URL%/}/deep-report.html" >/dev/null
+              curl -fsS "${PUBLIC_BASE_URL%/}/analysis.html" >/dev/null
             else
               echo "PUBLIC_BASE_URL is not configured; skipping external verification"
             fi

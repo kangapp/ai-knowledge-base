@@ -22,6 +22,7 @@ def test_deploy_waits_for_pipeline_health_then_builds_static_site():
     assert "docker compose logs --tail=100 pipeline" in workflow
     assert "test -f output/deep.html" in workflow
     assert "test -f output/deep-report.html" in workflow
+    assert "test -f output/analysis.html" in workflow
     assert 'if [ -n "$PUBLIC_BASE_URL" ]; then' in workflow
     assert 'curl -fsS "${PUBLIC_BASE_URL%/}/api/health"' in workflow
 
@@ -85,3 +86,9 @@ def test_pipeline_image_installs_repo_inspector_runtime_dependencies():
     assert "apt-get install -y --no-install-recommends curl git" in dockerfile
     assert "ghcr.io/astral-sh/uv:0.11.22" in dockerfile
     assert dockerfile.index("apt-get install") < dockerfile.index("COPY src/")
+
+
+def test_pipeline_image_contains_analysis_pages():
+    dockerfile = (ROOT / "Dockerfile").read_text()
+
+    assert "COPY docs/analysis/ ./docs/analysis/" in dockerfile
