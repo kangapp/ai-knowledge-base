@@ -26,6 +26,15 @@
         'feishu': '飞书',
         'arxiv': 'arXiv',
     };
+    window.__SOURCE_ID_LABELS__ = {
+        github_trending: 'GitHub Trending AI',
+        github_trending_hot: 'GitHub 持续热门',
+        github_trending_velocity: 'GitHub 趋势增速',
+        github_ai_devtools: 'GitHub AI 开发工具',
+        github_agent_infra: 'GitHub Agent 联网工具',
+        github_data_ai: 'GitHub AI × 数据工程',
+        github_data_infra: 'GitHub 数据工程基础设施',
+    };
 
     const INIT = window.__INIT__ || { articles: [], stats: {} };
     const FAVORITES_KEY = 'ai_kb_favorite_articles';
@@ -48,7 +57,10 @@
     let activeScoreTrigger = null;
     let scoreTooltipHideTimer = null;
 
-    function getSourceLabel(source, sourceDetail) {
+    function getSourceLabel(source, sourceDetail, sourceId) {
+        if (sourceId && window.__SOURCE_ID_LABELS__[sourceId]) {
+            return window.__SOURCE_ID_LABELS__[sourceId];
+        }
         if (source === 'hotlist' && sourceDetail) {
             return sourceDetail;
         }
@@ -65,6 +77,7 @@
     }
 
     function getOptionLabel(s) {
+        if (window.__SOURCE_ID_LABELS__[s]) return window.__SOURCE_ID_LABELS__[s];
         if (window.__RSS_LABELS__[s]) return window.__RSS_LABELS__[s];
         if (s.startsWith('http')) return s.replace(/^https?:\/\//, '').split('/')[0];
         return s;
@@ -83,12 +96,12 @@
             return;
         }
         list.innerHTML = articles.map(a => {
-            const label = getSourceLabel(a.source, a.source_detail);
+            const label = getSourceLabel(a.source, a.source_detail, a.source_id);
             const tagsHtml = (a.tags || []).slice(0, 3).map(t => `<span class="tag">${escapeHtml(t)}</span>`).join('');
             const isFavorite = favoriteIds.has(String(a.id));
             const isHidden = hiddenIds.has(String(a.id));
             return `
-            <div class="article-card" data-score="${a.relevance_score}" data-source="${a.source}" data-source-detail="${a.source_detail || ''}">
+            <div class="article-card" data-score="${a.relevance_score}" data-source="${a.source}" data-source-id="${a.source_id || ''}" data-source-detail="${a.source_detail || ''}">
                 <div class="card-header">
                     <span class="topic-tag">${escapeHtml(label)}</span>
                     ${tagsHtml ? `<div class="tags">${tagsHtml}</div>` : ''}
@@ -114,8 +127,11 @@
             articles = articles.filter(a => new Date(a.collected_at) >= cutoff);
         }
         if (state.source) {
-            // state.source 可能是基础类型，或 RSS/热榜的具体子源名
+            // state.source 可能是配置 source_id、基础类型，或 RSS/热榜的具体子源名
             articles = articles.filter(a => {
+                if (a.source_id === state.source) {
+                    return true;
+                }
                 if (state.source === 'github' || state.source === 'feishu' || state.source === 'arxiv') {
                     return a.source === state.source;
                 }
@@ -355,7 +371,7 @@
             // 按 label 分组去重，value 使用最后一个匹配的 raw
             const sourceMap = {};
             allArticles.forEach(a => {
-                const raw = ['rss', 'hotlist', 'hn'].includes(a.source) && a.source_detail ? a.source_detail : a.source;
+                const raw = ['rss', 'hotlist', 'hn'].includes(a.source) && a.source_detail ? a.source_detail : (a.source_id || a.source);
                 const normalized = getOptionLabel(raw);
                 if (!sourceMap[normalized]) {
                     sourceMap[normalized] = { label: normalized, value: raw };

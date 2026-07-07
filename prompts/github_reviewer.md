@@ -10,6 +10,7 @@
 - dimensions 只能包含 ai_relevance、developer_utility、project_signal、content_clarity 四个 key。
 - total_score 必须等于四个维度 score 之和。
 - 如果 source_id 是 github_ai_devtools，且仓库围绕 AI 编程助手、代码理解、知识图谱、RAG、Agent 工具链，ai_relevance 通常不低于 28。
+- 如果 source_id 是 github_data_infra，请按数据工程基础设施评估项目价值；dbt、数据血缘、数据目录、数据质量、analytics engineering、SQL workflow 等项目不要求 AI/LLM/Agent 相关，但仍需具备明确开发者实用性和项目信号。
 - GitHub repo 不要求具备文章式深度；请重点判断项目是否值得作为 AI 工具被收录。
 
 输出 JSON:

@@ -160,6 +160,41 @@ async def test_save_tags_normalizes_to_small_taxonomy(tmp_path):
 
 
 @pytest.mark.asyncio
+async def test_search_articles_exposes_config_source_id(tmp_path):
+    db = Database(tmp_path / "articles.db", migrations_dir=_MIGRATIONS_DIR)
+    await db.initialize()
+    try:
+        await operations.save_article(
+            db,
+            RawItem(
+                url="https://github.com/dbt-labs/dbt-core",
+                title="dbt-core",
+                source="github",
+                source_detail="dbt-labs/dbt-core",
+                raw_metadata={"source_id": "github_data_infra"},
+                collected_at="2026-07-05T10:00:00",
+            ),
+            AnalyzedItem(
+                ref_url="https://github.com/dbt-labs/dbt-core",
+                title="dbt-core",
+                summary="data transformation framework",
+                source="github",
+                source_detail="dbt-labs/dbt-core",
+                source_id="github_data_infra",
+            ),
+            ReviewedItem(total_score=80, dimensions={}, verdict="approved"),
+            cost=0,
+            tokens=0,
+        )
+
+        rows = await operations.search_articles(db, "", days=3650)
+
+        assert rows[0]["source_id"] == "github_data_infra"
+    finally:
+        await db.close()
+
+
+@pytest.mark.asyncio
 async def test_migrate_existing_deep_reports_to_version_1(tmp_path):
     legacy_migrations = tmp_path / "legacy_migrations"
     legacy_migrations.mkdir()

@@ -100,6 +100,50 @@ def test_project_sources_include_github_agent_infra():
     }.issubset(set(source.config["exclude_terms"]))
 
 
+def test_project_sources_include_data_sources():
+    cfg = load_sources_config(Path("config/sources.yaml"))
+    sources = {source.id: source for source in cfg.sources}
+
+    data_ai = sources["github_data_ai"]
+    assert data_ai.type == "github"
+    assert data_ai.enabled is True
+    assert data_ai.config["lookback_type"] == "pushed"
+    assert data_ai.config["lookback_days"] == 90
+    assert data_ai.config["min_stars"] == 50
+    assert data_ai.config["topics"] == []
+    assert data_ai.config["keywords"] == [
+        "text-to-SQL",
+        "natural language SQL",
+        "AI SQL",
+        "dbt copilot",
+        "data agent",
+    ]
+
+    data_infra = sources["github_data_infra"]
+    assert data_infra.type == "github"
+    assert data_infra.enabled is True
+    assert data_infra.config["lookback_type"] == "pushed"
+    assert data_infra.config["lookback_days"] == 90
+    assert data_infra.config["min_stars"] == 100
+    assert data_infra.config["topics"] == []
+    assert data_infra.config["keywords"] == [
+        "dbt",
+        "data lineage",
+        "data catalog",
+        "data quality",
+        "analytics engineering",
+    ]
+    assert {
+        "tutorial",
+        "course",
+        "awesome",
+        "example",
+        "template",
+        "boilerplate",
+    }.issubset(set(data_ai.config["exclude_terms"]))
+    assert set(data_ai.config["exclude_terms"]) == set(data_infra.config["exclude_terms"])
+
+
 def test_project_sources_include_recommended_ai_feeds():
     cfg = load_sources_config(Path("config/sources.yaml"))
     sources = {source.id: source for source in cfg.sources}

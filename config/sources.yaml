@@ -84,6 +84,40 @@ sources:
       min_forks: 0
       min_watchers: 0
 
+  - id: github_data_ai
+    name: GitHub AI × 数据工程
+    type: github
+    enabled: true
+    priority: 1
+    cron: "0 */6 * * *"
+    max_items: 10
+    config:
+      topics: []
+      keywords: ["text-to-SQL", "natural language SQL", "AI SQL", "dbt copilot", "data agent"]
+      exclude_terms: [wallpaper, porn, nsfw, account, registration, card, tutorial, course, awesome, interview, writeup, write-ups, example, examples, template, boilerplate]
+      lookback_type: pushed
+      lookback_days: 90
+      min_stars: 50
+      min_forks: 0
+      min_watchers: 0
+
+  - id: github_data_infra
+    name: GitHub 数据工程基础设施
+    type: github
+    enabled: true
+    priority: 1
+    cron: "0 */6 * * *"
+    max_items: 10
+    config:
+      topics: []
+      keywords: ["dbt", "data lineage", "data catalog", "data quality", "analytics engineering"]
+      exclude_terms: [wallpaper, porn, nsfw, account, registration, card, tutorial, course, awesome, interview, writeup, write-ups, example, examples, template, boilerplate]
+      lookback_type: pushed
+      lookback_days: 90
+      min_stars: 100
+      min_forks: 0
+      min_watchers: 0
+
   # ===== 中文科技媒体 =====
   - id: rss_36kr
     name: 36氪

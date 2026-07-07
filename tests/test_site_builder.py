@@ -86,6 +86,15 @@ def test_homepage_uses_hn_source_detail_as_label():
     assert "source === 'hn' && sourceDetail" in app_js
 
 
+def test_homepage_source_filter_uses_source_id_for_github_subsources():
+    app_js = (ROOT / "src/site/static/js/app.js").read_text()
+
+    assert "a.source_id || a.source" in app_js
+    assert "github_data_ai" in app_js
+    assert "GitHub AI × 数据工程" in app_js
+    assert "a.source_id === state.source" in app_js
+
+
 @pytest.mark.asyncio
 async def test_homepage_uses_hotlist_source_detail_as_label(tmp_path, monkeypatch):
     articles = [

@@ -18,7 +18,14 @@
 </div>
 <div id="article-list">
     {% for article in articles %}
-    {% if article.source in ['rss', 'hotlist', 'hn'] and article.source_detail %}
+    {% if article.source_id == 'github_trending' %}{% set source_label = 'GitHub Trending AI' %}
+    {% elif article.source_id == 'github_trending_hot' %}{% set source_label = 'GitHub 持续热门' %}
+    {% elif article.source_id == 'github_trending_velocity' %}{% set source_label = 'GitHub 趋势增速' %}
+    {% elif article.source_id == 'github_ai_devtools' %}{% set source_label = 'GitHub AI 开发工具' %}
+    {% elif article.source_id == 'github_agent_infra' %}{% set source_label = 'GitHub Agent 联网工具' %}
+    {% elif article.source_id == 'github_data_ai' %}{% set source_label = 'GitHub AI × 数据工程' %}
+    {% elif article.source_id == 'github_data_infra' %}{% set source_label = 'GitHub 数据工程基础设施' %}
+    {% elif article.source in ['rss', 'hotlist', 'hn'] and article.source_detail %}
         {% if article.source == 'hotlist' %}{% set source_label = article.source_detail %}
         {% elif article.source == 'hn' %}{% set source_label = article.source_detail %}
         {% elif article.source_detail == 'https://36kr.com/feed' %}{% set source_label = '36氪' %}
@@ -33,7 +40,7 @@
         {% else %}{% set source_label = article.source_detail %}{% endif %}
     {% else %}{% set source_label = article.source %}{% endif %}
     {% set article_tags = article.tags[:3] if article.tags else [] %}
-    <div class="article-card" data-score="{{ article.relevance_score }}" data-source="{{ article.source }}" data-source-detail="{{ article.source_detail or '' }}">
+    <div class="article-card" data-score="{{ article.relevance_score }}" data-source="{{ article.source }}" data-source-id="{{ article.source_id or '' }}" data-source-detail="{{ article.source_detail or '' }}">
         <div class="card-header">
             <span class="topic-tag">{{ source_label }}</span>
             {% if article_tags %}

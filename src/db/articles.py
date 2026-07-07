@@ -277,6 +277,12 @@ def _article_dimensions(extra_data: str | None) -> dict:
     return dimensions
 
 
+def _article_source_id(extra_data: str | None, fallback: str = "") -> str:
+    data = decode_json_field(extra_data or "", {})
+    raw = data.get("raw", {}) if isinstance(data, dict) else {}
+    return str(raw.get("source_id") or fallback or "")
+
+
 async def get_article_detail(db: Database, article_id: int) -> dict | None:
     row = await db.fetch_one("SELECT * FROM articles WHERE id = ?", (article_id,))
     if not row:
@@ -284,7 +290,9 @@ async def get_article_detail(db: Database, article_id: int) -> dict | None:
 
     article = dict(row)
     article["tags"] = await get_article_tags(db, article_id)
-    article["dimensions"] = _article_dimensions(article.pop("extra_data", None))
+    extra_data = article.pop("extra_data", None)
+    article["source_id"] = _article_source_id(extra_data, article.get("source"))
+    article["dimensions"] = _article_dimensions(extra_data)
 
     report = await db.fetch_one(
         """
@@ -340,5 +348,6 @@ async def search_articles(
     for row in rows:
         article = dict(row)
         article["tags"] = await get_article_tags(db, article["id"])
+        article["source_id"] = _article_source_id(article.pop("extra_data", None), article.get("source"))
         articles_with_tags.append(article)
     return articles_with_tags

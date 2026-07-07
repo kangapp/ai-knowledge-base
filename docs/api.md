@@ -78,6 +78,7 @@
         "title": "Example",
         "url": "https://example.com",
         "source": "rss",
+        "source_id": "rss_36kr",
         "tags": ["AI"]
       }
     ],
@@ -117,6 +118,7 @@
     "description": "原始简介",
     "summary": "AI 中文摘要",
     "source": "github",
+    "source_id": "github_ai_devtools",
     "source_detail": "org/repo",
     "published_at": "2026-06-19T08:00:00+08:00",
     "collected_at": "2026-06-20T10:00:00+08:00",

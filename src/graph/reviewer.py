@@ -102,9 +102,9 @@ def _load_reviewer_prompt_for_item(registry: LLMRegistry, item: AnalyzedItem) ->
         return GITHUB_REVIEWER_FALLBACK_PROMPT
 
 
-def parse_reviewer_output(raw: str, review_kind: str = "article") -> ReviewedItem:
+def parse_reviewer_output(raw: str, review_kind: str = "article", source_id: str = "") -> ReviewedItem:
     try:
-        return _normalize_review(extract_json_object(raw), review_kind)
+        return _normalize_review(extract_json_object(raw), review_kind, source_id)
     except ValueError:
         raise ValueError("Reviewer output is not valid JSON")
 
@@ -120,7 +120,7 @@ def _normalize_dimension(name: str, value: dict, dimension_limits: dict[str, int
     return {"score": score, "reason": str(value.get("reason") or "")}
 
 
-def _normalize_review(data: dict, kind: str = "article") -> ReviewedItem:
+def _normalize_review(data: dict, kind: str = "article", source_id: str = "") -> ReviewedItem:
     dimension_limits = GITHUB_DIMENSION_LIMITS if kind == "github_repo" else ARTICLE_DIMENSION_LIMITS
     raw_dimensions = data.get("dimensions") or {}
     normalized_dimensions = {}
@@ -142,6 +142,7 @@ def _normalize_review(data: dict, kind: str = "article") -> ReviewedItem:
             ai_score,
             normalized_dimensions["developer_utility"]["score"],
             normalized_dimensions["project_signal"]["score"],
+            source_id,
         )
     else:
         verdict = _decide_article_verdict(
@@ -172,7 +173,13 @@ def _decide_article_verdict(total_score: int, ai_score: int, depth_score: int) -
     return "discarded"
 
 
-def _decide_github_verdict(total_score: int, ai_score: int, utility_score: int, signal_score: int) -> str:
+def _decide_github_verdict(total_score: int, ai_score: int, utility_score: int, signal_score: int, source_id: str = "") -> str:
+    if source_id == "github_data_infra":
+        if total_score >= 60 and utility_score >= 18 and signal_score >= 10:
+            return "approved"
+        if total_score >= 55 and utility_score >= 15:
+            return "retry"
+        return "discarded"
     if ai_score < 25:
         return "discarded"
     if total_score >= 65 and ai_score >= 28 and utility_score >= 15:
@@ -271,7 +278,7 @@ async def _review_one_item(
                 )
 
                 try:
-                    reviewed = parse_reviewer_output(content, review_kind=kind)
+                    reviewed = parse_reviewer_output(content, review_kind=kind, source_id=item.source_id)
                 except (ValueError, TypeError) as parse_error:
                     cost_record.status = "parse_failed"
                     cost_record.error = str(parse_error)
