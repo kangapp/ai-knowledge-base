@@ -42,14 +42,14 @@ FTS5 全文索引：`articles_fts` over (title, summary, description)
   "url": "https://github.com/meta-llama/llama4/pull/142",
   "description": "Meta's latest open-source model featuring...",
   "summary": "Meta 发布 Llama 4 Scout，采用 MoE 架构...",
-  "source": "github",
-  "source_detail": "meta-llama/llama4",
+  "source": "rss",
+  "source_detail": "TechCrunch AI",
   "relevance_score": 85,
   "status": "approved",
   "retry_count": 0,
   "collected_at": "2026-05-24T08:30:00",
   "published_at": "2026-05-23T14:00:00Z",
-  "extra_data": "{\"dimensions\":{\"ai_relevance\":{\"score\":35,\"reason\":\"核心内容围绕 LLM Agent 工具链\"},\"content_depth\":{\"score\":24,\"reason\":\"包含架构和实现细节\"},\"info_density\":{\"score\":12,\"reason\":\"有明确的新功能和技术信息\"},\"timeliness\":{\"score\":13,\"reason\":\"近期发布\"}},\"raw\":{\"source_id\":\"github_ai_devtools\"},\"language\":\"en\"}",
+  "extra_data": "{\"dimensions\":{\"ai_relevance\":{\"score\":25,\"reason\":\"核心内容围绕 LLM Agent 工具链\"},\"engineering_relevance\":{\"score\":26,\"reason\":\"包含工程实践和基础设施细节\"},\"content_depth\":{\"score\":22,\"reason\":\"包含架构和实现细节\"},\"info_density\":{\"score\":12,\"reason\":\"有明确的新功能和技术信息\"}},\"raw\":{\"source_id\":\"rss_techcrunch\"},\"language\":\"en\"}",
   "analysis_cost": 0.0032,
   "analysis_tokens": 1240,
   "created_at": "2026-05-24T08:30:05",
@@ -256,7 +256,7 @@ UNIQUE(run_id, source_id)
 
 **审核评分口径：**
 
-- 普通文章新写入的 `extra_data.dimensions` 使用 `ai_relevance/content_depth/info_density/timeliness` 四个 key；GitHub repo 默认使用 `ai_relevance/developer_utility/project_signal/content_clarity` 四个 key；`github_data_infra` 使用 `data_infra_relevance/developer_utility/project_signal/content_clarity` 四个 key。
+- 普通文章新写入的 `extra_data.dimensions` 使用 `ai_relevance/engineering_relevance/content_depth/info_density` 四个 key；历史普通文章可能仍包含 `timeliness`；GitHub repo 默认使用 `ai_relevance/developer_utility/project_signal/content_clarity` 四个 key；`github_data_infra` 使用 `data_infra_relevance/developer_utility/project_signal/content_clarity` 四个 key。
 - Reviewer 模型输出会在代码层规范化，`information_density` 历史别名会映射到 `info_density`，`currency` 历史别名会映射到 `timeliness`。
 - `relevance_score` 不信任模型输出的 `total_score`，由四维分相加得到。
 - `status` 不信任模型输出的 `verdict`，由代码按阈值裁决：普通文章和默认 GitHub repo 低 AI 相关度直接丢弃；`github_data_infra` 低数据工程基础设施相关度或低实用性直接丢弃。
@@ -514,20 +514,20 @@ UNIQUE(repo_url, commit_sha, report_version)
 {
   "dimensions": {
     "ai_relevance": {
-      "score": 35,
+      "score": 25,
       "reason": "核心内容围绕 LLM Agent 工具链"
     },
+    "engineering_relevance": {
+      "score": 26,
+      "reason": "包含编码、工程实践或基础设施细节"
+    },
     "content_depth": {
-      "score": 24,
+      "score": 22,
       "reason": "包含架构和实现细节"
     },
     "info_density": {
       "score": 12,
       "reason": "有明确的新功能和技术信息"
-    },
-    "timeliness": {
-      "score": 13,
-      "reason": "近期发布"
     }
   },
   "raw": {"source_id": "github_ai_devtools"},
@@ -550,9 +550,11 @@ UNIQUE(repo_url, commit_sha, report_version)
 | 维度 | 说明 | 高分标准 |
 |------|------|----------|
 | ai_relevance | AI 相关性 | 与 AI/LLM/Agent 领域相关程度 |
+| engineering_relevance | 工程相关性 | 面向编码、软件工程、AI/LLM infra、Agent/RAG/MCP、数据工程、部署运维、评测观测、成本性能安全实践 |
 | content_depth | 内容深度 | 有详细技术实现或分析 |
 | info_density | 信息密度 | 内容充实、信息价值高 |
-| timeliness | 时效性 | 近期发布的内容 |
+| timeliness | 时效性 | 历史普通文章维度，新写入普通文章不再使用 |
+| data_infra_relevance | 数据工程相关性 | `github_data_infra` repo 与数据工程基础设施的相关程度 |
 | developer_utility | 项目实用性 | GitHub repo 能直接改善开发者工作流 |
 | project_signal | 项目信号 | GitHub repo 有 stars、topics、趋势等社区信号 |
 | content_clarity | 内容清晰度 | GitHub repo 摘要清楚说明做什么、给谁用、如何接入 |

@@ -246,8 +246,9 @@ def _article_dimensions(extra_data: str | None) -> dict:
     data = decode_json_field(extra_data or "", {})
     raw_dimensions = data.get("dimensions", {})
     article_definitions = (
-        ("ai_relevance", "ai_relevance", 40),
-        ("content_depth", "content_depth", 30),
+        ("ai_relevance", "ai_relevance", 30),
+        ("engineering_relevance", "engineering_relevance", 30),
+        ("content_depth", "content_depth", 25),
         ("info_density", "info_density", 15),
         ("timeliness", "timeliness", 15),
     )
@@ -271,8 +272,15 @@ def _article_dimensions(extra_data: str | None) -> dict:
         definitions = data_infra_definitions
     elif is_github_review:
         definitions = github_definitions
-    else:
+    elif "engineering_relevance" in raw_dimensions:
         definitions = article_definitions
+    else:
+        definitions = (
+            ("ai_relevance", "ai_relevance", 40),
+            ("content_depth", "content_depth", 30),
+            ("info_density", "info_density", 15),
+            ("timeliness", "timeliness", 15),
+        )
     dimensions = {}
     for name, key, max_score in definitions:
         value = raw_dimensions.get(key, {})

@@ -316,6 +316,8 @@ def test_homepage_score_tooltip_uses_article_detail_dimensions():
     assert "data-score-tooltip" in app_js
     assert "setupScoreTooltip" in app_js
     assert "renderScoreTooltip" in app_js
+    assert "engineering_relevance" in app_js
+    assert "工程相关度" in app_js
     assert "developer_utility" in app_js
     assert "项目实用性" in app_js
     assert "data_infra_relevance" in app_js

@@ -151,34 +151,35 @@
         );
 
         const dims = data.dimensions || {};
+        const qualityDims = [dims.ai_relevance, dims.engineering_relevance, dims.content_depth, dims.info_density];
         DashboardCharts.radar(
             'q-radar-chart',
-            ['AI相关度', '内容深度', '信息密度', '时效性'],
+            ['AI相关度', '工程相关度', '内容深度', '信息密度'],
             [
                 dimScore(dims.ai_relevance),
+                dimScore(dims.engineering_relevance),
                 dimScore(dims.content_depth),
                 dimScore(dims.info_density),
-                dimScore(dims.timeliness),
             ]
         );
 
         DashboardCharts.stackedBar(
             'q-dimension-chart',
-            ['AI相关度', '内容深度', '信息密度', '时效性'],
+            ['AI相关度', '工程相关度', '内容深度', '信息密度'],
             [
                 {
                     label: '高',
-                    data: [dims.ai_relevance, dims.content_depth, dims.info_density, dims.timeliness].map(d => (d?.high_rate || 0) * 100),
+                    data: qualityDims.map(d => (d?.high_rate || 0) * 100),
                     backgroundColor: '#10b981',
                 },
                 {
                     label: '中',
-                    data: [dims.ai_relevance, dims.content_depth, dims.info_density, dims.timeliness].map(d => (d?.mid_rate || 0) * 100),
+                    data: qualityDims.map(d => (d?.mid_rate || 0) * 100),
                     backgroundColor: '#f59e0b',
                 },
                 {
                     label: '低',
-                    data: [dims.ai_relevance, dims.content_depth, dims.info_density, dims.timeliness].map(d => (d?.low_rate || 0) * 100),
+                    data: qualityDims.map(d => (d?.low_rate || 0) * 100),
                     backgroundColor: '#ef4444',
                 },
             ],

@@ -1,6 +1,7 @@
 (function() {
     const DIMENSIONS = [
         ['ai_relevance', 'AI 相关度'],
+        ['engineering_relevance', '工程相关度'],
         ['data_infra_relevance', '数据工程相关度'],
         ['developer_utility', '项目实用性'],
         ['project_signal', '项目信号'],

@@ -55,7 +55,7 @@ APScheduler 北京时间 cron 分组触发 (同 cron 源合并为一个 pipeline
 |------|------|---------|--------|
 | 采集 | **RawItem** | url, title, description, source, source_detail, published_at, raw_metadata, collected_at | Collector |
 | 分析 | **AnalyzedItem** | ref_url → RawItem.url, title, summary, tags[], language, relevance_score (0-100), retry_count | Analyzer |
-| 评分 | **ReviewedItem** | ref_url, total_score, dimensions（普通文章：ai_relevance/content_depth/info_density/timeliness；GitHub repo：ai_relevance/developer_utility/project_signal/content_clarity）, verdict, retry_feedback | Reviewer |
+| 评分 | **ReviewedItem** | ref_url, total_score, dimensions（普通文章：ai_relevance/engineering_relevance/content_depth/info_density；GitHub repo：ai_relevance/developer_utility/project_signal/content_clarity；`github_data_infra`：data_infra_relevance/developer_utility/project_signal/content_clarity）, verdict, retry_feedback | Reviewer |
 
 最终合并写入 articles 表：`raw.url/description/source` + `analyzed.title/summary/tags/language` + `reviewed.total_score/verdict/dimensions`。四维评分细节存入 `extra_data` JSON。ref_url 未匹配的数据自然丢弃，由 `pipeline_runs.summary` 记录。
 

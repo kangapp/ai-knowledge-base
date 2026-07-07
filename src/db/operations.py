@@ -613,10 +613,10 @@ async def get_quality_detail_stats(db: Database, period: str = "week") -> dict:
 
     # 5. 四维评分统计（从 extra_data JSON 解析）
     dimensions = [
-        ("ai_relevance", "ai_relevance", 40),
-        ("content_depth", "content_depth", 30),
+        ("ai_relevance", "ai_relevance", 30),
+        ("engineering_relevance", "engineering_relevance", 30),
+        ("content_depth", "content_depth", 25),
         ("info_density", "info_density", 15),
-        ("timeliness", "timeliness", 15),
     ]
     dimension_stats = {}
     for name, json_key, max_score in dimensions:

@@ -111,10 +111,10 @@ async def test_article_detail_includes_dimensions_and_public_deep_report(api_cli
     extra_data = json.dumps(
         {
             "dimensions": {
-                "ai_relevance": {"score": 35, "reason": "与 Agent 开发直接相关"},
-                "content_depth": {"score": 24, "reason": "包含实现细节"},
+                "ai_relevance": {"score": 25, "reason": "与 Agent 开发直接相关"},
+                "engineering_relevance": {"score": 26, "reason": "包含工程实践和工具链细节"},
+                "content_depth": {"score": 22, "reason": "包含实现细节"},
                 "information_density": {"score": 12, "reason": "信息密度高"},
-                "timeliness": {"score": 14, "reason": "近期发布"},
             }
         },
         ensure_ascii=False,
@@ -166,10 +166,16 @@ async def test_article_detail_includes_dimensions_and_public_deep_report(api_cli
     assert response.status_code == 200
     data = response.json()["data"]
     assert data["dimensions"]["ai_relevance"] == {
-        "score": 35,
-        "max_score": 40,
+        "score": 25,
+        "max_score": 30,
         "reason": "与 Agent 开发直接相关",
     }
+    assert data["dimensions"]["engineering_relevance"] == {
+        "score": 26,
+        "max_score": 30,
+        "reason": "包含工程实践和工具链细节",
+    }
+    assert data["dimensions"]["content_depth"]["max_score"] == 25
     assert data["dimensions"]["info_density"]["score"] == 12
     assert data["deep_report"]["repo_name"] == "example/agent-tool"
     assert data["deep_report"]["candidate_score"] == 92

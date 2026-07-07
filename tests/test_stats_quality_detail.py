@@ -57,10 +57,10 @@ async def test_quality_detail_supports_dashboard_contract(tmp_path):
             score=90,
             retry_count=0,
             dimensions={
-                "ai_relevance": {"score": 36, "reason": "核心 LLM"},
-                "content_depth": {"score": 25, "reason": "深度原创"},
+                "ai_relevance": {"score": 26, "reason": "核心 LLM"},
+                "engineering_relevance": {"score": 28, "reason": "工程实践"},
+                "content_depth": {"score": 22, "reason": "深度原创"},
                 "info_density": {"score": 13, "reason": "信息密集"},
-                "timeliness": {"score": 12, "reason": "本周"},
             },
         )
         await _insert_article(
@@ -73,9 +73,9 @@ async def test_quality_detail_supports_dashboard_contract(tmp_path):
             retry_count=1,
             dimensions={
                 "ai_relevance": {"score": 20, "reason": "AI 基础设施"},
+                "engineering_relevance": {"score": 18, "reason": "有工程线索"},
                 "content_depth": {"score": 10, "reason": "简要"},
                 "info_density": {"score": 5, "reason": "一般"},
-                "timeliness": {"score": 5, "reason": "较早"},
             },
         )
         await db.execute("INSERT INTO tags (name) VALUES ('AI')")
@@ -101,10 +101,10 @@ async def test_quality_detail_supports_dashboard_contract(tmp_path):
         assert data["source_quality"][0]["avg_score"] == 90.0
         assert data["source_quality"][1]["source_detail"] == "openai_blog"
 
-        assert data["dimensions"]["ai_relevance"]["avg_score"] == 28.0
-        assert data["dimensions"]["content_depth"]["avg_score"] == 17.5
+        assert data["dimensions"]["ai_relevance"]["avg_score"] == 23.0
+        assert data["dimensions"]["engineering_relevance"]["avg_score"] == 23.0
+        assert data["dimensions"]["content_depth"]["avg_score"] == 16.0
         assert data["dimensions"]["info_density"]["avg_score"] == 9.0
-        assert data["dimensions"]["timeliness"]["avg_score"] == 8.5
         assert data["dimensions"]["ai_relevance"]["high_rate"] == 0.5
         assert data["dimensions"]["ai_relevance"]["mid_rate"] == 0.5
         assert data["dimensions"]["ai_relevance"]["low_rate"] == 0.0
@@ -127,10 +127,10 @@ async def test_quality_detail_accepts_legacy_information_density_key(tmp_path):
             score=80,
             retry_count=0,
             dimensions={
-                "ai_relevance": {"score": 35, "reason": "核心 AI"},
+                "ai_relevance": {"score": 25, "reason": "核心 AI"},
+                "engineering_relevance": {"score": 25, "reason": "工程实践"},
                 "content_depth": {"score": 20, "reason": "有细节"},
                 "information_density": {"score": 11, "reason": "历史 key"},
-                "timeliness": {"score": 14, "reason": "本周"},
             },
         )
         await db.commit()

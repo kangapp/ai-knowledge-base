@@ -12,10 +12,10 @@ MAX_RETRIES = 2
 DEFAULT_REVIEWER_CONCURRENCY = 3
 DEFAULT_REVIEWER_TIMEOUT_SECONDS = 60.0
 ARTICLE_DIMENSION_LIMITS = {
-    "ai_relevance": 40,
-    "content_depth": 30,
+    "ai_relevance": 30,
+    "engineering_relevance": 30,
+    "content_depth": 25,
     "info_density": 15,
-    "timeliness": 15,
 }
 GITHUB_DIMENSION_LIMITS = {
     "ai_relevance": 35,
@@ -96,14 +96,14 @@ def _load_reviewer_prompt(registry: LLMRegistry) -> str:
         return path.read_text(encoding="utf-8")
     except OSError:
         return """你是内容审核员。对文章按四维评分（0-100）:
-- AI相关度(0-40): 核心AI/LLM/Agent/MCP/RAG=35-40, AI基础设施=25-34, 泛技术提及=10-24, 无关=0-9
-- 内容深度(0-30): 深度原创=25-30, 有细节=15-24, 简要=5-14, 空内容=0-4
+- AI相关度(0-30): 核心AI/LLM/Agent/MCP/RAG=24-30, AI基础设施=18-23, 泛技术提及=8-17, 无关=0-7
+- 工程相关度engineering_relevance(0-30): 编码/开发工具/工程实践/AI infra/数据工程/部署运维=24-30, 有工程线索=18-23, 纯产品或应用新闻=8-17, 无工程价值=0-7
+- 内容深度(0-25): 深度原创=21-25, 有细节=13-20, 简要=5-12, 空内容=0-4
 - 信息密度info_density(0-15): 新颖独家=12-15, 有信息量=7-11, 重复营销=0-6
-- 时效性(0-15): 本周内=12-15, 本月=7-11, 较早=0-6
-dimensions 只能包含 ai_relevance、content_depth、info_density、timeliness 四个 key。total_score 必须等于四个维度 score 之和。
+dimensions 只能包含 ai_relevance、engineering_relevance、content_depth、info_density 四个 key。total_score 必须等于四个维度 score 之和。
 
 输出 JSON:
-{"total_score": 85, "dimensions": {"ai_relevance": {"score": 35, "reason": "..."}, "content_depth": {"score": 25, "reason": "..."}, "info_density": {"score": 12, "reason": "..."}, "timeliness": {"score": 13, "reason": "..."}}, "verdict": "approved"|"retry"|"discarded", "retry_feedback": null|{"suggestions": ["..."]}}"""
+{"total_score": 85, "dimensions": {"ai_relevance": {"score": 25, "reason": "..."}, "engineering_relevance": {"score": 25, "reason": "..."}, "content_depth": {"score": 23, "reason": "..."}, "info_density": {"score": 12, "reason": "..."}}, "verdict": "approved"|"retry"|"discarded", "retry_feedback": null|{"suggestions": ["..."]}}"""
 
 
 def _load_reviewer_prompt_for_item(registry: LLMRegistry, item: AnalyzedItem) -> str:
@@ -169,6 +169,7 @@ def _normalize_review(data: dict, kind: str = "article", source_id: str = "") ->
         verdict = _decide_article_verdict(
             total_score,
             normalized_dimensions["ai_relevance"]["score"],
+            normalized_dimensions["engineering_relevance"]["score"],
             normalized_dimensions["content_depth"]["score"],
         )
     retry_feedback = None
@@ -184,12 +185,12 @@ def _normalize_review(data: dict, kind: str = "article", source_id: str = "") ->
     })
 
 
-def _decide_article_verdict(total_score: int, ai_score: int, depth_score: int) -> str:
-    if ai_score < 20:
+def _decide_article_verdict(total_score: int, ai_score: int, engineering_score: int, depth_score: int) -> str:
+    if ai_score < 18:
         return "discarded"
-    if total_score >= 80 and ai_score >= 30:
+    if total_score >= 70 and engineering_score >= 22:
         return "approved"
-    if total_score >= 60 and ai_score >= 25 and depth_score >= 15:
+    if total_score >= 60 and engineering_score >= 18 and depth_score >= 12:
         return "retry"
     return "discarded"
 

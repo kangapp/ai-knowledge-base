@@ -9,41 +9,42 @@ from tests.fixtures.llm_responses import REVIEWER_RESPONSE
 
 def test_parse_reviewer_output():
     raw = json.dumps({
-        "total_score": 85,
+        "total_score": 88,
         "dimensions": {
-            "ai_relevance": {"score": 35, "reason": "核心 LLM 推理框架"},
-            "content_depth": {"score": 25, "reason": "有技术细节"},
+            "ai_relevance": {"score": 24, "reason": "核心 LLM 推理框架"},
+            "engineering_relevance": {"score": 28, "reason": "面向开发者和推理基础设施"},
+            "content_depth": {"score": 24, "reason": "有技术细节"},
             "info_density": {"score": 12, "reason": "有新信息"},
-            "timeliness": {"score": 13, "reason": "本周发布"}
         },
         "verdict": "approved",
         "retry_feedback": None
     })
     result = parse_reviewer_output(raw)
     assert isinstance(result, ReviewedItem)
-    assert result.total_score == 85
+    assert result.total_score == 88
     assert result.verdict == "approved"
-    assert result.dimensions["ai_relevance"]["score"] == 35
+    assert result.dimensions["ai_relevance"]["score"] == 24
+    assert result.dimensions["engineering_relevance"]["score"] == 28
     assert result.retry_feedback is None
 
 def test_parse_reviewer_output_retry():
     raw = json.dumps({
-        "total_score": 65,
+        "total_score": 62,
         "dimensions": {
-            "ai_relevance": {"score": 25, "reason": "AI 基础设施"},
-            "content_depth": {"score": 18, "reason": "有部分细节"},
+            "ai_relevance": {"score": 20, "reason": "AI 基础设施"},
+            "engineering_relevance": {"score": 19, "reason": "有一定工程线索"},
+            "content_depth": {"score": 13, "reason": "有部分细节"},
             "info_density": {"score": 10, "reason": "有一定信息量"},
-            "timeliness": {"score": 12, "reason": "本周"}
         },
         "verdict": "retry",
-        "retry_feedback": {"suggestions": ["补充 AI 相关度分析", "增加技术深度"]}
+        "retry_feedback": {"suggestions": ["补充 AI 和工程相关度分析", "增加技术深度"]}
     })
     result = parse_reviewer_output(raw)
     assert result.verdict == "retry"
-    assert result.retry_feedback["suggestions"] == ["补充 AI 相关度分析", "增加技术深度"]
+    assert result.retry_feedback["suggestions"] == ["补充 AI 和工程相关度分析", "增加技术深度"]
 
 def test_parse_reviewer_output_markdown_wrapped():
-    raw = '```json\n{"total_score": 30, "dimensions": {"ai_relevance": {"score": 5, "reason": "无关"}, "content_depth": {"score": 8, "reason": "简要"}, "info_density": {"score": 5, "reason": "重复"}, "timeliness": {"score": 12, "reason": "本周"}}, "verdict": "discarded", "retry_feedback": null}\n```'
+    raw = '```json\n{"total_score": 30, "dimensions": {"ai_relevance": {"score": 5, "reason": "无关"}, "engineering_relevance": {"score": 12, "reason": "弱相关"}, "content_depth": {"score": 8, "reason": "简要"}, "info_density": {"score": 5, "reason": "重复"}}, "verdict": "discarded", "retry_feedback": null}\n```'
     result = parse_reviewer_output(raw)
     assert result.verdict == "discarded"
 
@@ -51,17 +52,17 @@ def test_parse_reviewer_output_markdown_wrapped():
 def test_parse_reviewer_output_extracts_first_json_object_with_trailing_text():
     raw = (
         "<think>需要先评分</think>\n"
-        '{"total_score": 86, "dimensions": {"ai_relevance": {"score": 36, "reason": "核心"}, '
-        '"content_depth": {"score": 25, "reason": "深入"}, '
-        '"info_density": {"score": 12, "reason": "密集"}, '
-        '"timeliness": {"score": 13, "reason": "本周"}}, '
+        '{"total_score": 85, "dimensions": {"ai_relevance": {"score": 25, "reason": "核心"}, '
+        '"engineering_relevance": {"score": 24, "reason": "工程实践"}, '
+        '"content_depth": {"score": 24, "reason": "深入"}, '
+        '"info_density": {"score": 12, "reason": "密集"}}, '
         '"verdict": "approved", "retry_feedback": null}\n'
         "```"
     )
 
     result = parse_reviewer_output(raw)
 
-    assert result.total_score == 86
+    assert result.total_score == 85
     assert result.verdict == "approved"
 
 
@@ -70,9 +71,9 @@ def test_parse_reviewer_output_normalizes_dimension_alias_and_score():
         "total_score": 99,
         "dimensions": {
             "ai_relevance": {"score": 34, "reason": "AI 基础设施"},
+            "engineering_relevance": {"score": 35, "reason": "工程实践"},
             "content_depth": {"score": 20, "reason": "有细节"},
             "information_density": {"score": 10, "reason": "有信息量"},
-            "timeliness": {"score": 9, "reason": "本月"},
         },
         "verdict": "approved",
         "retry_feedback": None,
@@ -80,11 +81,13 @@ def test_parse_reviewer_output_normalizes_dimension_alias_and_score():
 
     result = parse_reviewer_output(raw)
 
-    assert result.total_score == 73
-    assert set(result.dimensions) == {"ai_relevance", "content_depth", "info_density", "timeliness"}
+    assert result.total_score == 90
+    assert set(result.dimensions) == {"ai_relevance", "engineering_relevance", "content_depth", "info_density"}
+    assert result.dimensions["ai_relevance"]["score"] == 30
+    assert result.dimensions["engineering_relevance"]["score"] == 30
     assert result.dimensions["info_density"]["score"] == 10
-    assert result.verdict == "retry"
-    assert result.retry_feedback is not None
+    assert result.verdict == "approved"
+    assert result.retry_feedback is None
 
 
 def test_parse_reviewer_output_discards_low_ai_relevance_even_when_model_approves():
@@ -92,9 +95,9 @@ def test_parse_reviewer_output_discards_low_ai_relevance_even_when_model_approve
         "total_score": 85,
         "dimensions": {
             "ai_relevance": {"score": 15, "reason": "只泛泛提到 AI"},
+            "engineering_relevance": {"score": 28, "reason": "工程相关"},
             "content_depth": {"score": 25, "reason": "有行业细节"},
             "info_density": {"score": 14, "reason": "信息密集"},
-            "timeliness": {"score": 15, "reason": "本周"},
         },
         "verdict": "approved",
         "retry_feedback": None,
@@ -102,7 +105,26 @@ def test_parse_reviewer_output_discards_low_ai_relevance_even_when_model_approve
 
     result = parse_reviewer_output(raw)
 
-    assert result.total_score == 69
+    assert result.total_score == 82
+    assert result.verdict == "discarded"
+    assert result.retry_feedback is None
+
+
+def test_parse_reviewer_output_discards_ai_news_without_engineering_value():
+    raw = json.dumps({
+        "total_score": 72,
+        "dimensions": {
+            "ai_relevance": {"score": 26, "reason": "自主机器人应用新闻"},
+            "engineering_relevance": {"score": 8, "reason": "没有编码、工程或基础设施细节"},
+            "content_depth": {"score": 25, "reason": "有现场信息"},
+            "info_density": {"score": 13, "reason": "信息密集"},
+        },
+        "verdict": "approved",
+        "retry_feedback": None,
+    })
+
+    result = parse_reviewer_output(raw)
+
     assert result.verdict == "discarded"
     assert result.retry_feedback is None
 
@@ -291,10 +313,10 @@ def test_article_policy_still_discards_shallow_article():
     raw = json.dumps({
         "total_score": 59,
         "dimensions": {
-            "ai_relevance": {"score": 30, "reason": "AI related"},
-            "content_depth": {"score": 14, "reason": "thin"},
-            "info_density": {"score": 8, "reason": "normal"},
-            "timeliness": {"score": 7, "reason": "recent"},
+            "ai_relevance": {"score": 24, "reason": "AI related"},
+            "engineering_relevance": {"score": 24, "reason": "engineering related"},
+            "content_depth": {"score": 11, "reason": "thin"},
+            "info_density": {"score": 7, "reason": "normal"},
         },
         "verdict": "approved",
         "retry_feedback": None,
@@ -337,10 +359,10 @@ async def test_reviewer_node_mocked():
     mock_response.choices = [
         MagicMock(message=MagicMock(content=json.dumps({
             "total_score": 88, "dimensions": {
-                "ai_relevance": {"score": 38, "reason": "核心 Agent 框架"},
-                "content_depth": {"score": 25, "reason": "深度原创"},
-                "info_density": {"score": 13, "reason": "新颖"},
-                "timeliness": {"score": 12, "reason": "本周"}
+                "ai_relevance": {"score": 27, "reason": "核心 Agent 框架"},
+                "engineering_relevance": {"score": 27, "reason": "面向开发者工程实践"},
+                "content_depth": {"score": 22, "reason": "深度原创"},
+                "info_density": {"score": 12, "reason": "新颖"},
             }, "verdict": "approved", "retry_feedback": None
         })))
     ]
@@ -448,10 +470,10 @@ async def test_reviewer_node_runs_with_limited_concurrency_and_keeps_order():
         response.choices = [MagicMock(message=MagicMock(content=json.dumps({
             "total_score": 88,
             "dimensions": {
-                "ai_relevance": {"score": 38, "reason": "核心 Agent 框架"},
-                "content_depth": {"score": 25, "reason": "深度原创"},
-                "info_density": {"score": 13, "reason": "新颖"},
-                "timeliness": {"score": 12, "reason": "本周"},
+                "ai_relevance": {"score": 27, "reason": "核心 Agent 框架"},
+                "engineering_relevance": {"score": 27, "reason": "面向开发者工程实践"},
+                "content_depth": {"score": 22, "reason": "深度原创"},
+                "info_density": {"score": 12, "reason": "新颖"},
             },
             "verdict": "approved",
             "retry_feedback": None,
@@ -507,10 +529,10 @@ async def test_reviewer_node_times_out_slow_request_and_discards_item():
         response.choices = [MagicMock(message=MagicMock(content=json.dumps({
             "total_score": 88,
             "dimensions": {
-                "ai_relevance": {"score": 38, "reason": "核心 Agent 框架"},
-                "content_depth": {"score": 25, "reason": "深度原创"},
-                "info_density": {"score": 13, "reason": "新颖"},
-                "timeliness": {"score": 12, "reason": "本周"},
+                "ai_relevance": {"score": 27, "reason": "核心 Agent 框架"},
+                "engineering_relevance": {"score": 27, "reason": "面向开发者工程实践"},
+                "content_depth": {"score": 22, "reason": "深度原创"},
+                "info_density": {"score": 12, "reason": "新颖"},
             },
             "verdict": "approved",
             "retry_feedback": None,

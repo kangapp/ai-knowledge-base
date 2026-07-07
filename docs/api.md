@@ -103,7 +103,7 @@
 **响应:** 返回文章正文信息，并附加：
 
 - `tags`：全部标签。
-- `dimensions`：标准化四维审核评分，每项包含 `score`、`max_score`、`reason`。普通文章使用 `ai_relevance/content_depth/info_density/timeliness`；GitHub repo 默认使用 `ai_relevance/developer_utility/project_signal/content_clarity`；`github_data_infra` 使用 `data_infra_relevance/developer_utility/project_signal/content_clarity`。
+- `dimensions`：标准化四维审核评分，每项包含 `score`、`max_score`、`reason`。普通文章新写入使用 `ai_relevance/engineering_relevance/content_depth/info_density`；历史普通文章可能仍包含 `timeliness`；GitHub repo 默认使用 `ai_relevance/developer_utility/project_signal/content_clarity`；`github_data_infra` 使用 `data_infra_relevance/developer_utility/project_signal/content_clarity`。
 - `deep_report`：关联的当前公开版本 completed 深度报告摘要；不存在时为 `null`。
 
 内部存储字段 `extra_data` 不直接返回。
@@ -311,10 +311,10 @@
       "avg_tags": 3.0
     },
     "dimensions": {
-      "ai_relevance": {"avg_score": 34.4, "high_rate": 1.0, "mid_rate": 0, "low_rate": 0},
-      "content_depth": {"avg_score": 24.0, "high_rate": 0.6, "mid_rate": 0.4, "low_rate": 0},
-      "info_density": {"avg_score": 12.0, "high_rate": 0.5, "mid_rate": 0.5, "low_rate": 0},
-      "timeliness": {"avg_score": 13.0, "high_rate": 0.8, "mid_rate": 0.2, "low_rate": 0}
+      "ai_relevance": {"avg_score": 24.4, "high_rate": 1.0, "mid_rate": 0, "low_rate": 0, "max_score": 30},
+      "engineering_relevance": {"avg_score": 25.0, "high_rate": 0.6, "mid_rate": 0.4, "low_rate": 0, "max_score": 30},
+      "content_depth": {"avg_score": 20.0, "high_rate": 0.6, "mid_rate": 0.4, "low_rate": 0, "max_score": 25},
+      "info_density": {"avg_score": 12.0, "high_rate": 0.5, "mid_rate": 0.5, "low_rate": 0, "max_score": 15}
     },
     "reason_keywords": [
       {"word": "核心", "count": 47},

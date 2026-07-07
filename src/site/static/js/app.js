@@ -42,6 +42,7 @@
     const PAGE_SIZE_KEY = 'ai_kb_page_size';
     const SCORE_DIMENSIONS = [
         ['ai_relevance', 'AI 相关度'],
+        ['engineering_relevance', '工程相关度'],
         ['data_infra_relevance', '数据工程相关度'],
         ['developer_utility', '项目实用性'],
         ['project_signal', '项目信号'],
