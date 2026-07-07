@@ -23,20 +23,33 @@ GITHUB_DIMENSION_LIMITS = {
     "project_signal": 20,
     "content_clarity": 15,
 }
+DATA_INFRA_DIMENSION_LIMITS = {
+    "data_infra_relevance": 35,
+    "developer_utility": 30,
+    "project_signal": 20,
+    "content_clarity": 15,
+}
 DIMENSION_ALIASES = {
     "information_density": "info_density",
     "currency": "timeliness",
 }
 GITHUB_REVIEWER_FALLBACK_PROMPT = """你是 AI 开源项目审核员。只根据用户给出的 GitHub 仓库标题、摘要、标签、URL 和仓库元数据评分。
 
-评分维度：
+默认评分维度：
 - ai_relevance(0-35): 核心 AI/LLM/Agent/MCP/RAG/代码理解工具=30-35；AI 开发辅助或知识库工具=24-29；仅泛泛使用 AI 标签=10-23；无关=0-9。
 - developer_utility(0-30): 明确解决开发者工作流痛点且可直接使用=22-30；用途清晰但细节一般=15-21；概念模糊或偏展示=5-14；无实用价值=0-4。
 - project_signal(0-20): stars/forks/topics/source_id 显示强社区或趋势信号=15-20；有一定关注度或专业 topic=8-14；信号弱=0-7。
 - content_clarity(0-15): 摘要清楚说明做什么、给谁用、如何接入=11-15；基本清楚=7-10；含糊=0-6。
 
+如果 source_id 是 github_data_infra，改用数据工程基础设施评分维度：
+- data_infra_relevance(0-35): dbt/SQLMesh/ELT/ETL/数据转换、数据血缘、数据目录、元数据、数据质量、数据观测、语义层、SQL workflow 等核心基础设施=30-35；明确服务数据工程工作流但范围较窄=24-29；普通数据分析 demo/脚本/模板=10-23；无关=0-9。
+- developer_utility(0-30): 可部署、可集成、文档清楚、支持主流数据栈=22-30；用途清晰但接入或文档一般=15-21；概念验证/demo/脚手架=5-14；无实用价值=0-4。
+- project_signal(0-20): stars/forks/topics/source_id 显示强社区、活跃维护或生态位置明确=15-20；有一定关注度或专业 topic=8-14；信号弱或长期不维护=0-7。
+- content_clarity(0-15): 摘要清楚说明解决什么数据工程问题、给谁用、如何接入、支持哪些数据栈=11-15；基本清楚=7-10；含糊=0-6。
+
 强约束：
-- dimensions 只能包含 ai_relevance、developer_utility、project_signal、content_clarity 四个 key。
+- 默认情况下 dimensions 只能包含 ai_relevance、developer_utility、project_signal、content_clarity 四个 key。
+- 如果 source_id 是 github_data_infra，dimensions 只能包含 data_infra_relevance、developer_utility、project_signal、content_clarity 四个 key，不要输出 ai_relevance。
 - total_score 必须等于四个维度 score 之和。
 - 如果 source_id 是 github_ai_devtools，且仓库围绕 AI 编程助手、代码理解、知识图谱、RAG、Agent 工具链，ai_relevance 通常不低于 28。
 - GitHub repo 不要求具备文章式深度；请重点判断项目是否值得作为 AI 工具被收录。
@@ -121,7 +134,10 @@ def _normalize_dimension(name: str, value: dict, dimension_limits: dict[str, int
 
 
 def _normalize_review(data: dict, kind: str = "article", source_id: str = "") -> ReviewedItem:
-    dimension_limits = GITHUB_DIMENSION_LIMITS if kind == "github_repo" else ARTICLE_DIMENSION_LIMITS
+    if source_id == "github_data_infra":
+        dimension_limits = DATA_INFRA_DIMENSION_LIMITS
+    else:
+        dimension_limits = GITHUB_DIMENSION_LIMITS if kind == "github_repo" else ARTICLE_DIMENSION_LIMITS
     raw_dimensions = data.get("dimensions") or {}
     normalized_dimensions = {}
     for raw_key, value in raw_dimensions.items():
@@ -134,25 +150,30 @@ def _normalize_review(data: dict, kind: str = "article", source_id: str = "") ->
         raise ValueError(f"Reviewer output missing dimensions: {', '.join(missing)}")
 
     total_score = sum(item["score"] for item in normalized_dimensions.values())
-    ai_score = normalized_dimensions["ai_relevance"]["score"]
-
     if kind == "github_repo":
-        verdict = _decide_github_verdict(
-            total_score,
-            ai_score,
-            normalized_dimensions["developer_utility"]["score"],
-            normalized_dimensions["project_signal"]["score"],
-            source_id,
-        )
+        if source_id == "github_data_infra":
+            verdict = _decide_data_infra_verdict(
+                total_score,
+                normalized_dimensions["data_infra_relevance"]["score"],
+                normalized_dimensions["developer_utility"]["score"],
+                normalized_dimensions["project_signal"]["score"],
+            )
+        else:
+            verdict = _decide_github_verdict(
+                total_score,
+                normalized_dimensions["ai_relevance"]["score"],
+                normalized_dimensions["developer_utility"]["score"],
+                normalized_dimensions["project_signal"]["score"],
+            )
     else:
         verdict = _decide_article_verdict(
             total_score,
-            ai_score,
+            normalized_dimensions["ai_relevance"]["score"],
             normalized_dimensions["content_depth"]["score"],
         )
     retry_feedback = None
     if verdict == "retry":
-        retry_feedback = data.get("retry_feedback") or {"suggestions": ["补充 AI 相关性和技术细节证据后重新分析"]}
+        retry_feedback = data.get("retry_feedback") or {"suggestions": ["补充相关性和技术细节证据后重新分析"]}
 
     return ReviewedItem.model_validate({
         "ref_url": data.get("ref_url"),
@@ -173,18 +194,22 @@ def _decide_article_verdict(total_score: int, ai_score: int, depth_score: int) -
     return "discarded"
 
 
-def _decide_github_verdict(total_score: int, ai_score: int, utility_score: int, signal_score: int, source_id: str = "") -> str:
-    if source_id == "github_data_infra":
-        if total_score >= 60 and utility_score >= 18 and signal_score >= 10:
-            return "approved"
-        if total_score >= 55 and utility_score >= 15:
-            return "retry"
-        return "discarded"
+def _decide_github_verdict(total_score: int, ai_score: int, utility_score: int, signal_score: int) -> str:
     if ai_score < 25:
         return "discarded"
     if total_score >= 65 and ai_score >= 28 and utility_score >= 15:
         return "approved"
     if total_score >= 55 and ai_score >= 25:
+        return "retry"
+    return "discarded"
+
+
+def _decide_data_infra_verdict(total_score: int, infra_score: int, utility_score: int, signal_score: int) -> str:
+    if infra_score < 22 or utility_score < 12:
+        return "discarded"
+    if total_score >= 70 and infra_score >= 26 and utility_score >= 18 and signal_score >= 8:
+        return "approved"
+    if total_score >= 60 and infra_score >= 22 and utility_score >= 15:
         return "retry"
     return "discarded"
 

@@ -103,7 +103,7 @@
 **响应:** 返回文章正文信息，并附加：
 
 - `tags`：全部标签。
-- `dimensions`：标准化四维审核评分，每项包含 `score`、`max_score`、`reason`。普通文章使用 `ai_relevance/content_depth/info_density/timeliness`；GitHub repo 使用 `ai_relevance/developer_utility/project_signal/content_clarity`。
+- `dimensions`：标准化四维审核评分，每项包含 `score`、`max_score`、`reason`。普通文章使用 `ai_relevance/content_depth/info_density/timeliness`；GitHub repo 默认使用 `ai_relevance/developer_utility/project_signal/content_clarity`；`github_data_infra` 使用 `data_infra_relevance/developer_utility/project_signal/content_clarity`。
 - `deep_report`：关联的当前公开版本 completed 深度报告摘要；不存在时为 `null`。
 
 内部存储字段 `extra_data` 不直接返回。

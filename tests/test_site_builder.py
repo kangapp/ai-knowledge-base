@@ -318,6 +318,8 @@ def test_homepage_score_tooltip_uses_article_detail_dimensions():
     assert "renderScoreTooltip" in app_js
     assert "developer_utility" in app_js
     assert "项目实用性" in app_js
+    assert "data_infra_relevance" in app_js
+    assert "数据工程相关度" in app_js
     assert "`/api/articles/${encodeURIComponent(articleId)}`" in app_js
     assert ".score-tooltip" in css
 

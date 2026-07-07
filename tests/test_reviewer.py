@@ -168,14 +168,14 @@ def test_parse_github_review_approves_under_repo_policy():
     assert result.verdict == "approved"
 
 
-def test_parse_data_infra_github_review_approves_without_ai_relevance():
+def test_parse_data_infra_github_review_uses_data_infra_relevance():
     raw = json.dumps({
-        "total_score": 60,
+        "total_score": 77,
         "dimensions": {
-            "ai_relevance": {"score": 8, "reason": "纯数据工程基础设施"},
+            "data_infra_relevance": {"score": 27, "reason": "核心 analytics engineering 基础设施"},
             "developer_utility": {"score": 24, "reason": "核心 analytics engineering 工作流"},
             "project_signal": {"score": 18, "reason": "强社区信号"},
-            "content_clarity": {"score": 10, "reason": "用途清楚"},
+            "content_clarity": {"score": 8, "reason": "用途清楚"},
         },
         "verdict": "discarded",
         "retry_feedback": None,
@@ -187,8 +187,32 @@ def test_parse_data_infra_github_review_approves_without_ai_relevance():
         source_id="github_data_infra",
     )
 
-    assert result.total_score == 60
+    assert result.total_score == 77
+    assert "data_infra_relevance" in result.dimensions
+    assert "ai_relevance" not in result.dimensions
     assert result.verdict == "approved"
+
+
+def test_parse_data_infra_github_review_discards_low_infra_relevance():
+    raw = json.dumps({
+        "total_score": 73,
+        "dimensions": {
+            "data_infra_relevance": {"score": 21, "reason": "只是普通 SQL demo"},
+            "developer_utility": {"score": 24, "reason": "有一定实用性"},
+            "project_signal": {"score": 18, "reason": "强社区信号"},
+            "content_clarity": {"score": 10, "reason": "用途清楚"},
+        },
+        "verdict": "approved",
+        "retry_feedback": None,
+    })
+
+    result = parse_reviewer_output(
+        raw,
+        review_kind="github_repo",
+        source_id="github_data_infra",
+    )
+
+    assert result.verdict == "discarded"
 
 
 def test_parse_data_ai_github_review_still_requires_ai_relevance():

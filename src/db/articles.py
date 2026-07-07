@@ -257,11 +257,22 @@ def _article_dimensions(extra_data: str | None) -> dict:
         ("project_signal", "project_signal", 20),
         ("content_clarity", "content_clarity", 15),
     )
+    data_infra_definitions = (
+        ("data_infra_relevance", "data_infra_relevance", 35),
+        ("developer_utility", "developer_utility", 30),
+        ("project_signal", "project_signal", 20),
+        ("content_clarity", "content_clarity", 15),
+    )
     is_github_review = any(
         key in raw_dimensions
         for key in ("developer_utility", "project_signal", "content_clarity")
     )
-    definitions = github_definitions if is_github_review else article_definitions
+    if "data_infra_relevance" in raw_dimensions:
+        definitions = data_infra_definitions
+    elif is_github_review:
+        definitions = github_definitions
+    else:
+        definitions = article_definitions
     dimensions = {}
     for name, key, max_score in definitions:
         value = raw_dimensions.get(key, {})
