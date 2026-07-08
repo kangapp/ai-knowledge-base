@@ -29,12 +29,12 @@ def test_parse_reviewer_output():
 
 def test_parse_reviewer_output_retry():
     raw = json.dumps({
-        "total_score": 62,
+        "total_score": 75,
         "dimensions": {
-            "ai_relevance": {"score": 20, "reason": "AI 基础设施"},
-            "engineering_relevance": {"score": 19, "reason": "有一定工程线索"},
-            "content_depth": {"score": 13, "reason": "有部分细节"},
-            "info_density": {"score": 10, "reason": "有一定信息量"},
+            "ai_relevance": {"score": 22, "reason": "AI 基础设施"},
+            "engineering_relevance": {"score": 22, "reason": "有一定工程线索"},
+            "content_depth": {"score": 20, "reason": "有部分细节"},
+            "info_density": {"score": 11, "reason": "有一定信息量"},
         },
         "verdict": "retry",
         "retry_feedback": {"suggestions": ["补充 AI 和工程相关度分析", "增加技术深度"]}
@@ -171,7 +171,7 @@ def test_github_reviewer_prompt_includes_repo_signals():
     assert "topics: codebase-analysis, knowledge-graph, codex, claude-code" in prompt
 
 
-def test_parse_github_review_approves_under_repo_policy():
+def test_parse_github_review_retries_below_new_repo_policy():
     raw = json.dumps({
         "total_score": 70,
         "dimensions": {
@@ -187,17 +187,36 @@ def test_parse_github_review_approves_under_repo_policy():
     result = parse_reviewer_output(raw, review_kind="github_repo")
 
     assert result.total_score == 70
+    assert result.verdict == "retry"
+
+
+def test_parse_github_review_approves_under_repo_policy():
+    raw = json.dumps({
+        "total_score": 80,
+        "dimensions": {
+            "ai_relevance": {"score": 30, "reason": "AI code knowledge graph tool"},
+            "developer_utility": {"score": 22, "reason": "solves codebase understanding"},
+            "project_signal": {"score": 18, "reason": "strong stars and topics"},
+            "content_clarity": {"score": 10, "reason": "clear summary"},
+        },
+        "verdict": "discarded",
+        "retry_feedback": None,
+    })
+
+    result = parse_reviewer_output(raw, review_kind="github_repo")
+
+    assert result.total_score == 80
     assert result.verdict == "approved"
 
 
 def test_parse_data_infra_github_review_uses_data_infra_relevance():
     raw = json.dumps({
-        "total_score": 77,
+        "total_score": 80,
         "dimensions": {
-            "data_infra_relevance": {"score": 27, "reason": "核心 analytics engineering 基础设施"},
+            "data_infra_relevance": {"score": 28, "reason": "核心 analytics engineering 基础设施"},
             "developer_utility": {"score": 24, "reason": "核心 analytics engineering 工作流"},
             "project_signal": {"score": 18, "reason": "强社区信号"},
-            "content_clarity": {"score": 8, "reason": "用途清楚"},
+            "content_clarity": {"score": 10, "reason": "用途清楚"},
         },
         "verdict": "discarded",
         "retry_feedback": None,
@@ -209,7 +228,7 @@ def test_parse_data_infra_github_review_uses_data_infra_relevance():
         source_id="github_data_infra",
     )
 
-    assert result.total_score == 77
+    assert result.total_score == 80
     assert "data_infra_relevance" in result.dimensions
     assert "ai_relevance" not in result.dimensions
     assert result.verdict == "approved"
@@ -261,12 +280,12 @@ def test_parse_data_ai_github_review_still_requires_ai_relevance():
 
 def test_parse_github_review_retries_when_useful_but_thin():
     raw = json.dumps({
-        "total_score": 58,
+        "total_score": 64,
         "dimensions": {
             "ai_relevance": {"score": 28, "reason": "AI devtool"},
-            "developer_utility": {"score": 14, "reason": "useful but thin"},
-            "project_signal": {"score": 10, "reason": "some stars"},
-            "content_clarity": {"score": 6, "reason": "basic summary"},
+            "developer_utility": {"score": 16, "reason": "useful but thin"},
+            "project_signal": {"score": 12, "reason": "some stars"},
+            "content_clarity": {"score": 8, "reason": "basic summary"},
         },
         "verdict": "discarded",
         "retry_feedback": {"suggestions": ["补充技术细节"]},
@@ -274,11 +293,11 @@ def test_parse_github_review_retries_when_useful_but_thin():
 
     result = parse_reviewer_output(raw, review_kind="github_repo")
 
-    assert result.total_score == 58
+    assert result.total_score == 64
     assert result.verdict == "retry"
 
 
-def test_understand_anything_like_repo_is_approved_with_repo_policy():
+def test_understand_anything_like_repo_retries_when_score_is_below_new_policy():
     raw = json.dumps({
         "total_score": 72,
         "dimensions": {
@@ -305,8 +324,27 @@ def test_understand_anything_like_repo_is_approved_with_repo_policy():
 
     result = parse_reviewer_output(raw, review_kind="github_repo")
 
-    assert result.verdict == "approved"
+    assert result.verdict == "retry"
     assert result.total_score == 72
+
+
+def test_article_policy_retries_borderline_engineering_article():
+    raw = json.dumps({
+        "total_score": 74,
+        "dimensions": {
+            "ai_relevance": {"score": 21, "reason": "AI infra"},
+            "engineering_relevance": {"score": 22, "reason": "engineering related"},
+            "content_depth": {"score": 20, "reason": "some depth"},
+            "info_density": {"score": 11, "reason": "normal"},
+        },
+        "verdict": "approved",
+        "retry_feedback": None,
+    })
+
+    result = parse_reviewer_output(raw)
+
+    assert result.verdict == "retry"
+    assert result.retry_feedback is not None
 
 
 def test_article_policy_still_discards_shallow_article():

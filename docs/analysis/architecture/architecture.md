@@ -23,10 +23,10 @@ APScheduler 北京时间 cron 分组触发 (同 cron 源合并为一个 pipeline
   Aggregator ─── 汇总 analyzed_items + Pydantic 校验 + 成本统计
        │
        ▼
-  Reviewer ─── 四维评分 (temp=0, 含逐维度 score+reason)
-       │           ├── ≥80 → approved → 入库
-       │           ├── 50-79 → retry (带 retry_feedback.suggestions, 限 2 轮)
-       │           └── <50 → discarded
+  Reviewer ─── 四维评分 (temp=0, 含逐维度 score+reason，代码重算 verdict)
+       │           ├── AI + 工程门槛通过 → approved → 入库
+       │           ├── 边界分 → retry (带 retry_feedback.suggestions, 限 2 轮)
+       │           └── 不达标 → discarded
        │
        ▼
   入库 SQLite ─── articles + tags (新标签自动收录) + cost_logs + pipeline_runs
@@ -151,7 +151,7 @@ collector / dedupe / retry reviewer / persist / deep_reports / site_builder
 | Deep Reports 失败 | `deep_reports.status=failed`、`deep.failed` | 不影响主 pipeline completed | 单 repo 重试或重建 |
 | Site Builder 失败 | `build.failed` | 不影响数据 pipeline，旧站点保留 | 修复模板/权限后手动 build |
 
-Reviewer 结果和文章持久化完成后，`run_deep_report_stage()` 作为图外后置阶段运行。GitHub Analyzer 先按仓库主要交付物输出结构化 `project_type`；该阶段只从本轮 `approved`、Reviewer 总分至少 85、`ai_relevance` 至少 28、`developer_utility` 至少 24 且 `project_type=coding_tool` 的 GitHub 仓库中选择最多 1 个候选，并跳过 7 天内已有 completed 报告的仓库。论文、模型权重、数据集、benchmark、资源合集、通用 AI 基础设施和框架均通过结构化类型排除。候选分只用于合格项目之间排序，不再作为第二道准入门槛；stars 不参与候选评分。`deep.selector_skipped` 和 `deep.selector_done` 事件携带汇总诊断，可直接查看各拒绝原因数量。
+Reviewer 结果和文章持久化完成后，`run_deep_report_stage()` 作为图外后置阶段运行。GitHub Analyzer 先按仓库主要交付物输出结构化 `project_type`；该阶段只从本轮 `approved`、Reviewer 总分至少 80、`ai_relevance` 至少 28、`developer_utility` 至少 20 且 `project_type=coding_tool` 的 GitHub 仓库中选择最多 1 个候选，并跳过 7 天内已有 completed 报告的仓库。每个北京时间自然周最多生成 2 篇 completed 深度报告，配额满时直接跳过候选选择和深度分析 LLM。论文、模型权重、数据集、benchmark、资源合集、通用 AI 基础设施和框架均通过结构化类型排除。候选分只用于合格项目之间排序，不再作为第二道准入门槛；stars 不参与候选评分。`deep.selector_skipped` 和 `deep.selector_done` 事件携带汇总诊断，可直接查看各拒绝原因数量。
 
 入选仓库临时 shallow clone 后只读取受限大小的文本、manifest、入口文件和关键源码，不执行仓库代码。扫描结果压缩为证据包交给 `deep_report` Agent，其中每个关键文件内容最多保留 2,000 字符。V2 Agent 输出采用决策、架构节点/连线、快速上手、部署运行、核心模块和运行时数据流；源码证据继续约束 LLM 结论，但不在详情页展示。completed 或 failed 结果以 `report_version=2` 写入 `deep_reports`，阶段返回状态也写入 `pipeline_runs.summary.deep_report`。该阶段采用 best-effort 隔离，候选选择、clone、扫描、LLM、成本或报告持久化失败均不会把主 pipeline 标记为失败。
 

@@ -188,9 +188,9 @@ def _normalize_review(data: dict, kind: str = "article", source_id: str = "") ->
 def _decide_article_verdict(total_score: int, ai_score: int, engineering_score: int, depth_score: int) -> str:
     if ai_score < 18:
         return "discarded"
-    if total_score >= 70 and engineering_score >= 22:
+    if total_score >= 80 and ai_score >= 20 and engineering_score >= 24:
         return "approved"
-    if total_score >= 60 and engineering_score >= 18 and depth_score >= 12:
+    if total_score >= 70 and engineering_score >= 22 and depth_score >= 12:
         return "retry"
     return "discarded"
 
@@ -198,19 +198,19 @@ def _decide_article_verdict(total_score: int, ai_score: int, engineering_score: 
 def _decide_github_verdict(total_score: int, ai_score: int, utility_score: int, signal_score: int) -> str:
     if ai_score < 25:
         return "discarded"
-    if total_score >= 65 and ai_score >= 28 and utility_score >= 15:
+    if total_score >= 75 and ai_score >= 28 and utility_score >= 20 and signal_score >= 8:
         return "approved"
-    if total_score >= 55 and ai_score >= 25:
+    if total_score >= 60 and utility_score >= 16:
         return "retry"
     return "discarded"
 
 
 def _decide_data_infra_verdict(total_score: int, infra_score: int, utility_score: int, signal_score: int) -> str:
-    if infra_score < 22 or utility_score < 12:
+    if infra_score < 24 or utility_score < 16:
         return "discarded"
-    if total_score >= 70 and infra_score >= 26 and utility_score >= 18 and signal_score >= 8:
+    if total_score >= 75 and infra_score >= 28 and utility_score >= 20 and signal_score >= 8:
         return "approved"
-    if total_score >= 60 and infra_score >= 22 and utility_score >= 15:
+    if total_score >= 65:
         return "retry"
     return "discarded"
 

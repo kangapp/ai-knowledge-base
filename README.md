@@ -614,9 +614,11 @@ GitHub repo：
 | `github_data_infra` | `data_infra_relevance / developer_utility / project_signal / content_clarity` |
 
 评审结果：
-- 普通文章：`ai_relevance < 18` 直接 discarded；`total_score >= 70 && engineering_relevance >= 22` 才 approved；边界分 retry。
+- 普通文章：`ai_relevance < 18` 直接 discarded；`total_score >= 80 && ai_relevance >= 20 && engineering_relevance >= 24` 才 approved；边界分 retry。
 - 默认 GitHub：要求 AI 相关度、开发者实用性和项目信号达标。
 - `github_data_infra`：不看 AI 相关度，要求数据工程基础设施相关度和实用性达标。
+
+Deep Report 每个北京时间自然周最多生成 2 篇 completed 报告；配额满时 selector 直接跳过，不调用深度分析 LLM。
 
 ## LLM 交互流程
 

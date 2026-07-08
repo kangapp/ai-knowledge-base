@@ -784,7 +784,7 @@
           ["输入", "AnalyzedItem", "reviewer_node", "ref_url、title、summary、tags、metadata、project_type", { ref_url: "https://github.com/example/agent-runtime", title: "Agent Runtime", relevance_score: 92, project_type: "coding_tool" }],
           ["上下文补充", "RawItem 映射", "prompt payload", "通过 ref_url 找来源、原始描述、source-aware 审核信息", { prompt_payload: { source: "github", raw_description: "Runtime for building tool-using agents", stars: 1240 } }],
           ["LLM 输出", "JSON score/reason", "ReviewedItem", "代码规范化维度 key，重算 total_score，不信任模型 verdict", { dimensions: { ai_relevance: 28, engineering_relevance: 27, content_depth: 21, info_density: 12 }, total_score: 88 }],
-          ["裁决", "total_score + 维度门槛", "approved/retry/discarded", "普通文章要求 ai_relevance >= 18，approved 还要求 engineering_relevance >= 22；超过 MAX_RETRIES 后丢弃", { verdict: "approved", rule: "total_score >= 70 && engineering_relevance >= 22" }],
+          ["裁决", "total_score + 维度门槛", "approved/retry/discarded", "普通文章 approved 要求 total_score >= 80、ai_relevance >= 20、engineering_relevance >= 24；超过 MAX_RETRIES 后丢弃", { verdict: "approved", rule: "total_score >= 80 && engineering_relevance >= 24" }],
           ["副作用", "CostRecord + pipeline_events", "cost_logs / pipeline_events", "每次真实调用都记账；parse_failed 单独记录", { cost_log: { agent: "reviewer", model: "deepseek-chat", cost: 0.0018 }, pipeline_event: "reviewer.item_done" }]
         ],
         failures: [
@@ -824,13 +824,13 @@
       },
       "deep-selector": {
         title: "Deep Reports 候选选择",
-        summary: "只从本轮高价值 GitHub coding_tool 中最多选 1 个。",
-        flow: ["approved GitHub repo", "Reviewer 总分和维度阈值", "project_type=coding_tool", "跳过 7 天内已有 completed 报告", "按候选分排序"],
+        summary: "只从本轮高价值 GitHub coding_tool 中最多选 1 个，每周最多 2 篇 completed。",
+        flow: ["本周 completed 未满 2 篇", "approved GitHub repo", "Reviewer 总分和维度阈值", "project_type=coding_tool", "跳过 7 天内已有 completed 报告", "按候选分排序"],
         data: ["选择/跳过原因写 deep.selector_* 事件"],
         files: ["src/deep_reports/selector.py"],
         dataflow: [
           ["输入", "本轮 approved Articles + ReviewedItem + AnalyzedItem", "selector", "仅 GitHub repo；要求 project_type=coding_tool", { article_id: 18250, repo_url: "https://github.com/example/agent-runtime", project_type: "coding_tool", verdict: "approved" }],
-          ["准入过滤", "score/dimensions/project_type/history", "Candidate[]", "总分、AI 相关度、开发者实用性、7 天重复窗口", { filters: { total_score: 88, ai_relevance: 30, developer_utility: 24, no_completed_report_in_days: 7 }, passed: true }],
+          ["准入过滤", "score/dimensions/project_type/history/quota", "Candidate[]", "周配额、总分、AI 相关度、开发者实用性、7 天重复窗口", { filters: { weekly_completed_lt: 2, total_score: 88, ai_relevance: 30, developer_utility: 24, no_completed_report_in_days: 7 }, passed: true }],
           ["排序", "candidate_score", "最多 1 个 Candidate", "stars 不参与准入；候选分只用于合格项目排序", { candidate_score: 91, selected_rank: 1, selected_limit: 1 }],
           ["副作用", "selector diagnostics", "pipeline_events", "deep.selector_skipped / deep.selector_done", { event: "deep.selector_done", selected_repo: "example/agent-runtime", skipped: [] }]
         ]

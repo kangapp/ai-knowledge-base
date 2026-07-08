@@ -259,7 +259,8 @@ UNIQUE(run_id, source_id)
 - 普通文章新写入的 `extra_data.dimensions` 使用 `ai_relevance/engineering_relevance/content_depth/info_density` 四个 key；历史普通文章可能仍包含 `timeliness`；GitHub repo 默认使用 `ai_relevance/developer_utility/project_signal/content_clarity` 四个 key；`github_data_infra` 使用 `data_infra_relevance/developer_utility/project_signal/content_clarity` 四个 key。
 - Reviewer 模型输出会在代码层规范化，`information_density` 历史别名会映射到 `info_density`，`currency` 历史别名会映射到 `timeliness`。
 - `relevance_score` 不信任模型输出的 `total_score`，由四维分相加得到。
-- `status` 不信任模型输出的 `verdict`，由代码按阈值裁决：普通文章和默认 GitHub repo 低 AI 相关度直接丢弃；`github_data_infra` 低数据工程基础设施相关度或低实用性直接丢弃。
+- `status` 不信任模型输出的 `verdict`，由代码按阈值裁决：普通文章 approved 要求 `total_score >= 80`、`ai_relevance >= 20`、`engineering_relevance >= 24`；默认 GitHub approved 要求 `total_score >= 75`、`ai_relevance >= 28`、`developer_utility >= 20`、`project_signal >= 8`；`github_data_infra` approved 要求 `total_score >= 75`、`data_infra_relevance >= 28`、`developer_utility >= 20`、`project_signal >= 8`。
+- Deep Report 每个北京时间自然周最多生成 2 篇 completed 报告；配额满时不调用深度分析 LLM。
 
 ### source_health — 数据源健康统计
 

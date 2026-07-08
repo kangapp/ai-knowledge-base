@@ -1,5 +1,7 @@
 import re
+from datetime import datetime, timedelta
 from urllib.parse import urlparse
+from zoneinfo import ZoneInfo
 
 from src.core.database import Database
 from src.deep_reports.models import DeepReportCandidate, DeepReportSelection
@@ -16,6 +18,7 @@ MIN_AI_RELEVANCE_SCORE = 28
 MIN_DEVELOPER_UTILITY_SCORE = 20
 MIN_ADOPTION_VALUE = 55
 MIN_ANALYZABILITY = 40
+MAX_DEEP_REPORTS_PER_WEEK = 2
 EXCLUDED_PROJECT_TYPES = {
     "research",
     "dataset",
@@ -79,6 +82,7 @@ REJECTION_REASONS = (
     "adoption_value",
     "analyzability",
     "recent_report",
+    "weekly_quota",
 )
 
 
@@ -100,6 +104,10 @@ class DeepCandidateSelector:
             "eligible": 0,
             "rejected": {reason: 0 for reason in REJECTION_REASONS},
         }
+        if await self._weekly_quota_used() >= MAX_DEEP_REPORTS_PER_WEEK:
+            diagnostics["rejected"]["weekly_quota"] = len(reviewed_items)
+            return DeepReportSelection(candidate=None, diagnostics=diagnostics)
+
         candidates = []
 
         for reviewed in reviewed_items:
@@ -187,6 +195,24 @@ class DeepCandidateSelector:
             (repo_url,),
         )
         return row is not None
+
+    async def _weekly_quota_used(self) -> int:
+        now = datetime.now(ZoneInfo("Asia/Shanghai"))
+        week_start = (now - timedelta(days=now.weekday())).replace(
+            hour=0,
+            minute=0,
+            second=0,
+            microsecond=0,
+        )
+        row = await self.db.fetch_one(
+            """
+            SELECT COUNT(*) AS c FROM deep_reports
+            WHERE status = 'completed'
+              AND datetime(updated_at) >= datetime(?)
+            """,
+            (week_start.strftime("%Y-%m-%d %H:%M:%S"),),
+        )
+        return int(row["c"] or 0) if row else 0
 
 
 async def select_deep_report_candidate(

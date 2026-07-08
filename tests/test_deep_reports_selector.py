@@ -260,6 +260,43 @@ async def test_selector_rejects_recent_completed_report(db):
     assert result.diagnostics["rejected"]["recent_report"] == 1
 
 
+async def test_selector_skips_when_weekly_completed_quota_is_full(db):
+    await db.execute(
+        """
+        INSERT INTO pipeline_runs (id, started_at, status, trigger)
+        VALUES (?, datetime('now', '+8 hours'), 'completed', 'test')
+        """,
+        ("weekly_quota_run",),
+    )
+    await db.commit()
+    for index in range(2):
+        await save_deep_report(
+            db,
+            repo_url=f"https://github.com/acme/reported-{index}",
+            repo_name=f"acme/reported-{index}",
+            article_id=None,
+            run_id="weekly_quota_run",
+            commit_sha="abc",
+            status="completed",
+            candidate_score=90,
+            trigger_reason="test",
+            report_json={},
+            report_markdown="",
+            evidence_json=[],
+            tech_stack_json={},
+            file_tree_summary="",
+            analysis_cost=0,
+            analysis_tokens=0,
+            error="",
+        )
+
+    result = await _select(db, "https://github.com/acme/new-tool")
+
+    assert result.candidate is None
+    assert result.diagnostics["rejected"]["weekly_quota"] == 1
+    assert result.diagnostics["eligible"] == 0
+
+
 async def test_candidate_score_is_ranking_only_and_uses_source_bonus(db):
     first_url = "https://github.com/acme/first"
     second_url = "https://github.com/acme/second"
@@ -391,5 +428,6 @@ async def test_selector_diagnostics_count_each_review_once(db):
             "adoption_value": 0,
             "analyzability": 0,
             "recent_report": 0,
+            "weekly_quota": 0,
         },
     }
