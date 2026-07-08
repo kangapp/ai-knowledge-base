@@ -431,12 +431,12 @@
           <div class="lane-title">Reviewer</div>
           <div class="card green clickable" data-detail="reviewer">
             <h3>四维评分</h3>
-            <p>AI 相关度、内容深度、信息密度、时效性；GitHub repo 使用专属评分锚点。</p>
+            <p>普通文章按 AI 相关度、工程相关度、内容深度、信息密度评分；GitHub repo 使用专属评分锚点。</p>
           </div>
           <div class="mini-row">
-            <span class="pill">≥80 approved</span>
-            <span class="pill">50-79 retry</span>
-            <span class="pill">&lt;50 discarded</span>
+            <span class="pill">AI + 工程门槛</span>
+            <span class="pill">代码重算总分</span>
+            <span class="pill">不信模型 verdict</span>
           </div>
         </div>
       </div>
@@ -770,27 +770,27 @@
       reviewer: {
         title: "Reviewer",
         summary: "模型只给四维分草稿，代码统一维度 key、重算总分并裁决 verdict。",
-        flow: ["普通文章用 reviewer.md", "GitHub repo 用 github_reviewer.md", "解析四维 score/reason", ">=80 approved；50-79 retry；<50 discarded", "retry 最多 2 轮"],
+        flow: ["普通文章用 reviewer.md", "GitHub repo 用 github_reviewer.md", "解析四维 score/reason", "普通文章要求 AI 相关 + 工程相关", "retry 最多 2 轮"],
         data: ["ReviewedItem.dimensions 写入 articles.extra_data", "Reviewer 成本后续按 ref_url 补齐 source"],
         files: ["src/graph/reviewer.py", "prompts/reviewer.md", "prompts/github_reviewer.md"],
         process: [
           ["接收分析结果", "AnalyzedItem[] + RawItem 映射", "reviewer prompt payload", "通过 ref_url 找回 RawItem.source/source_detail/raw_metadata", { ref_url: "https://github.com/example/agent-runtime", source: "github" }],
-          ["选择 prompt", "review_kind(item)", "reviewer.md / github_reviewer.md", "GitHub repo 用专属维度锚点，普通文章用内容维度", { kind: "github_repo", prompt: "prompts/github_reviewer.md" }],
-          ["LLM 打分", "prompt payload", "dimensions JSON", "要求每个维度包含 score 和 reason", { dimensions: { ai_relevance: { score: 36, reason: "Agent runtime" }, developer_utility: { score: 26, reason: "可直接接入工具调用" } } }],
+          ["选择 prompt", "review_kind(item)", "reviewer.md / github_reviewer.md", "GitHub repo 用专属维度锚点，普通文章用 AI + 工程内容维度", { kind: "github_repo", prompt: "prompts/github_reviewer.md" }],
+          ["LLM 打分", "prompt payload", "dimensions JSON", "要求每个维度包含 score 和 reason", { dimensions: { ai_relevance: { score: 28, reason: "Agent runtime" }, engineering_relevance: { score: 27, reason: "工程实践明确" } } }],
           ["代码裁决", "dimensions", "ReviewedItem", "代码统一 key、重算 total_score，不直接信任模型 verdict", { total_score: 88, verdict: "approved" }],
           ["分支处理", "ReviewedItem.verdict", "approved / retry / discarded", "approved 入库；retry 最多 2 轮重审 Reviewer；discarded 只记事件", { approved: 1, retry: 0, discarded: 0 }]
         ],
         dataflow: [
           ["输入", "AnalyzedItem", "reviewer_node", "ref_url、title、summary、tags、metadata、project_type", { ref_url: "https://github.com/example/agent-runtime", title: "Agent Runtime", relevance_score: 92, project_type: "coding_tool" }],
           ["上下文补充", "RawItem 映射", "prompt payload", "通过 ref_url 找来源、原始描述、source-aware 审核信息", { prompt_payload: { source: "github", raw_description: "Runtime for building tool-using agents", stars: 1240 } }],
-          ["LLM 输出", "JSON score/reason", "ReviewedItem", "代码规范化维度 key，重算 total_score，不信任模型 verdict", { dimensions: { ai_relevance: 92, developer_value: 88, novelty: 84, credibility: 90 }, total_score: 88 }],
-          ["裁决", "total_score + ai_relevance", "approved/retry/discarded", "retry 附 retry_feedback；超过 MAX_RETRIES 后丢弃", { verdict: "approved", rule: "total_score >= 80 && ai_relevance >= threshold" }],
+          ["LLM 输出", "JSON score/reason", "ReviewedItem", "代码规范化维度 key，重算 total_score，不信任模型 verdict", { dimensions: { ai_relevance: 28, engineering_relevance: 27, content_depth: 21, info_density: 12 }, total_score: 88 }],
+          ["裁决", "total_score + 维度门槛", "approved/retry/discarded", "普通文章要求 ai_relevance >= 18，approved 还要求 engineering_relevance >= 22；超过 MAX_RETRIES 后丢弃", { verdict: "approved", rule: "total_score >= 70 && engineering_relevance >= 22" }],
           ["副作用", "CostRecord + pipeline_events", "cost_logs / pipeline_events", "每次真实调用都记账；parse_failed 单独记录", { cost_log: { agent: "reviewer", model: "deepseek-chat", cost: 0.0018 }, pipeline_event: "reviewer.item_done" }]
         ],
         failures: [
           ["Reviewer request_failed", "cost_logs + pipeline_events reviewer.request_failed", "该 item 未审核；可能进入 retry 或失败统计", "fallback/下次运行；检查 Provider 健康"],
           ["Reviewer parse_failed", "pipeline_events reviewer.parse_failed", "该 item 不入库", "调整 reviewer prompt 或解析逻辑"],
-          ["50-79 retry", "ReviewedItem.retry_feedback + pipeline_events", "不中断；最多重审 2 轮", "根据 retry_feedback 改善 prompt 或接受丢弃"],
+          ["边界分 retry", "ReviewedItem.retry_feedback + pipeline_events", "不中断；最多重审 2 轮", "根据 retry_feedback 改善 prompt 或接受丢弃"],
           ["低分 discarded", "pipeline_events reviewer.item_done status=discarded", "不中断", "除非评分规则错误，否则不处理"]
         ]
       },
@@ -830,7 +830,7 @@
         files: ["src/deep_reports/selector.py"],
         dataflow: [
           ["输入", "本轮 approved Articles + ReviewedItem + AnalyzedItem", "selector", "仅 GitHub repo；要求 project_type=coding_tool", { article_id: 18250, repo_url: "https://github.com/example/agent-runtime", project_type: "coding_tool", verdict: "approved" }],
-          ["准入过滤", "score/dimensions/project_type/history", "Candidate[]", "总分、AI 相关度、开发者实用性、7 天重复窗口", { filters: { total_score: 88, ai_relevance: 92, developer_value: 88, no_completed_report_in_days: 7 }, passed: true }],
+          ["准入过滤", "score/dimensions/project_type/history", "Candidate[]", "总分、AI 相关度、开发者实用性、7 天重复窗口", { filters: { total_score: 88, ai_relevance: 30, developer_utility: 24, no_completed_report_in_days: 7 }, passed: true }],
           ["排序", "candidate_score", "最多 1 个 Candidate", "stars 不参与准入；候选分只用于合格项目排序", { candidate_score: 91, selected_rank: 1, selected_limit: 1 }],
           ["副作用", "selector diagnostics", "pipeline_events", "deep.selector_skipped / deep.selector_done", { event: "deep.selector_done", selected_repo: "example/agent-runtime", skipped: [] }]
         ]
@@ -942,7 +942,7 @@
           ["构建静态外壳", "SQLite articles/stats/deep_reports", "output/ 静态文件", "Site Builder 预渲染首屏和页面外壳，减少首屏 API 依赖", { output: ["index.html", "article.html", "dashboard.html", "dag.html", "deep.html", "data.json", "stats.json"] }],
           ["Caddy 服务", "output/", "浏览器 HTML/CSS/JS", "Caddy 直接返回静态文件；/api/* 由反向代理交给 FastAPI", { request: "GET /", static_file: "output/index.html", api_proxy: "/api/* -> FastAPI:8000" }],
           ["首页渲染", "index.html + data.json", "文章卡片列表", "构建时已有最近文章；JS 后台加载 data.json 扩展全量筛选和搜索字段", { data_json_item: { id: 18250, title: "Agent Runtime", source: "github", summary: "面向工具调用 Agent 的运行时" } }],
-          ["文章详情", "点击文章 id", "/api/articles/{id}", "首页抽屉和独立 article.html 复用 article-detail.js 渲染完整详情", { request: "/api/articles/18250", response: { data: { id: 18250, tags: ["Agent", "LLM"], dimensions: { ai_relevance: 92 } } } }],
+          ["文章详情", "点击文章 id", "/api/articles/{id}", "首页抽屉和独立 article.html 复用 article-detail.js 渲染完整详情", { request: "/api/articles/18250", response: { data: { id: 18250, tags: ["Agent", "LLM"], dimensions: { ai_relevance: 28, engineering_relevance: 27 } } } }],
           ["Dashboard", "stats.json + /api/stats", "KPI + 图表", "构建时内联基础统计；需要刷新时可走 API", { stats: { total_articles: 18250, approved_today: 15, cost_today: 0.15 } }],
           ["DAG 运行页", "dag.html", "/api/pipeline/dag?detail=full", "每 5 秒轮询运行状态、阶段耗时、source 漏斗和 item 事件", { poll_ms: 5000, response: { run_id: "run_20260705_093000", phases: ["collect", "route", "analyze", "review"] } }],
           ["Deep Reports", "deep.html / deep-report.html", "/api/deep-reports", "列表页请求 completed 报告；详情页按 id 请求 V2 report_json", { list_api: "/api/deep-reports", detail_api: "/api/deep-reports/12" }],
@@ -950,7 +950,7 @@
         ],
         dataflow: [
           ["静态首屏", "SQLite → Site Builder", "output/index.html + data.json", "适合公开阅读，Caddy 可直接服务", { index_html: "最近 100 条预渲染", data_json: "列表摘要 + 搜索字段" }],
-          ["动态详情", "文章 id", "FastAPI /api/articles/{id}", "避免把完整 extra_data 和长摘要塞进首屏", { input: { id: 18250 }, output: { title: "Agent Runtime", full_summary: "...", dimensions: { ai_relevance: 92 } } }],
+          ["动态详情", "文章 id", "FastAPI /api/articles/{id}", "避免把完整 extra_data 和长摘要塞进首屏", { input: { id: 18250 }, output: { title: "Agent Runtime", full_summary: "...", dimensions: { ai_relevance: 28, engineering_relevance: 27 } } }],
           ["运行观测", "浏览器轮询", "/api/pipeline/dag?detail=full", "DAG 页面展示 pipeline_runs、phase_logs、events、source_runs", { phase: "analyze", status: "done", duration_ms: 105000 }],
           ["全文搜索", "q", "/api/search", "后端 FTS5 返回匹配文章，前端替换列表", { q: "RAG", results: [{ id: 18251, title: "RAG eval toolkit" }] }],
           ["深度报告", "report id/latest", "/api/deep-reports/{id}", "静态外壳只负责布局，报告 JSON 由 API 返回", { report_id: 12, decision: "adopt", architecture_nodes: 4 }]
