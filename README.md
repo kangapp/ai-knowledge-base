@@ -1,6 +1,6 @@
 # AI Knowledge Base
 
-个人 AI 知识库系统 — 自动采集 AI/LLM/Agent 领域资讯，经 LLM 分析审核后生成静态网站展示。
+个人 AI 知识库系统 — 自动采集 AI/LLM/Agent、编码、工程和基础设施领域资讯，经 LLM 分析审核后生成静态网站展示。
 
 ## 项目概览
 
@@ -61,10 +61,10 @@ flowchart TD
 
     subgraph Review["审核阶段"]
         H --> I["Reviewer\n四维评分"]
-        I --> J{"评分结果"}
-        J -->|≥80| K["approved → 入库"]
-        J -->|50-79| L["retry (≤2轮)"]
-        J -->|<50| M["discarded"]
+        I --> J{"代码裁决"}
+        J -->|AI + 工程门槛通过| K["approved → 入库"]
+        J -->|边界分| L["retry (≤2轮)"]
+        J -->|不达标| M["discarded"]
     end
 
     subgraph Storage["存储阶段"]
@@ -133,10 +133,10 @@ flowchart TD
 
     subgraph Review["审核阶段"]
         G --> H["Reviewer\n四维评分"]
-        H --> I{"评分结果"}
-        I -->|≥80| J["approved → 入库"]
-        I -->|50-79| K["retry (≤2轮)"]
-        I -->|<50| L["discarded"]
+        H --> I{"代码裁决"}
+        I -->|AI + 工程门槛通过| J["approved → 入库"]
+        I -->|边界分| K["retry (≤2轮)"]
+        I -->|不达标| L["discarded"]
     end
 
     subgraph Storage["存储阶段"]
@@ -152,7 +152,7 @@ flowchart TD
 ```mermaid
 flowchart LR
     subgraph Input["输入"]
-        RSS[/"RSS Feed\nGitHub Trending\n飞书文档\narXiv"/]
+        RSS[/"RSS / Hotlist / HN\nGitHub sources\n飞书 / arXiv"/]
     end
 
     subgraph Pipeline["LangGraph Pipeline"]
@@ -179,13 +179,13 @@ flowchart LR
 ai-knowledge-base/
 ├── config/                     # 配置文件
 │   ├── llm.yaml               #   LLM Provider 注册 (base_url, api_key, models, 价格)
-│   ├── sources.yaml           #   数据源定义 (RSS/GitHub/飞书/arXiv)
+│   ├── sources.yaml           #   数据源定义 (RSS/Hotlist/HN/GitHub/飞书/arXiv)
 │   └── agents.yaml            #   SubAgent 绑定 (primary/fallback model, params)
 │
 ├── prompts/                    # Agent Prompt 模板
 │   ├── github_analyzer.md / rss_analyzer.md / feishu_analyzer.md / arxiv_analyzer.md
-│   ├── reviewer.md            #   文章四维评分锚点 + retry 格式
-│   ├── github_reviewer.md     #   GitHub repo-aware 审核
+│   ├── reviewer.md            #   普通文章 AI + 工程四维评分
+│   ├── github_reviewer.md     #   GitHub repo-aware 审核（含数据工程基础设施）
 │   └── deep_report.md         #   GitHub 源码级深度报告
 │
 ├── src/
@@ -260,15 +260,15 @@ ai-knowledge-base/
 
 ### extra_data JSON 结构
 
-`articles.extra_data` 存储 Reviewer 四维评分：
+`articles.extra_data` 存储 Reviewer 四维评分。普通文章新写入 `ai_relevance/engineering_relevance/content_depth/info_density`；GitHub repo 默认使用 `ai_relevance/developer_utility/project_signal/content_clarity`；`github_data_infra` 使用 `data_infra_relevance/developer_utility/project_signal/content_clarity`。
 
 ```json
 {
   "dimensions": {
-    "ai_relevance": {"score": 35, "reason": "..."},
-    "内容深度": {"score": 25, "reason": "..."},
-    "信息密度": {"score": 12, "reason": "..."},
-    "时效性": {"score": 10, "reason": "..."}
+    "ai_relevance": {"score": 25, "reason": "..."},
+    "engineering_relevance": {"score": 26, "reason": "..."},
+    "content_depth": {"score": 22, "reason": "..."},
+    "info_density": {"score": 12, "reason": "..."}
   }
 }
 ```
@@ -317,14 +317,38 @@ sources:
       lookback_days: 90
       min_stars: 100
 
-  - id: rss_the_batch
-    name: The Batch
+  - id: github_data_infra
+    name: GitHub 数据工程基础设施
+    type: github
+    enabled: true
+    cron: "0 */6 * * *"
+    max_items: 10
+    config:
+      keywords: ["dbt", "SQLMesh", "data lineage", "data catalog", "data quality"]
+      lookback_type: pushed
+      lookback_days: 90
+      min_stars: 100
+
+  - id: hotlist_aihot
+    name: AIHot
+    type: hotlist
+    enabled: true
+    cron: "0 */2 * * *"
+    max_items: 10
+    config:
+      api_url: "https://newsnow.busiyi.world/api/s"
+      platform_id: "aihot"
+      filter_keywords: [AI, LLM, Agent, RAG, MCP, OpenAI, 大模型, 人工智能]
+      filter_scope: title_summary
+
+  - id: rss_techcrunch
+    name: TechCrunch AI
     type: rss
     enabled: true
-    cron: "0 9 * * 1"        # 周刊
-    max_items: 5
+    cron: "0 */6 * * *"
+    max_items: 10
     config:
-      url: "https://www.deeplearning.ai/the-batch/feed/"
+      url: "https://techcrunch.com/feed/"
 ```
 
 ### agents.yaml 配置结构
@@ -571,19 +595,28 @@ docker compose restart pipeline
 
 ## 评审算法
 
-Reviewer 采用四维评分，总分 0-100：
+Reviewer 采用 source-aware 四维评分，总分 0-100；模型只给分数草稿，最终 verdict 由代码按阈值重算。
+
+普通文章：
 
 | 维度 | 权重 | 评分标准 |
 |------|------|---------|
-| AI 相关度 | 0-40 | 35-40: 核心 AI/LLM/Agent；25-34: AI 基础设施；10-24: 泛技术提及 |
-| 内容深度 | 0-30 | 25-30: 深度原创；15-24: 有具体细节；5-14: 简要介绍 |
+| AI 相关度 | 0-30 | 24-30: 核心 AI/LLM/Agent/MCP/RAG；18-23: AI 基础设施；8-17: 泛泛提及 |
+| 工程相关度 | 0-30 | 24-30: 编码/工程/AI infra/数据工程；18-23: 有工程线索；0-17: 偏产品、商业或应用新闻 |
+| 内容深度 | 0-25 | 21-25: 深度原创；13-20: 有具体细节；5-12: 简要介绍 |
 | 信息密度 | 0-15 | 12-15: 新颖/独家；7-11: 有一定信息量；0-6: 重复/营销 |
-| 时效性 | 0-15 | 12-15: 本周内；7-11: 本月；0-6: 较早 |
+
+GitHub repo：
+
+| 来源 | 维度 |
+|------|------|
+| 默认 GitHub | `ai_relevance / developer_utility / project_signal / content_clarity` |
+| `github_data_infra` | `data_infra_relevance / developer_utility / project_signal / content_clarity` |
 
 评审结果：
-- **≥80 分**: approved → 入库
-- **50-79 分**: retry (最多 2 轮，带修改建议)
-- **<50 分**: discarded
+- 普通文章：`ai_relevance < 18` 直接 discarded；`total_score >= 70 && engineering_relevance >= 22` 才 approved；边界分 retry。
+- 默认 GitHub：要求 AI 相关度、开发者实用性和项目信号达标。
+- `github_data_infra`：不看 AI 相关度，要求数据工程基础设施相关度和实用性达标。
 
 ## LLM 交互流程
 
@@ -640,13 +673,13 @@ URL: {url}
 #### reviewer.md
 ```
 你是内容审核员。对文章按四维评分（0-100）:
-- AI相关度(0-40): 核心AI/LLM/Agent/MCP/RAG=35-40, AI基础设施=25-34, 泛技术提及=10-24, 无关=0-9
-- 内容深度(0-30): 深度原创=25-30, 有细节=15-24, 简要=5-14, 空内容=0-4
-- 信息密度(0-15): 新颖独家=12-15, 有信息量=7-11, 重复营销=0-6
-- 时效性(0-15): 本周内=12-15, 本月=7-11, 较早=0-6
+- AI相关度(0-30): 核心AI/LLM/Agent/MCP/RAG=24-30, AI基础设施=18-23, 泛泛提及=8-17, 无关=0-7
+- 工程相关度engineering_relevance(0-30): 编码/开发工具/工程实践/AI infra/数据工程=24-30, 有工程线索=18-23, 无工程价值=0-7
+- 内容深度(0-25): 深度原创=21-25, 有细节=13-20, 简要=5-12, 空内容=0-4
+- 信息密度info_density(0-15): 新颖独家=12-15, 有信息量=7-11, 重复营销=0-6
 
 输出 JSON:
-{ "total_score": 85, "dimensions": { "ai_relevance": {"score": 35, "reason": "..."}, ... }, "verdict": "approved"|"retry"|"discarded", "retry_feedback": null|{"suggestions": ["..."]} }
+{ "total_score": 85, "dimensions": { "ai_relevance": {"score": 25, "reason": "..."}, "engineering_relevance": {"score": 25, "reason": "..."}, "content_depth": {"score": 23, "reason": "..."}, "info_density": {"score": 12, "reason": "..."} }, "verdict": "approved"|"retry"|"discarded", "retry_feedback": null|{"suggestions": ["..."]} }
 ```
 
 ### Agent 配置
@@ -668,17 +701,18 @@ URL: {url}
 路由阶段（Router）── 100% 规则分流
     │
     ├── github ──▶ github_analyzer ──prompts/github_analyzer.md──┐
-    ├── rss    ──▶ rss_analyzer    ──prompts/rss_analyzer.md─────┤
+    ├── rss/hotlist/hn ─▶ rss_analyzer ─prompts/rss_analyzer.md──┤
     ├── feishu ──▶ feishu_analyzer ──prompts/feishu_analyzer.md─┤──▶ Aggregator（汇总）
     └── arxiv  ──▶ arxiv_analyzer  ──prompts/arxiv_analyzer.md─┘
                                                                   │
                                                                   ▼
                                                               Reviewer
-                                                        ──prompts/reviewer.md──▶ 四维评分
+                                ┌──────────────────prompts/reviewer.md──▶ 普通文章 AI + 工程评分
+                                └─────────────prompts/github_reviewer.md──▶ GitHub repo-aware 评分
                                                                   │
                                         ┌──────────────────┬─────┴─────┐
                                         ▼                  ▼            ▼
-                                    ≥80: 入库      50-79: retry     <50: discarded
+                                    approved 入库      retry      discarded
                                                      (最多 2 轮)
 ```
 
@@ -709,10 +743,10 @@ URL: {url}
 {
   "total_score": 85,
   "dimensions": {
-    "ai_relevance": {"score": 35, "reason": "..."},
-    "depth": {"score": 25, "reason": "..."},
-    "info_density": {"score": 15, "reason": "..."},
-    "timeliness": {"score": 10, "reason": "..."}
+    "ai_relevance": {"score": 25, "reason": "..."},
+    "engineering_relevance": {"score": 25, "reason": "..."},
+    "content_depth": {"score": 23, "reason": "..."},
+    "info_density": {"score": 12, "reason": "..."}
   },
   "verdict": "approved|retry|discarded",
   "retry_feedback": null | {"suggestions": ["..."]}
@@ -725,7 +759,7 @@ URL: {url}
 |------|---------|
 | Analyzer parse 失败 | 重试一次（最多 2 轮），仍失败则跳过该条，记录 warning |
 | LLM Provider 熔断 | 自动切换 fallback provider，无 fallback 则跳过 |
-| Reviewer verdict=retry | 返回修改建议，重新进入 analyzer 处理，最多 2 轮 |
+| Reviewer verdict=retry | 返回修改建议，只重审 Reviewer，最多 2 轮 |
 | Reviewer verdict=discarded | 直接丢弃，不入库 |
 
 ### Prompt 扩展
@@ -741,7 +775,7 @@ URL: {url}
 ### 短期优化
 
 - [ ] **数据源扩展**: 添加 Twitter/X、微博、知乎专栏等社交媒体源
-- [ ] **评分维度优化**: 增加"原创性"、"可操作性"等评分维度
+- [ ] **评分策略校准**: 根据线上误杀/误收样本调整各 source 的阈值
 - [ ] **缓存优化**: 引入 Redis 缓存热门搜索结果
 - [ ] **监控告警**: 对采集失败率、LLM 熔断次数等指标设置告警
 
