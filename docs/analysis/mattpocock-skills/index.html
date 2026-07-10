@@ -296,7 +296,7 @@
           </div>
         </div>
       </div>
-      <p class="route-note">箭头表示推荐路线。相邻的 user-invoked 技能仍须由人类逐步启动；只有 model-invoked 技能能被编排流程采用。单会话小改可从 grilling 直接进入 implement，不制造 Spec 和 Tickets。</p>
+      <p class="route-note">箭头表示推荐路线。相邻的 user-invoked 技能仍须由人类逐步启动；只有 model-invoked 技能能被编排流程采用。单会话小改可从 grill-with-docs 直接进入 implement，不制造 Spec 和 Tickets。</p>
     </section>
 
     <section aria-labelledby="section-4">
@@ -315,8 +315,8 @@
       <h3 style="margin-top:12px;">固定源码明确存在的组合边</h3>
       <div class="grid cols-3">
         <div class="dependency"><button class="skill-button user" type="button" data-detail="grill-with-docs"><strong>grill-with-docs</strong></button><span class="dependency-mark">→</span><button class="skill-button model" type="button" data-detail="grilling"><strong>grilling</strong><span>+ domain-modeling</span></button></div>
-        <div class="dependency"><button class="skill-button user" type="button" data-detail="triage"><strong>triage</strong></button><span class="dependency-mark">→</span><button class="skill-button model" type="button" data-detail="grilling"><strong>grilling + domain-modeling</strong><span>必要时补全请求与领域词汇</span></button></div>
-        <div class="dependency"><button class="skill-button user" type="button" data-detail="wayfinder"><strong>wayfinder</strong></button><span class="dependency-mark">→</span><button class="skill-button model" type="button" data-detail="grilling"><strong>grilling + domain-modeling</strong><span>prototype 类型调查票还可采用 prototype</span></button></div>
+        <div class="dependency"><button class="skill-button user" type="button" data-detail="triage"><strong>triage</strong></button><span class="dependency-mark">→</span><button class="skill-button model" type="button" data-detail="grilling"><strong>grilling</strong><span>必要时还采用 domain-modeling 补全领域词汇</span></button></div>
+        <div class="dependency"><button class="skill-button user" type="button" data-detail="wayfinder"><strong>wayfinder</strong></button><span class="dependency-mark">→</span><button class="skill-button model" type="button" data-detail="grilling"><strong>grilling</strong><span>还采用 domain-modeling；prototype 类型调查票可采用 prototype</span></button></div>
         <div class="dependency"><button class="skill-button user" type="button" data-detail="improve-codebase-architecture"><strong>improve-codebase-architecture</strong></button><span class="dependency-mark">→</span><button class="skill-button model" type="button" data-detail="codebase-design"><strong>codebase-design</strong><span>+ grilling + domain-modeling</span></button></div>
         <div class="dependency"><button class="skill-button user" type="button" data-detail="implement"><strong>implement</strong></button><span class="dependency-mark">→</span><button class="skill-button model" type="button" data-detail="tdd"><strong>tdd</strong><span>+ code-review</span></button></div>
         <div class="dependency"><button class="skill-button user" type="button" data-detail="grill-me"><strong>grill-me</strong></button><span class="dependency-mark">→</span><button class="skill-button model" type="button" data-detail="grilling"><strong>grilling</strong><span>无代码库、不写领域文档</span></button></div>
@@ -732,6 +732,21 @@
     detailBackdrop.addEventListener("click", closeDetail);
     document.addEventListener("keydown", event => {
       if (event.key === "Escape") closeDetail();
+      if (event.key === "Tab" && !detailPanel.hidden) {
+        const focusable = detailPanel.querySelectorAll("button:not([disabled]), a[href]");
+        const first = focusable[0];
+        const last = focusable[focusable.length - 1];
+        if (event.shiftKey && document.activeElement === first) {
+          event.preventDefault();
+          last.focus();
+        } else if (!event.shiftKey && document.activeElement === last) {
+          event.preventDefault();
+          first.focus();
+        } else if (!detailPanel.contains(document.activeElement)) {
+          event.preventDefault();
+          first.focus();
+        }
+      }
     });
   </script>
 </body>
