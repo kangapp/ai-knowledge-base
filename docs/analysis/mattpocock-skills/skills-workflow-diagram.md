@@ -73,7 +73,6 @@ flowchart LR
         Domain["domain-modeling"]
         Design["codebase-design"]
         Prototype["prototype"]
-        Research["research"]
         TDD["tdd"]
         Review["code-review"]
     end
@@ -86,7 +85,6 @@ flowchart LR
     Wayfinder --> Grilling
     Wayfinder --> Domain
     Wayfinder -->|"prototype 类型调查票"| Prototype
-    Wayfinder -->|"research 类型调查票"| Research
     Improve --> Design
     Improve --> Grilling
     Improve --> Domain
