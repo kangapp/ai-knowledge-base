@@ -80,6 +80,7 @@ to-spec → to-tickets → implement → tdd → code-review → commit
 
 | 起始情境 | 入口与局部路径 | 产物 | 回到主链的位置 |
 | --- | --- | --- | --- |
+| 新需求 | `grill-with-docs`：通过 `grilling` 逐问澄清，并用 `domain-modeling` 维护领域文档 | 共享理解、更新后的 `CONTEXT.md` 和必要 ADR | 单会话小改回到 `implement`；多会话工作回到 `to-spec` |
 | Bug 或性能回归 | `diagnosing-bugs`：建立能捕获用户精确症状的 tight feedback loop，再最小化、列 3–5 个可证伪假设、逐项探测、先写回归测试后修复 | 最小复现、修复、回归测试、清理和 post-mortem | 该技能已经包含修复和回归测试，因此通常在 `code-review → commit` 收尾；若发现没有正确测试 seam，修复后转入架构维护入口，再从 `grill-with-docs` 回主链 |
 | 外部 Issue/PR | `triage`：读取 tracker、验证主张、必要时组合 `grilling` 与 `domain-modeling`，在人类确认下改变状态 | category/state 标签、triage notes 或 agent brief；PR 还验证现有 diff | `ready-for-agent` 的新工作回到 `implement`；已有 PR 可按 brief 处理 diff 后进入 `code-review`；`ready-for-human` 交给人类，不强行进入自动实现 |
 | 超大、模糊、单会话装不下的工作 | `wayfinder`：先定义 destination，再建立 map、调查 tickets、blocking edges 与 frontier；每个会话只解决一张票 | 决策地图、已关闭的决策票、逐步消散的 fog of war | 路线清楚后回到 `to-spec`；若实际范围足够小，可直接回到 `implement` |
