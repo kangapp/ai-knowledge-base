@@ -50,7 +50,7 @@
 
   解释安装时选择 `/setup-matt-pocock-skills`，以及 Setup 对仓库探测、Issue Tracker、Triage Labels、Domain Docs 的配置流程。用表格对比 user-invoked 与 model-invoked，明确“用户调用技能可以组合模型调用技能；用户调用技能不能自动调用另一个用户调用技能”。
 
-- [ ] **Step 3: 写主工作流与六类情境入口**
+- [ ] **Step 3: 写主工作流、六个业务入口与跨会话桥**
 
   主链必须覆盖：
 
@@ -59,7 +59,7 @@
   to-spec → to-tickets → implement → tdd → code-review → commit
   ```
 
-  解释单会话小改动可从 `grill-with-docs` 直接进入 `implement`；多会话工作才生成 Spec 与 Tickets。情境入口分别覆盖 Bug、外部 Issue/PR、超大模糊工作、架构维护、研究、跨会话交接，并标明各自回到主链的位置。
+  解释单会话小改动可从 `grill-with-docs` 直接进入 `implement`；多会话工作才生成 Spec 与 Tickets。六个业务入口分别覆盖新需求、Bug、外部 Issue/PR、超大模糊工作、架构维护、研究，并标明各自回到主链的位置；跨会话交接作为任意节点可用的桥单独说明。
 
 - [ ] **Step 4: 写产物交接和正式技能目录**
 
@@ -182,7 +182,7 @@
 
 - [ ] **Step 3: 写 21 个技能详情数据**
 
-  在脚本中的 `skillDetails` 对象为每个正式技能提供：`title`、`summary`、`invocation`、`input`、`output`、`requires`、`previous`、`next`、`source`。`source` 必须是对应 GitHub `blob/main/.../SKILL.md` 的 HTTPS 链接。
+  在脚本中的 `skillDetails` 对象为每个正式技能提供：`title`、`summary`、`invocation`、`input`、`output`、`requires`、`previous`、`next`、`source`。`source` 必须是对应 GitHub `blob/391a2701dd948f94f56a39f7533f8eea9a859c87/.../SKILL.md` 的 HTTPS 链接。
 
 - [ ] **Step 4: 实现详情抽屉交互**
 

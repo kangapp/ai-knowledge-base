@@ -110,7 +110,7 @@
     }
 
     .skill-button:hover { box-shadow: 0 6px 18px rgba(15, 23, 42, .14); transform: translateY(-1px); }
-    .skill-button:focus-visible, .detail-close:focus-visible, .source-link:focus-visible { outline: 3px solid rgba(37, 99, 235, .35); outline-offset: 2px; }
+    .skill-button:focus-visible, .detail-close:focus-visible, .source-link:focus-visible { outline: 3px solid #2563eb; outline-offset: 2px; }
     .skill-button strong { display: block; overflow-wrap: anywhere; font-size: 15px; }
     .skill-button span { display: block; margin-top: 5px; color: var(--muted); font-size: 13px; }
     .skill-button.user { border-color: var(--blue); background: var(--blue-soft); }
@@ -232,7 +232,7 @@
     </section>
 
     <section aria-labelledby="section-2">
-      <h2 id="section-2"><span class="icon" aria-hidden="true">②</span>情境入口</h2>
+      <h2 id="section-2"><span class="icon" aria-hidden="true">②</span>六个业务入口与跨会话桥</h2>
       <div class="route-grid">
         <div class="card router-card amber">
           <div>
@@ -326,7 +326,7 @@
     <section aria-labelledby="section-5">
       <h2 id="section-5"><span class="icon" aria-hidden="true">⑤</span>产物交接链</h2>
       <div class="artifact-chain">
-        <div class="artifact blue"><strong>Setup 配置</strong><code>issue-tracker.md</code><br><code>triage-labels.md</code><br><code>domain.md</code></div>
+        <div class="artifact blue"><strong>Setup 配置</strong>两个：<code>issue-tracker.md</code>、<code>domain.md</code><br>安装 <code>triage</code> 时为三个，增加 <code>triage-labels.md</code></div>
         <div class="artifact green"><strong>领域语言</strong><code>CONTEXT.md</code><br><code>docs/adr/*.md</code></div>
         <div class="artifact blue"><strong>Spec issue</strong>多会话工作的需求基线</div>
         <div class="artifact amber"><strong>Tickets</strong>tracer bullets + blocking edges</div>
@@ -339,7 +339,7 @@
         <div class="card"><h3>handoff Markdown</h3><p>OS 临时目录中的脱敏跨会话桥；引用正式产物，不复制第二份事实源。</p></div>
         <div class="card"><h3>research Markdown</h3><p>仓库内带一手来源引用的事实快照；提供输入，不代替人类决策。</p></div>
       </div>
-      <p class="route-note">Spec 与 Tickets 只服务多会话工作；单会话小改仍读取领域文档，并以 Tests、Review 和 Commit 收尾。</p>
+      <p class="route-note">Spec 与 Tickets 只服务多会话工作；单会话小改仍读取领域文档，并以 Tests、Review 和 Commit 收尾。固定源码存在未决前置张力：Setup 未安装 <code>triage</code> 时不生成 <code>triage-labels.md</code>，但 <code>to-spec</code> 与 <code>to-tickets</code> 声明需要 triage label vocabulary 并应用 <code>ready-for-agent</code>；源码未给出回退行为。</p>
     </section>
 
     <section aria-labelledby="section-6">
@@ -449,7 +449,7 @@
         requires: "21 项技能的路由知识、调用规则",
         previous: "任意工程工作开始前；先检查是否已完成 Setup",
         next: "由用户显式启动被推荐的 user-invoked 技能",
-        source: "https://github.com/mattpocock/skills/blob/main/skills/engineering/ask-matt/SKILL.md"
+        source: "https://github.com/mattpocock/skills/blob/391a2701dd948f94f56a39f7533f8eea9a859c87/skills/engineering/ask-matt/SKILL.md"
       },
       "diagnosing-bugs": {
         title: "diagnosing-bugs",
@@ -460,7 +460,7 @@
         requires: "CONTEXT.md、相关 ADR、可运行测试/脚本/浏览器/trace",
         previous: "Bug 或性能回归入口",
         next: "通常进入 code-review → commit；若暴露测试 seam 问题则转架构维护",
-        source: "https://github.com/mattpocock/skills/blob/main/skills/engineering/diagnosing-bugs/SKILL.md"
+        source: "https://github.com/mattpocock/skills/blob/391a2701dd948f94f56a39f7533f8eea9a859c87/skills/engineering/diagnosing-bugs/SKILL.md"
       },
       "grill-with-docs": {
         title: "grill-with-docs",
@@ -471,7 +471,7 @@
         requires: "grilling、domain-modeling、代码与已有领域文档",
         previous: "Setup 之后的新需求主链起点；研究结果也可在此汇入",
         next: "小改直达 implement；多会话工作进入 to-spec；必要时走 prototype 支线",
-        source: "https://github.com/mattpocock/skills/blob/main/skills/engineering/grill-with-docs/SKILL.md"
+        source: "https://github.com/mattpocock/skills/blob/391a2701dd948f94f56a39f7533f8eea9a859c87/skills/engineering/grill-with-docs/SKILL.md"
       },
       "triage": {
         title: "triage",
@@ -482,7 +482,7 @@
         requires: "Issue Tracker、Triage Labels、领域文档；必要时 grilling、domain-modeling",
         previous: "外部请求入口",
         next: "ready-for-agent → implement；已有 PR 可处理后进入 code-review；ready-for-human 交给人类",
-        source: "https://github.com/mattpocock/skills/blob/main/skills/engineering/triage/SKILL.md"
+        source: "https://github.com/mattpocock/skills/blob/391a2701dd948f94f56a39f7533f8eea9a859c87/skills/engineering/triage/SKILL.md"
       },
       "improve-codebase-architecture": {
         title: "improve-codebase-architecture",
@@ -493,18 +493,18 @@
         requires: "codebase-design、代码探索、grilling、domain-modeling",
         previous: "架构维护入口；也可承接诊断发现的 seam 问题",
         next: "候选想法回到 grill-with-docs，再按规模走 implement 或 Spec/Tickets",
-        source: "https://github.com/mattpocock/skills/blob/main/skills/engineering/improve-codebase-architecture/SKILL.md"
+        source: "https://github.com/mattpocock/skills/blob/391a2701dd948f94f56a39f7533f8eea9a859c87/skills/engineering/improve-codebase-architecture/SKILL.md"
       },
       "setup-matt-pocock-skills": {
         title: "setup-matt-pocock-skills",
-        summary: "首次工程流程前的提示驱动配置：探测仓库、展示草稿、逐节确认后写入 tracker、labels 与 domain 约定。",
+        summary: "首次工程流程前的提示驱动配置：探测仓库、展示草稿、逐节确认后写入两个配置；安装 triage 时为三个，增加 labels 约定。",
         invocation: "用户：/setup-matt-pocock-skills",
         input: "仓库结构、remote、现有 agent/domain 文件、用户选择",
         output: "docs/agents/*.md 与现有 CLAUDE.md/AGENTS.md 中的 Agent skills 配置块",
         requires: "Git 与文件探测；用户逐节确认",
         previous: "安装插件并选中该技能",
         next: "grill-with-docs 或其它工程情境入口",
-        source: "https://github.com/mattpocock/skills/blob/main/skills/engineering/setup-matt-pocock-skills/SKILL.md"
+        source: "https://github.com/mattpocock/skills/blob/391a2701dd948f94f56a39f7533f8eea9a859c87/skills/engineering/setup-matt-pocock-skills/SKILL.md"
       },
       "tdd": {
         title: "tdd",
@@ -515,7 +515,7 @@
         requires: "CONTEXT.md、ADR、测试工具、用户预先确认 seam",
         previous: "通常由 implement 内部采用；也可独立构建具体行为",
         next: "持续局部验证；实现结束进入 code-review",
-        source: "https://github.com/mattpocock/skills/blob/main/skills/engineering/tdd/SKILL.md"
+        source: "https://github.com/mattpocock/skills/blob/391a2701dd948f94f56a39f7533f8eea9a859c87/skills/engineering/tdd/SKILL.md"
       },
       "to-spec": {
         title: "to-spec",
@@ -526,7 +526,7 @@
         requires: "Issue Tracker、Triage Labels、领域术语、用户确认测试 seams",
         previous: "grill-with-docs 后的多会话分支",
         next: "由用户显式启动 to-tickets",
-        source: "https://github.com/mattpocock/skills/blob/main/skills/engineering/to-spec/SKILL.md"
+        source: "https://github.com/mattpocock/skills/blob/391a2701dd948f94f56a39f7533f8eea9a859c87/skills/engineering/to-spec/SKILL.md"
       },
       "to-tickets": {
         title: "to-tickets",
@@ -537,7 +537,7 @@
         requires: "Issue Tracker、Triage Labels、领域术语、tracker 阻塞能力",
         previous: "多会话工作的 to-spec 之后",
         next: "每张已解锁 ticket 由用户在干净上下文启动 implement",
-        source: "https://github.com/mattpocock/skills/blob/main/skills/engineering/to-tickets/SKILL.md"
+        source: "https://github.com/mattpocock/skills/blob/391a2701dd948f94f56a39f7533f8eea9a859c87/skills/engineering/to-tickets/SKILL.md"
       },
       "wayfinder": {
         title: "wayfinder",
@@ -548,7 +548,7 @@
         requires: "Issue Tracker、grilling、domain-modeling；按票型使用 research/prototype",
         previous: "巨大模糊工作入口",
         next: "路线清楚后进入 to-spec；范围已变小时可直接 implement",
-        source: "https://github.com/mattpocock/skills/blob/main/skills/engineering/wayfinder/SKILL.md"
+        source: "https://github.com/mattpocock/skills/blob/391a2701dd948f94f56a39f7533f8eea9a859c87/skills/engineering/wayfinder/SKILL.md"
       },
       "implement": {
         title: "implement",
@@ -559,7 +559,7 @@
         requires: "tdd、code-review、类型检查和测试命令",
         previous: "单会话 grilling 后，或每张已解锁 ticket 的干净上下文",
         next: "下一张已解锁 ticket 使用新会话；全部完成则结束本轮交付",
-        source: "https://github.com/mattpocock/skills/blob/main/skills/engineering/implement/SKILL.md"
+        source: "https://github.com/mattpocock/skills/blob/391a2701dd948f94f56a39f7533f8eea9a859c87/skills/engineering/implement/SKILL.md"
       },
       "prototype": {
         title: "prototype",
@@ -570,7 +570,7 @@
         requires: "现有项目运行方式和路由约定",
         previous: "grilling 中无法仅靠对话解决的问题；通常先 handoff 到新会话",
         next: "handoff 结论回原 idea/Spec/implementation 会话",
-        source: "https://github.com/mattpocock/skills/blob/main/skills/engineering/prototype/SKILL.md"
+        source: "https://github.com/mattpocock/skills/blob/391a2701dd948f94f56a39f7533f8eea9a859c87/skills/engineering/prototype/SKILL.md"
       },
       "research": {
         title: "research",
@@ -581,7 +581,7 @@
         requires: "后台 agent、高信任一手来源、仓库既有笔记约定",
         previous: "研究入口；也可作为 wayfinder research 类型调查票",
         next: "把研究文件带入 grill-with-docs 或其它决策会话",
-        source: "https://github.com/mattpocock/skills/blob/main/skills/engineering/research/SKILL.md"
+        source: "https://github.com/mattpocock/skills/blob/391a2701dd948f94f56a39f7533f8eea9a859c87/skills/engineering/research/SKILL.md"
       },
       "domain-modeling": {
         title: "domain-modeling",
@@ -592,7 +592,7 @@
         requires: "single/multi-context 布局、用户决策、代码事实",
         previous: "贯穿 grilling、triage、wayfinder 与架构工作的词汇层",
         next: "更新后的领域语言被 Spec、实现、测试、诊断和评审消费",
-        source: "https://github.com/mattpocock/skills/blob/main/skills/engineering/domain-modeling/SKILL.md"
+        source: "https://github.com/mattpocock/skills/blob/391a2701dd948f94f56a39f7533f8eea9a859c87/skills/engineering/domain-modeling/SKILL.md"
       },
       "codebase-design": {
         title: "codebase-design",
@@ -603,7 +603,7 @@
         requires: "当前调用关系和可变 adapter 事实；需要时 design-it-twice agent",
         previous: "架构扫描与 TDD 下方的设计词汇层",
         next: "为 improve-codebase-architecture 候选或 TDD seam 选择提供依据",
-        source: "https://github.com/mattpocock/skills/blob/main/skills/engineering/codebase-design/SKILL.md"
+        source: "https://github.com/mattpocock/skills/blob/391a2701dd948f94f56a39f7533f8eea9a859c87/skills/engineering/codebase-design/SKILL.md"
       },
       "code-review": {
         title: "code-review",
@@ -614,7 +614,7 @@
         requires: "可解析 Git fixed point、Issue Tracker、标准文件、两个并行 sub-agents",
         previous: "implement 提交前；也可独立 review 分支或 PR",
         next: "修正问题并重新验证，然后 commit",
-        source: "https://github.com/mattpocock/skills/blob/main/skills/engineering/code-review/SKILL.md"
+        source: "https://github.com/mattpocock/skills/blob/391a2701dd948f94f56a39f7533f8eea9a859c87/skills/engineering/code-review/SKILL.md"
       },
       "grill-me": {
         title: "grill-me",
@@ -625,7 +625,7 @@
         requires: "grilling",
         previous: "无代码库的通用澄清入口",
         next: "确认共享理解后再进入适合的实施流程",
-        source: "https://github.com/mattpocock/skills/blob/main/skills/productivity/grill-me/SKILL.md"
+        source: "https://github.com/mattpocock/skills/blob/391a2701dd948f94f56a39f7533f8eea9a859c87/skills/productivity/grill-me/SKILL.md"
       },
       "grilling": {
         title: "grilling",
@@ -636,7 +636,7 @@
         requires: "代码库可查事实、用户对决策的回答",
         previous: "被 grill-me、grill-with-docs、triage、wayfinder 等流程采用",
         next: "共享理解确认后返回编排流程；自身不实施计划",
-        source: "https://github.com/mattpocock/skills/blob/main/skills/productivity/grilling/SKILL.md"
+        source: "https://github.com/mattpocock/skills/blob/391a2701dd948f94f56a39f7533f8eea9a859c87/skills/productivity/grilling/SKILL.md"
       },
       "handoff": {
         title: "handoff",
@@ -647,7 +647,7 @@
         requires: "对 Spec、ADR、issue、commit、diff 等已有产物的引用",
         previous: "任意阶段上下文接近上限；prototype 支线双向桥",
         next: "新会话从被中断节点继续，不在原会话继续",
-        source: "https://github.com/mattpocock/skills/blob/main/skills/productivity/handoff/SKILL.md"
+        source: "https://github.com/mattpocock/skills/blob/391a2701dd948f94f56a39f7533f8eea9a859c87/skills/productivity/handoff/SKILL.md"
       },
       "teach": {
         title: "teach",
@@ -658,7 +658,7 @@
         requires: "当前目录作为教学 workspace、一手资料、用户反馈",
         previous: "独立教学流入口",
         next: "依据学习记录与最近发展区规划后续 lesson",
-        source: "https://github.com/mattpocock/skills/blob/main/skills/productivity/teach/SKILL.md"
+        source: "https://github.com/mattpocock/skills/blob/391a2701dd948f94f56a39f7533f8eea9a859c87/skills/productivity/teach/SKILL.md"
       },
       "writing-great-skills": {
         title: "writing-great-skills",
@@ -669,7 +669,7 @@
         requires: "同目录 GLOSSARY.md 及被编辑技能",
         previous: "独立参考层入口",
         next: "按规范修改或评估 skill；不属于工程交付主链",
-        source: "https://github.com/mattpocock/skills/blob/main/skills/productivity/writing-great-skills/SKILL.md"
+        source: "https://github.com/mattpocock/skills/blob/391a2701dd948f94f56a39f7533f8eea9a859c87/skills/productivity/writing-great-skills/SKILL.md"
       }
     };
 

@@ -2,7 +2,7 @@
 
 本文把 [`skills-analysis.md`](./skills-analysis.md) 的结论压缩为五张可独立阅读的关系图。所有数量与关系固定到 `mattpocock/skills` 提交 `391a2701dd948f94f56a39f7533f8eea9a859c87`；箭头表达推荐路线或实际组合关系，不表示一个 user-invoked 技能能自动调用另一个 user-invoked 技能。
 
-## 1. 六类情境入口
+## 1. 六个业务入口与跨会话桥
 
 `ask-matt` 根据当前工作情境推荐入口；它只负责给出路线，仍由用户显式启动下一项 user-invoked 技能。
 
@@ -16,7 +16,7 @@ flowchart LR
     Study["研究"] -->|"ask-matt 推荐"| Research["research"]
 ```
 
-路由按输入行一一对应：新需求进入澄清主链，Bug 先建立可执行反馈环，外部请求先分流，巨大工作先消除未知，架构维护先扫描候选，研究先产出带引用的事实材料。
+路由按输入行一一对应：新需求进入澄清主链，Bug 先建立可执行反馈环，外部请求先分流，巨大工作先消除未知，架构维护先扫描候选，研究先产出带引用的事实材料。这六项是业务入口；`handoff` 不构成第七项，而是任意节点可用的跨会话桥。
 
 ## 2. Idea-to-ship 主流程
 
@@ -127,10 +127,10 @@ flowchart LR
     Glossary --> Spec
     ADR --> Spec
     Tracker --> Spec
-    Labels --> Spec
+    Labels -. "源码要求读取；仅安装 triage 时生成" .-> Spec
     Spec --> Tickets
     Tracker --> Tickets
-    Labels --> Tickets
+    Labels -. "源码要求读取；仅安装 triage 时生成" .-> Tickets
     Tickets --> Build
     Glossary --> Build
     ADR --> Build
@@ -140,7 +140,7 @@ flowchart LR
     Review --> Commit
 ```
 
-Spec 与 Tickets 只服务多会话工作；单会话小改可在 `grill-with-docs` 后直接实施，但仍应读取领域文档，并以 Tests、Review 和 Commit 收尾。
+Spec 与 Tickets 只服务多会话工作；单会话小改可在 `grill-with-docs` 后直接实施，但仍应读取领域文档，并以 Tests、Review 和 Commit 收尾。固定源码在这里存在未决张力：Setup 未安装 `triage` 时不生成 `triage-labels.md`，而 `to-spec`、`to-tickets` 声明需要 triage label vocabulary 并应用 `ready-for-agent`；源码没有给出回退行为，因此虚线只表示已声明依赖，不表示该前置一定已满足。
 
 ## 5. 正式暴露与目录状态分层
 
