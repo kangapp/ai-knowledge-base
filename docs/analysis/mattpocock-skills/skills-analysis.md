@@ -217,7 +217,7 @@
 | 产物 | 路径/位置 | 创建者 | 更新者 | 消费者 | 内部结构 | 生命周期与作用 |
 | --- | --- | --- | --- | --- | --- | --- |
 | `CONTEXT.md` | 单上下文项目根目录，或各上下文根 | `domain-modeling`（常由组合流程驱动） | `domain-modeling` | grilling、规划、实现、TDD、诊断、审查、架构扫描 | 严格的领域 glossary：术语、定义、边界与关系 | 长期且持续演化；跨会话压缩统一语言，不承载实现细节或 Spec |
-| `CONTEXT-MAP.md` | 大型多包项目根目录，可选 | `setup-matt-pocock-skills` | `setup-matt-pocock-skills`（布局变化时） | 需要选择上下文的工程 Skill | 子上下文名称、范围与对应 `CONTEXT.md` 指针 | 长期；多上下文导航，普通仓库不创建 |
+| `CONTEXT-MAP.md` | 大型多包项目根目录，可选；Setup 只配置其位置 | 无固定创建者 | 无固定更新者 | 需要选择上下文的工程 Skill | 子上下文名称、范围与对应 `CONTEXT.md` 指针 | 长期；多上下文导航，普通仓库不使用 |
 | `docs/adr/NNNN-*.md` | `docs/adr/` 或 domain 配置指定位置 | `domain-modeling` | 无固定更新者 | 后续领域建模、规划、实现、诊断、审查与架构工作 | 编号/标题、上下文、决策、备选与后果 | 长期不可变记录；仅在难逆、缺上下文会意外且存在真实权衡时创建 |
 
 ### 4.4 工作规划产物
@@ -253,9 +253,9 @@
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | `setup-matt-pocock-skills` | C/U | R | R |  |  |  |  |  |  |  |  |
 | `grill-with-docs` | R | C/U/R | C/R |  |  |  |  |  |  |  |  |
-| `triage` | R | U/R | C/R |  | U/R |  |  |  |  | R |  |
+| `triage` | R | U/R | C/R |  |  |  |  |  |  | R |  |
 | `wayfinder` | R | U/R | C/R |  | C/U/R |  |  |  |  |  |  |
-| `to-spec` | R | R | R | C |  | R | R |  |  |  |  |
+| `to-spec` | R | R | R | C |  |  | R |  |  |  |  |
 | `to-tickets` | R | R |  | R | C |  |  |  |  |  |  |
 | `implement` | R | R | R | R | R/U |  |  |  |  | C/U/R | R |
 | `tdd` |  | R | R |  |  |  |  |  |  | C/U/R |  |
@@ -265,12 +265,12 @@
 | `codebase-design` |  | R | R |  |  |  |  |  |  | R |  |
 | `improve-codebase-architecture` |  | R | R |  |  |  |  | C |  | R |  |
 | `research` |  |  |  |  |  | C |  |  |  |  |  |
-| `prototype` |  |  |  | R | R |  | C/U |  |  | C/U |  |
+| `prototype` |  |  |  |  | U |  | C/U |  |  | C/U |  |
 | `handoff` |  |  | R | R | R |  |  |  | C | R |  |
 
 图例：`C` = Create（创建），`U` = Update（更新），`R` = Read（读取）。同一格可包含多种关系。
 
-证据边界：矩阵不把流程建议自动升级为调用事实。例如 Wayfinder 的 Research Ticket 会创建“linked Markdown summary”，但源码没有明确规定它调用 `research`，因此 `wayfinder × Research Markdown` 留空；若实践中组合两者，应标注为可选路线。`handoff` 明确读取/引用 ADR、Spec、Issue/Ticket、commit/diff，但不会更新它们。Triage 对领域文档/ADR 的创建更新来自其主动领域建模分支，而非每次 triage 都发生。
+证据边界：矩阵不把流程建议自动升级为调用事实。例如 Wayfinder 的 Research Ticket 会创建“linked Markdown summary”，但源码没有明确规定它调用 `research`，因此 `wayfinder × Research Markdown` 留空；若实践中组合两者，应标注为可选路线。`to-spec` 也没有固定读取 Research Markdown，研究结果只有进入当前对话后才可能成为可选输入。`prototype × Tickets` 的 `U` 只表示源码要求把原型分支指针和结论写回 implementation issue，不表示读取或处理 `to-tickets` 产出的规划票。`handoff` 明确读取/引用 ADR、Spec、Issue/Ticket、commit/diff，但不会更新它们。Triage 对领域文档/ADR 的创建更新来自其主动领域建模分支，而非每次 triage 都发生；其处理的是外部原始 Issue/PR，不是本矩阵的规划 Tickets。
 
 ## 6. 五条协作流程与跨会话桥
 
@@ -289,7 +289,7 @@
 
 1. `diagnosing-bugs` → red-capable 反馈命令 / 最小复现 / 排序假设 → 根因。
 2. `diagnosing-bugs` → 失败的 Regression Test → 修复 Code。
-3. 修复 Code + Regression Test → `code-review` → 审查结论与 Code commit。
+3. 修复 Code + Regression Test → `code-review` → 审查结论 → `implement` 修正并产生 Code commit。
 4. 若没有正确 test seam：`diagnosing-bugs` → post-mortem 中的架构发现 → `improve-codebase-architecture`，但先完成可验证修复。
 
 ### 6.3 大型模糊项目
