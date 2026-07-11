@@ -70,3 +70,17 @@
 - 修复有复发风险的 bug：记录到 `docs/bug-progress.md`，包含症状、根因、修复和验证命令。
 - 推进或调整阶段性任务：同步更新 `docs/task.md`。
 - 如果 AGENTS.md 或 docs 与代码冲突，以代码为准，并修正文档。
+
+## Agent skills
+
+### Issue tracker
+
+Issues 和 PRD 统一通过当前仓库的 GitHub Issues 管理。详见 `docs/agents/issue-tracker.md`。
+
+### Triage labels
+
+使用 `needs-triage`、`needs-info`、`ready-for-agent`、`ready-for-human` 和 `wontfix` 五类默认标签。详见 `docs/agents/triage-labels.md`。
+
+### Domain docs
+
+使用 single-context 领域文档布局：根目录 `CONTEXT.md` 和 `docs/adr/`。详见 `docs/agents/domain.md`。

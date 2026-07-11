@@ -95,12 +95,25 @@ def test_homepage_source_filter_uses_source_id_for_github_subsources():
     assert "a.source_id === state.source" in app_js
 
 
-def test_skills_workflow_cards_stay_within_their_grid():
-    index_html = (
-        ROOT / "docs/analysis/mattpocock-skills/index.html"
+def test_skills_handbook_declares_all_browser_pages():
+    config = (
+        ROOT / "docs/analysis/mattpocock-skills/topic.yaml"
     ).read_text(encoding="utf-8")
 
-    assert ".flow-card{\n    min-width:0;" in index_html
+    assert "source: README.md" in config
+    assert "source: usage-guide.md" in config
+    assert "source: file-management.md" in config
+    assert "source: examples/article-favorites.md" in config
+
+
+def test_analysis_topic_supports_progressive_details_and_mermaid():
+    template = (ROOT / "src/site/templates/analysis-topic.html").read_text()
+    script = (ROOT / "src/site/static/js/analysis-topic.js").read_text()
+
+    assert "mermaid.min.js" in template
+    assert "enhanceDetailSections" in script
+    assert ".topic-content h3" in script
+    assert "查看详情" in script
 
 
 @pytest.mark.asyncio
@@ -182,6 +195,68 @@ async def test_site_builder_publishes_analysis_html_pages(tmp_path, monkeypatch)
     assert 'href="/analysis/architecture/index.html"' in analysis_html
     assert "架构分析" in analysis_html
     assert copied_html.read_text(encoding="utf-8").startswith("<!doctype html>")
+
+
+@pytest.mark.asyncio
+async def test_site_builder_renders_markdown_analysis_topic(tmp_path, monkeypatch):
+    analysis_dir = tmp_path / "docs" / "analysis"
+    project_dir = analysis_dir / "skills"
+    project_dir.mkdir(parents=True)
+    (project_dir / "topic.yaml").write_text(
+        """title: Skills 手册
+pages:
+  - source: README.md
+    output: index.html
+    title: 快速入门
+  - source: usage-guide.md
+    output: usage-guide.html
+    title: 使用指南
+""",
+        encoding="utf-8",
+    )
+    (project_dir / "README.md").write_text(
+        "# 快速入门\n\n查看 [使用指南](usage-guide.md)。\n",
+        encoding="utf-8",
+    )
+    (project_dir / "usage-guide.md").write_text(
+        "# 使用指南\n\n- 澄清需求\n- 实施功能\n",
+        encoding="utf-8",
+    )
+
+    async def fake_search_articles(*args, **kwargs):
+        return []
+
+    async def fake_get_stats(*args, **kwargs):
+        return {}
+
+    monkeypatch.setattr(builder, "search_articles", fake_search_articles)
+    monkeypatch.setattr(builder, "get_stats", fake_get_stats)
+
+    output_dir = tmp_path / "output"
+    site_builder = builder.SiteBuilder(
+        db=object(),
+        output_dir=output_dir,
+        template_dir=ROOT / "src/site/templates",
+        analysis_dir=analysis_dir,
+    )
+    await site_builder.build()
+
+    index_html = (output_dir / "analysis" / "skills" / "index.html").read_text()
+    guide_html = (
+        output_dir / "analysis" / "skills" / "usage-guide.html"
+    ).read_text()
+    analysis_html = (output_dir / "analysis.html").read_text()
+
+    assert "快速入门</h1>" in index_html
+    assert 'href="usage-guide.html"' in index_html
+    assert 'href="/analysis/skills/index.html"' in analysis_html
+    assert "<li>澄清需求</li>" in guide_html
+    assert "快速入门" in guide_html
+    assert 'class="topic-content"' in guide_html
+    assert 'id="detail-panel"' in guide_html
+    assert 'aria-label="关闭详情"' in guide_html
+    assert (output_dir / "static" / "css" / "analysis-topic.css").is_file()
+    assert (output_dir / "static" / "js" / "analysis-topic.js").is_file()
 
 
 @pytest.mark.asyncio

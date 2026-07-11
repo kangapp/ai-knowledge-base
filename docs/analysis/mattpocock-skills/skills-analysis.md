@@ -1,6 +1,6 @@
 # mattpocock/skills：Skill 与产物说明书
 
-本文固定分析 `mattpocock/skills` 提交 `391a2701dd948f94f56a39f7533f8eea9a859c87`。正式 Skill 仅以该提交的 `.claude-plugin/plugin.json` 为准；目录桶、README 分组和浮动 `main` 都不替代这条边界。
+本文以 `mattpocock/skills` 当前 `main` 为准。正式 Skill 以 `.claude-plugin/plugin.json` 为边界；核对日期与提交哈希只用于让读者验证资料来源。
 
 ## 1. 快速认识
 
@@ -33,147 +33,147 @@
 - **核心作用**：按当前情境推荐 Skill 或流程；**适用场景**：不确定从哪个入口开始；**调用方式**：用户显式 `/ask-matt`。
 - **输入**：当前问题、代码库有无、工作规模；**执行动作**：区分主流程、入口、维护与独立工具并给出路线；**输出**：推荐路线。
 - **中间产物**：无；**依赖**：仓库 Skill 与调用规则知识；**协作关系**：位于所有流程之前，指向 Setup 或具体入口；**使用边界**：只路由，不执行另一个 user-invoked Skill。
-- **固定源码**：[ask-matt](https://github.com/mattpocock/skills/blob/391a2701dd948f94f56a39f7533f8eea9a859c87/skills/engineering/ask-matt/SKILL.md)
+- **源代码**：[ask-matt](https://github.com/mattpocock/skills/blob/391a2701dd948f94f56a39f7533f8eea9a859c87/skills/engineering/ask-matt/SKILL.md)
 
 ### `setup-matt-pocock-skills`
 
 - **核心作用**：为工程 Skill 建立仓库级配置；**适用场景**：每个仓库首次使用工程流程；**调用方式**：用户显式 `/setup-matt-pocock-skills`。
 - **输入**：remote、仓库结构、现有 agent/domain 文件、已安装 Skill 与用户选择；**执行动作**：探测、展示草稿、逐节确认后写入；**输出**：可被工程 Skill 消费的项目配置。
 - **中间产物**：`AGENTS.md`/`CLAUDE.md` 配置块及 `docs/agents/*.md` 草稿；**依赖**：Git/文件探测与用户确认；**协作关系**：为 `triage`、`wayfinder`、`to-spec`、`to-tickets`、领域相关 Skill 提供前置；**使用边界**：不同时新建两种 agent 文件，未安装 `triage` 时跳过标签配置。
-- **固定源码**：[setup-matt-pocock-skills](https://github.com/mattpocock/skills/blob/391a2701dd948f94f56a39f7533f8eea9a859c87/skills/engineering/setup-matt-pocock-skills/SKILL.md)
+- **源代码**：[setup-matt-pocock-skills](https://github.com/mattpocock/skills/blob/391a2701dd948f94f56a39f7533f8eea9a859c87/skills/engineering/setup-matt-pocock-skills/SKILL.md)
 
 ### `grill-me`
 
 - **核心作用**：用持续访谈澄清通用计划或设计；**适用场景**：没有代码库的方案讨论；**调用方式**：用户显式 `/grill-me`。
 - **输入**：计划、设计与逐题回答；**执行动作**：运行 `grilling`；**输出**：共享理解与已解决决策树。
 - **中间产物**：对话中的问题与答案；**依赖**：`grilling`；**协作关系**：通用澄清入口；**使用边界**：无状态，不写领域文档，确认前不实施。
-- **固定源码**：[grill-me](https://github.com/mattpocock/skills/blob/391a2701dd948f94f56a39f7533f8eea9a859c87/skills/productivity/grill-me/SKILL.md)
+- **源代码**：[grill-me](https://github.com/mattpocock/skills/blob/391a2701dd948f94f56a39f7533f8eea9a859c87/skills/productivity/grill-me/SKILL.md)
 
 ### `grill-with-docs`
 
 - **核心作用**：澄清工程计划并同步固化领域语言和决策；**适用场景**：有代码库的功能或架构讨论；**调用方式**：用户显式 `/grill-with-docs`。
 - **输入**：计划、代码事实、领域文档与用户决策；**执行动作**：组合 `grilling` 和 `domain-modeling`；**输出**：共享理解、更新后的领域文档。
 - **中间产物**：`CONTEXT.md`、必要 ADR、对话决策；**依赖**：`grilling`、`domain-modeling`；**协作关系**：新功能主链起点，可交给 `to-spec` 或小改的 `implement`；**使用边界**：负责澄清与记录，不实施计划。
-- **固定源码**：[grill-with-docs](https://github.com/mattpocock/skills/blob/391a2701dd948f94f56a39f7533f8eea9a859c87/skills/engineering/grill-with-docs/SKILL.md)
+- **源代码**：[grill-with-docs](https://github.com/mattpocock/skills/blob/391a2701dd948f94f56a39f7533f8eea9a859c87/skills/engineering/grill-with-docs/SKILL.md)
 
 ### `grilling`
 
 - **核心作用**：逐分支、逐问题压力测试计划；**适用场景**：需要消除设计分歧或未决项；**调用方式**：模型自动或用户显式。
 - **输入**：计划、可查事实和用户回答；**执行动作**：事实自行查证，决策每次只问一题并给推荐答案；**输出**：共享理解。
 - **中间产物**：对话中的决策树；**依赖**：用户参与和可访问代码库；**协作关系**：被 `grill-me`、`grill-with-docs`、`triage`、`wayfinder` 等复用；**使用边界**：不替用户作决策，不实施计划。
-- **固定源码**：[grilling](https://github.com/mattpocock/skills/blob/391a2701dd948f94f56a39f7533f8eea9a859c87/skills/productivity/grilling/SKILL.md)
+- **源代码**：[grilling](https://github.com/mattpocock/skills/blob/391a2701dd948f94f56a39f7533f8eea9a859c87/skills/productivity/grilling/SKILL.md)
 
 ### `prototype`
 
 - **核心作用**：用抛弃式可运行代码回答一个设计问题；**适用场景**：状态/逻辑需 CLI 验证，或 UI 必须看见多个差异方案；**调用方式**：模型自动或用户显式。
 - **输入**：单一设计问题与现有项目约定；**执行动作**：建立隔离分支，做最小 CLI 或同一路由多种 UI，记录结论；**输出**：可运行原型与已验证决策。
 - **中间产物**：Prototype branch、问题/答案和返回原线程的 context pointer；**依赖**：项目运行方式、路由与 Git；**协作关系**：由 grilling 支线进入，结论回到原想法/Spec；**使用边界**：代码从第一天即抛弃，默认不做持久化、测试、抽象或 polish。
-- **固定源码**：[prototype](https://github.com/mattpocock/skills/blob/391a2701dd948f94f56a39f7533f8eea9a859c87/skills/engineering/prototype/SKILL.md)
+- **源代码**：[prototype](https://github.com/mattpocock/skills/blob/391a2701dd948f94f56a39f7533f8eea9a859c87/skills/engineering/prototype/SKILL.md)
 
 ### `triage`
 
 - **核心作用**：把外部 Issue/PR 推进到明确类别与状态；**适用场景**：维护者处理未经治理的请求；**调用方式**：用户显式 `/triage`。
 - **输入**：外部 Issue/PR、tracker 状态、标签映射和维护者指示；**执行动作**：分类、验证、补问、写 notes/brief，经人确认后变更状态；**输出**：`needs-info`、`ready-for-agent`、`ready-for-human` 或 `wontfix` 结果。
 - **中间产物**：Triage Notes、Agent/Human Brief、标签和评论；**依赖**：Issue Tracker、Triage Labels，必要时 `grilling`/`domain-modeling`；**协作关系**：agent-ready 请求交给 `implement`；**使用边界**：仅治理外来原始请求，`to-tickets` 产出的票不再 triage，所有发布内容带 AI 声明。
-- **固定源码**：[triage](https://github.com/mattpocock/skills/blob/391a2701dd948f94f56a39f7533f8eea9a859c87/skills/engineering/triage/SKILL.md)
+- **源代码**：[triage](https://github.com/mattpocock/skills/blob/391a2701dd948f94f56a39f7533f8eea9a859c87/skills/engineering/triage/SKILL.md)
 
 ### `wayfinder`
 
 - **核心作用**：把超大模糊工作变成共享决策地图；**适用场景**：目的地已知但单会话看不清路线；**调用方式**：用户显式 `/wayfinder`。
 - **输入**：destination、tracker 配置、领域知识和用户决策；**执行动作**：创建 Map 与子票、连接阻塞边、每会话认领并解决至多一票、更新 frontier；**输出**：逐步消散 fog of war 的决策地图。
 - **中间产物**：Map Issue、Research/Prototype/Grilling/Task Tickets、resolution comments、Decisions so far；**依赖**：Issue Tracker、`grilling`、`domain-modeling`；**协作关系**：路线清晰后交给 `to-spec` 或小范围 `implement`；**使用边界**：默认产出决策而非目的地交付物；Research Ticket 是票据类型，不等于源码明确调用 `research`，二者组合只能标作可选路线。
-- **固定源码**：[wayfinder](https://github.com/mattpocock/skills/blob/391a2701dd948f94f56a39f7533f8eea9a859c87/skills/engineering/wayfinder/SKILL.md)
+- **源代码**：[wayfinder](https://github.com/mattpocock/skills/blob/391a2701dd948f94f56a39f7533f8eea9a859c87/skills/engineering/wayfinder/SKILL.md)
 
 ### `to-spec`
 
 - **核心作用**：把已经讨论清楚的内容综合成可执行 Spec；**适用场景**：多会话工作进入正式规划；**调用方式**：用户显式 `/to-spec`。
 - **输入**：当前完整对话、代码库理解和领域文档；**执行动作**：综合目标、范围、行为与测试 seams，确认后发布；**输出**：带 `ready-for-agent` 的 Spec Issue。
 - **中间产物**：Spec 草稿与 seam 确认；**依赖**：Issue Tracker、Triage Labels、领域术语；**协作关系**：承接 grilling/wayfinder，交给 `to-tickets`；**使用边界**：不重新访谈，通常不写具体实现文件或代码。
-- **固定源码**：[to-spec](https://github.com/mattpocock/skills/blob/391a2701dd948f94f56a39f7533f8eea9a859c87/skills/engineering/to-spec/SKILL.md)
+- **源代码**：[to-spec](https://github.com/mattpocock/skills/blob/391a2701dd948f94f56a39f7533f8eea9a859c87/skills/engineering/to-spec/SKILL.md)
 
 ### `to-tickets`
 
 - **核心作用**：把计划拆成单会话 tracer-bullet tickets；**适用场景**：Spec 或计划需分阶段实现；**调用方式**：用户显式 `/to-tickets`。
 - **输入**：Spec、plan、issue 或当前讨论；**执行动作**：设计端到端切片、确认粒度与 blocking edges、发布到 tracker；**输出**：带依赖关系和 `ready-for-agent` 的 Ticket Issues。
 - **中间产物**：票据草稿；本地 tracker 为 `.scratch/<feature>/issues/NN-<ticket>.md`；**依赖**：Issue Tracker、Triage Labels 与阻塞能力；**协作关系**：每票由新的 `implement` 会话消费；**使用边界**：不修改/关闭 parent，wide refactor 用 expand-contract，发布前必须经用户确认。
-- **固定源码**：[to-tickets](https://github.com/mattpocock/skills/blob/391a2701dd948f94f56a39f7533f8eea9a859c87/skills/engineering/to-tickets/SKILL.md)
+- **源代码**：[to-tickets](https://github.com/mattpocock/skills/blob/391a2701dd948f94f56a39f7533f8eea9a859c87/skills/engineering/to-tickets/SKILL.md)
 
 ### `implement`
 
 - **核心作用**：完成一张明确票据并以测试、审查和提交收尾；**适用场景**：Spec/Ticket 已足够可执行；**调用方式**：用户显式 `/implement`。
 - **输入**：Ticket、Spec 或明确工作说明；**执行动作**：理解范围，在确认 seam 上驱动 `tdd`，运行反馈命令，以 `code-review` 收尾并提交；**输出**：已验证实现和 Code commit。
 - **中间产物**：Tests、Code、测试输出、Code Review report；**依赖**：`tdd`、`code-review`、项目测试/类型检查；**协作关系**：承接 agent-ready 工作，逐票完成主链；**使用边界**：不得跳过预定 seam、完整测试或提交前双轴审查。
-- **固定源码**：[implement](https://github.com/mattpocock/skills/blob/391a2701dd948f94f56a39f7533f8eea9a859c87/skills/engineering/implement/SKILL.md)
+- **源代码**：[implement](https://github.com/mattpocock/skills/blob/391a2701dd948f94f56a39f7533f8eea9a859c87/skills/engineering/implement/SKILL.md)
 
 ### `tdd`
 
 - **核心作用**：以 red-green-refactor 垂直切片实现外部行为；**适用场景**：功能或修复有已确认 public seam；**调用方式**：模型自动或用户显式。
 - **输入**：一个行为、确认过的 seam、领域文档；**执行动作**：先写一个失败测试，再写最小实现使其通过并重复；**输出**：通过的行为切片。
 - **中间产物**：失败后转绿并保留的 Tests 与 Code；**依赖**：测试工具、`CONTEXT.md`/ADR；**协作关系**：由 `implement` 驱动，也可独立使用；**使用边界**：不测试实现细节、不横向批量铺测试、不在未确认 seam 上开始。
-- **固定源码**：[tdd](https://github.com/mattpocock/skills/blob/391a2701dd948f94f56a39f7533f8eea9a859c87/skills/engineering/tdd/SKILL.md)
+- **源代码**：[tdd](https://github.com/mattpocock/skills/blob/391a2701dd948f94f56a39f7533f8eea9a859c87/skills/engineering/tdd/SKILL.md)
 
 ### `diagnosing-bugs`
 
 - **核心作用**：用紧反馈环诊断困难 Bug/性能回归并验证修复；**适用场景**：错误、失败、变慢、间歇性问题；**调用方式**：模型自动或用户显式。
 - **输入**：用户精确症状、环境、代码与历史状态；**执行动作**：建立 red-capable 命令、复现并最小化、排序可证伪假设、单变量探测、先回归测试后修复、清理复盘；**输出**：根因、已验证修复与 post-mortem。
 - **中间产物**：最小复现、反馈命令、临时 instrumentation、Regression Test；**依赖**：可运行环境、`CONTEXT.md`/ADR；**协作关系**：修复后交给 review/commit，无正确 seam 时把发现交给架构维护；**使用边界**：没有已运行且捕获精确症状的紧红灯命令，不进入假设阶段。
-- **固定源码**：[diagnosing-bugs](https://github.com/mattpocock/skills/blob/391a2701dd948f94f56a39f7533f8eea9a859c87/skills/engineering/diagnosing-bugs/SKILL.md)
+- **源代码**：[diagnosing-bugs](https://github.com/mattpocock/skills/blob/391a2701dd948f94f56a39f7533f8eea9a859c87/skills/engineering/diagnosing-bugs/SKILL.md)
 
 ### `code-review`
 
 - **核心作用**：从固定点对 diff 做 Standards 与 Spec 双轴审查；**适用场景**：实现收尾或独立检查分支/PR；**调用方式**：模型自动或用户显式。
 - **输入**：可解析 fixed point、`HEAD` diff、仓库 standards 与可选 Spec；**执行动作**：两个独立并行审查分别核对标准/气味和规格忠实度；**输出**：并排的双轴 Code Review report。
 - **中间产物**：两个 sub-agent 报告；**依赖**：Git、Issue Tracker/Spec、标准文件与并行 agent 能力；**协作关系**：`implement` 提交前质量门；**使用边界**：缺 fixed point 先问、空 diff 停止、无 Spec 明示跳过该轴、两轴不合并重排。
-- **固定源码**：[code-review](https://github.com/mattpocock/skills/blob/391a2701dd948f94f56a39f7533f8eea9a859c87/skills/engineering/code-review/SKILL.md)
+- **源代码**：[code-review](https://github.com/mattpocock/skills/blob/391a2701dd948f94f56a39f7533f8eea9a859c87/skills/engineering/code-review/SKILL.md)
 
 ### `domain-modeling`
 
 - **核心作用**：建立并持续校准项目统一领域语言；**适用场景**：术语模糊、重载、边界冲突或决策需要固化；**调用方式**：模型自动或用户显式。
 - **输入**：领域术语、边界场景、代码事实和用户决策；**执行动作**：挑战定义、用反例压力测试、即时更新 glossary，达到门槛才写 ADR；**输出**：清晰领域模型。
 - **中间产物**：`CONTEXT.md`、可选 `CONTEXT-MAP.md`、`docs/adr/NNNN-*.md`；**依赖**：`docs/agents/domain.md` 与用户裁决；**协作关系**：贯穿 grilling、triage、wayfinder、架构工作；**使用边界**：仅被动读取 glossary 不算调用；`CONTEXT.md` 不放实现细节；ADR 必须同时具备难逆、意外和真实权衡。
-- **固定源码**：[domain-modeling](https://github.com/mattpocock/skills/blob/391a2701dd948f94f56a39f7533f8eea9a859c87/skills/engineering/domain-modeling/SKILL.md)
+- **源代码**：[domain-modeling](https://github.com/mattpocock/skills/blob/391a2701dd948f94f56a39f7533f8eea9a859c87/skills/engineering/domain-modeling/SKILL.md)
 
 ### `codebase-design`
 
 - **核心作用**：提供 deep module、interface 与 seam 的统一设计纪律；**适用场景**：模块边界、抽象、adapter 或可测试性设计；**调用方式**：模型自动或用户显式。
 - **输入**：调用关系、行为、变化轴与候选接口；**执行动作**：以 module/interface/depth/seam/adapter/leverage/locality 评价设计，必要时 design-it-twice；**输出**：深模块接口与测试 seam 设计。
 - **中间产物**：候选接口、边界方案与比较；**依赖**：现有代码事实；**协作关系**：为 `tdd` 和架构扫描提供词汇，选定设计回主开发流程；**使用边界**：只有一个 adapter 时不凭空制造 seam，不把浅包装当深模块。
-- **固定源码**：[codebase-design](https://github.com/mattpocock/skills/blob/391a2701dd948f94f56a39f7533f8eea9a859c87/skills/engineering/codebase-design/SKILL.md)
+- **源代码**：[codebase-design](https://github.com/mattpocock/skills/blob/391a2701dd948f94f56a39f7533f8eea9a859c87/skills/engineering/codebase-design/SKILL.md)
 
 ### `improve-codebase-architecture`
 
 - **核心作用**：扫描代码库并可视化 deepening opportunities；**适用场景**：周期性架构维护或缺少测试 seam；**调用方式**：用户显式 `/improve-codebase-architecture`。
 - **输入**：代码库、`CONTEXT.md`、相关 ADR；**执行动作**：用 `codebase-design` 词汇探索候选，生成 HTML，由用户选择后 grilling；**输出**：Architecture HTML report 与选定架构问题。
 - **中间产物**：OS 临时目录中的报告、候选列表与设计对话；**依赖**：`codebase-design`、代码探索、`grilling`/`domain-modeling`；**协作关系**：选题后经领域/边界澄清回主开发流程；**使用边界**：扫描时不先定具体 interface，报告不落仓库，不绕过 ADR 冲突。
-- **固定源码**：[improve-codebase-architecture](https://github.com/mattpocock/skills/blob/391a2701dd948f94f56a39f7533f8eea9a859c87/skills/engineering/improve-codebase-architecture/SKILL.md)
+- **源代码**：[improve-codebase-architecture](https://github.com/mattpocock/skills/blob/391a2701dd948f94f56a39f7533f8eea9a859c87/skills/engineering/improve-codebase-architecture/SKILL.md)
 
 ### `research`
 
 - **核心作用**：针对一个问题查阅高信任一手资料并固化引用；**适用场景**：决策前需要外部事实；**调用方式**：模型自动或用户显式。
 - **输入**：清晰研究问题、仓库笔记约定；**执行动作**：后台 agent 搜索、筛选 primary sources、逐项引用并写文件；**输出**：仓库内单一 Research Markdown。
 - **中间产物**：来源列表、检索笔记和引用；**依赖**：后台 agent、网络/资料访问；**协作关系**：结果可带入 `grill-with-docs` 或其他决策会话；**使用边界**：只做事实调研，不以二手摘要替代一手来源，不代替决策或实现；与 Wayfinder Research Ticket 的结合不是固定调用事实。
-- **固定源码**：[research](https://github.com/mattpocock/skills/blob/391a2701dd948f94f56a39f7533f8eea9a859c87/skills/engineering/research/SKILL.md)
+- **源代码**：[research](https://github.com/mattpocock/skills/blob/391a2701dd948f94f56a39f7533f8eea9a859c87/skills/engineering/research/SKILL.md)
 
 ### `handoff`
 
 - **核心作用**：把当前会话压缩成新会话可接续的文档；**适用场景**：上下文将满、需要分支或换会话；**调用方式**：用户显式 `/handoff`。
 - **输入**：当前对话、下一会话目标和正式产物指针；**执行动作**：总结、引用既有产物、建议 Skill、脱敏并写入临时目录；**输出**：handoff Markdown。
 - **中间产物**：无；**依赖**：OS 临时目录与现有 Spec/ADR/Issue/commit/diff 指针；**协作关系**：任意流程、任意节点到新会话的桥；**使用边界**：不在原会话继续，不复制已有正式产物，不写当前 workspace，不携带敏感信息。
-- **固定源码**：[handoff](https://github.com/mattpocock/skills/blob/391a2701dd948f94f56a39f7533f8eea9a859c87/skills/productivity/handoff/SKILL.md)
+- **源代码**：[handoff](https://github.com/mattpocock/skills/blob/391a2701dd948f94f56a39f7533f8eea9a859c87/skills/productivity/handoff/SKILL.md)
 
 ### `teach`
 
 - **核心作用**：在当前目录维护多会话教学工作区；**适用场景**：持续学习一个概念或技能；**调用方式**：用户显式 `/teach`。
 - **输入**：主题、mission、学习记录、可信资源与反馈；**执行动作**：确定最近发展区，制作短 lesson、reference、练习和学习记录；**输出**：状态化教学工作区与 HTML lessons。
 - **中间产物**：`MISSION.md`、`RESOURCES.md`、`NOTES.md`、`lessons/`、`reference/`、`assets/`、`learning-records/`；**依赖**：当前目录、一手资源和用户反馈；**协作关系**：独立多会话教学流；**使用边界**：每课服务 mission，mission 变更先确认，不属于工程交付链。
-- **固定源码**：[teach](https://github.com/mattpocock/skills/blob/391a2701dd948f94f56a39f7533f8eea9a859c87/skills/productivity/teach/SKILL.md)
+- **源代码**：[teach](https://github.com/mattpocock/skills/blob/391a2701dd948f94f56a39f7533f8eea9a859c87/skills/productivity/teach/SKILL.md)
 
 ### `writing-great-skills`
 
 - **核心作用**：提供可预测 Skill 的编写与裁剪规范；**适用场景**：编写、修改或评估 Skill；**调用方式**：用户显式 `/writing-great-skills`。
 - **输入**：待处理 Skill 与调用需求；**执行动作**：检查 invocation、description、信息层级、拆分、单一事实源、leading words 与 failure modes；**输出**：Skill 设计/编辑规范或改进结论。
 - **中间产物**：被编辑 Skill 与检查笔记；**依赖**：同目录 `GLOSSARY.md`；**协作关系**：独立参考能力；**使用边界**：追求过程可预测，不承诺输出逐字一致，不混淆 context load 与 cognitive load。
-- **固定源码**：[writing-great-skills](https://github.com/mattpocock/skills/blob/391a2701dd948f94f56a39f7533f8eea9a859c87/skills/productivity/writing-great-skills/SKILL.md)
+- **源代码**：[writing-great-skills](https://github.com/mattpocock/skills/blob/391a2701dd948f94f56a39f7533f8eea9a859c87/skills/productivity/writing-great-skills/SKILL.md)
 
 ## 4. 文件与产物图鉴
 
@@ -247,7 +247,7 @@
 
 ## 5. Skill × 产物矩阵
 
-只列固定源码能直接支持的关系；空白表示没有明确的创建、更新或读取关系，而不是证明 Skill 永远不会接触该产物。
+只列源代码能直接支持的关系；空白表示没有明确的创建、更新或读取关系，而不是证明 Skill 永远不会接触该产物。
 
 | Skill | AGENTS.md / CLAUDE.md | docs/agents/issue-tracker.md | docs/agents/domain.md | docs/agents/triage-labels.md | CONTEXT.md | CONTEXT-MAP.md | docs/adr/NNNN-*.md | Spec Issue | Ticket Issues | .scratch/&lt;feature&gt;/issues/NN-&lt;ticket&gt;.md | Research Markdown | Prototype branch | Architecture HTML report | handoff Markdown | Tests | Code commits | Code Review report |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -304,7 +304,7 @@
 3. Map 完成 → 已确认决策与清晰路线 → `to-spec`（范围已缩小到单会话时可到 `implement`）。
 4. `to-spec` → Spec Issue → `to-tickets` → Ticket Issues → `implement`。
 
-Research Ticket 是 Wayfinder 的票据类型；将它交给 `research` 产出 Research Markdown 是合理的**可选组合建议**，不是固定源码规定的自动调用。
+Research Ticket 是 Wayfinder 的票据类型；将它交给 `research` 产出 Research Markdown 是合理的**可选组合建议**，不是源代码规定的自动调用。
 
 ### 6.4 外部请求治理
 
@@ -357,7 +357,7 @@ Issue Tracker 的固定 Skill 正文选项是 GitHub、GitLab、本地 Markdown�
 
 ### 7.3 Setup/Triage 前置张力
 
-固定源码存在一个不能自行补齐的前置张力：Setup 在未安装 `triage` 时明确不生成 `docs/agents/triage-labels.md`；但 `to-spec` 与 `to-tickets` 又要求 triage label vocabulary 已提供，并要给 Spec/Tickets 应用 `ready-for-agent`。源码没有定义未安装 `triage` 时的回退标签来源，因此本文只记录张力，不虚构默认映射或跳过规则。
+源代码存在一个不能自行补齐的前置张力：Setup 在未安装 `triage` 时明确不生成 `docs/agents/triage-labels.md`；但 `to-spec` 与 `to-tickets` 又要求 triage label vocabulary 已提供，并要给 Spec/Tickets 应用 `ready-for-agent`。源码没有定义未安装 `triage` 时的回退标签来源，因此本文只记录张力，不虚构默认映射或跳过规则。
 
 ### 7.4 已知能力前提
 
@@ -365,7 +365,7 @@ Issue Tracker 的固定 Skill 正文选项是 GitHub、GitLab、本地 Markdown�
 
 ## 8. 非正式 Skill 附录
 
-固定提交包含 39 个 Skill 目录，插件正式暴露 21 个；剩余目录不能统称为“未完成”。
+当前提交包含 39 个 Skill 目录，插件正式暴露 21 个；剩余目录不能统称为“未完成”。
 
 | 目录桶 | 数量 | 状态与正式边界 |
 | --- | ---: | --- |
@@ -376,12 +376,12 @@ Issue Tracker 的固定 Skill 正文选项是 GitHub、GitLab、本地 Markdown�
 | `in-progress` | 7 | 开发中，未进入插件 |
 | `deprecated` | 4 | 已弃用，未进入插件 |
 
-`engineering/resolving-merge-conflicts` 的目录存在但不在 `plugin.json`；固定快照不足以解释原因，不推断为遗漏或即将发布。`misc`、`personal`、`in-progress`、`deprecated` 也不提升为本文正式 Skill。
+`engineering/resolving-merge-conflicts` 的目录存在但不在 `plugin.json`；当前源码不足以解释原因，不推断为遗漏或即将发布。`misc`、`personal`、`in-progress`、`deprecated` 也不提升为本文正式 Skill。
 
-## 9. 固定快照来源
+## 9. 核对来源
 
 - 研究日期：2026-07-11；上游提交：`391a2701dd948f94f56a39f7533f8eea9a859c87`。
 - [README](https://github.com/mattpocock/skills/blob/391a2701dd948f94f56a39f7533f8eea9a859c87/README.md)：安装、Setup 入口、整体定位与调用分组。
 - [插件清单](https://github.com/mattpocock/skills/blob/391a2701dd948f94f56a39f7533f8eea9a859c87/.claude-plugin/plugin.json)：21 个正式 Skill 的唯一清单。
 - [调用规则](https://github.com/mattpocock/skills/blob/391a2701dd948f94f56a39f7533f8eea9a859c87/.agents/invocation.md)：user/model-invoked 判定、依赖表达与被动/主动领域工作边界。
-- 21 个正式 `SKILL.md` 的固定提交链接逐项列在第 3 节，避免事实随上游漂移。
+- 21 个正式 `SKILL.md` 的源代码链接逐项列在第 3 节。

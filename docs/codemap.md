@@ -210,7 +210,8 @@
 - `src/site/builder.py`
   - 静态站生成、临时目录原子替换、dashboard 模板渲染。
   - 首页使用 `list_summary`（120 字），`data.json` 保留最长 200 字 summary 供筛选和动态列表展示。
-  - 构建时复制 `docs/analysis/` 到 `/analysis/`，并生成 `/analysis.html` 展示带 `index.html` 的分析页面。
+  - 构建时复制 `docs/analysis/` 到 `/analysis/`，并生成 `/analysis.html` 展示分析专题。
+  - 带 `topic.yaml` 的专题以 Markdown 为唯一正文源，构建时生成统一主题的 HTML 页面；未配置专题继续使用既有 `index.html` 发布方式。
   - `DebouncedBuilder` 绑定触发 run id，记录构建 queued/running/completed/failed；后续 run 合并旧任务时记录 superseded。
 
 - `src/site/templates/index.html` / `src/site/templates/article.html`
@@ -230,7 +231,11 @@
   - 常见改动入口：页面结构、加载/空/错误状态容器。
 
 - `src/site/templates/analysis.html`
-  - 手工分析 HTML 页面列表，数据来自 `docs/analysis/*/index.html`。
+  - 手工分析专题列表，数据来自 `docs/analysis/*/index.html` 或 `topic.yaml`。
+- `src/site/templates/analysis-topic.html`
+  - Markdown 分析专题的统一页面外壳，提供专题导航、前后页、详情抽屉与无脚本可读正文。
+- `src/site/static/css/analysis-topic.css` / `src/site/static/js/analysis-topic.js`
+  - 分析专题共用视觉主题与渐进增强交互。
 
 - `src/site/static/js/deep-reports.js`
   - 深度报告列表/详情请求、安全转义、V2 决策漏斗、SVG 架构图和流程卡片渲染；移动端架构自动降级为节点卡片。
