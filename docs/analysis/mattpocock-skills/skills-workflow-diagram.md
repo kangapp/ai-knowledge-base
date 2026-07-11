@@ -1,169 +1,215 @@
-# mattpocock/skills 工作流与产物关系图
+# mattpocock/skills 能力、产物与协作关系图
 
-本文把 [`skills-analysis.md`](./skills-analysis.md) 的结论压缩为五张可独立阅读的关系图。所有数量与关系固定到 `mattpocock/skills` 提交 `391a2701dd948f94f56a39f7533f8eea9a859c87`；箭头表达推荐路线或实际组合关系，不表示一个 user-invoked 技能能自动调用另一个 user-invoked 技能。
+本文把 [`skills-analysis.md`](./skills-analysis.md) 中已经审定的六类能力、产物生命周期和五条协作流程压缩为五张关系图。所有名称与关系固定到 `mattpocock/skills` 提交 `391a2701dd948f94f56a39f7533f8eea9a859c87`；箭头表示产物交接，不表示相邻 Skill 会自动互相调用。
 
-## 1. 六个业务入口与跨会话桥
+## 1. 六类能力地图
 
-`ask-matt` 根据当前工作情境推荐入口；它只负责给出路线，仍由用户显式启动下一项 user-invoked 技能。
-
-```mermaid
-flowchart LR
-    New["新需求"] -->|"ask-matt 推荐"| Grill["grill-with-docs"]
-    Bug["Bug"] -->|"ask-matt 推荐"| Diagnose["diagnosing-bugs"]
-    External["外部 Issue / PR"] -->|"ask-matt 推荐"| Triage["triage"]
-    Huge["巨大模糊工作"] -->|"ask-matt 推荐"| Wayfinder["wayfinder"]
-    Architecture["架构维护"] -->|"ask-matt 推荐"| Improve["improve-codebase-architecture"]
-    Study["研究"] -->|"ask-matt 推荐"| Research["research"]
-```
-
-路由按输入行一一对应：新需求进入澄清主链，Bug 先建立可执行反馈环，外部请求先分流，巨大工作先消除未知，架构维护先扫描候选，研究先产出带引用的事实材料。这六项是业务入口；`handoff` 不构成第七项，而是任意节点可用的跨会话桥。
-
-## 2. Idea-to-ship 主流程
-
-Setup 是仓库级首次前置。前期讨论、Spec 和 Tickets 尽量保留在同一未压缩上下文；进入实施后，每张 Ticket 都在干净上下文中重新启动一次 `implement`。
+这张图回答“21 个正式 Skill 分别解决哪类问题”。六个分组是导航视图，不代表调用顺序或上游目录结构。
 
 ```mermaid
-flowchart LR
-    Setup["Setup<br/>首次仓库配置"] --> Grill["grill-with-docs<br/>同一 idea 会话"]
-    Grill --> NeedPrototype{"有问题必须用<br/>可运行原型回答？"}
-
-    NeedPrototype -->|"是"| Out["handoff<br/>转入原型会话"]
-    Out --> Prototype["prototype<br/>抛弃式证据"]
-    Prototype --> Back["handoff<br/>结论回原 idea 会话"]
-    NeedPrototype -->|"否"| Size{"能否在单会话完成？"}
-    Back --> Size
-
-    Size -->|"小改动"| Start["启动 implement"]
-    Size -->|"多会话工作"| Spec["to-spec<br/>同一未压缩上下文"]
-    Spec --> Tickets["to-tickets<br/>声明 blocking edges"]
-    Tickets --> Fresh["领取一张可执行 Ticket<br/>清理上下文"]
-    Fresh --> Start
-
-    subgraph Implement["Implement 内部执行与收尾"]
-        direction LR
-        Start --> Slice["内部 TDD<br/>red → green 垂直切片"]
-        Slice --> Review["结束前 Code Review<br/>Standards + Spec"]
-        Review --> Commit["Commit"]
+flowchart TB
+    subgraph Navigation["导航与项目配置"]
+        AskMatt["ask-matt"]
+        Setup["setup-matt-pocock-skills"]
     end
 
-    Commit --> More{"还有已解锁 Ticket？"}
-    More -->|"是：新会话"| Fresh
-    More -->|"否"| Done["本轮交付完成"]
-```
-
-图中的 TDD 是 `implement` 内部反馈环，不是与 `implement` 平级的必经用户命令；`code-review` 也是其提交前的收尾门。二者仍可被单独调用。
-
-## 3. User-invoked 与 Model-invoked 调用依赖
-
-仅绘制固定源码中明确存在的组合边。左侧技能可编排右侧技能；图中没有画出的相邻主流程步骤（例如 `to-spec → to-tickets`）是用户下一步启动关系，不是自动调用依赖。
-
-```mermaid
-flowchart LR
-    subgraph User["User-invoked｜必须由人类显式启动"]
-        GrillDocs["grill-with-docs"]
+    subgraph Discovery["需求澄清与方案探索"]
         GrillMe["grill-me"]
+        GrillDocs["grill-with-docs"]
+        Grilling["grilling"]
+        Prototype["prototype"]
+    end
+
+    subgraph Governance["请求治理与规划拆分"]
         Triage["triage"]
         Wayfinder["wayfinder"]
-        Improve["improve-codebase-architecture"]
-        Implement["implement"]
+        ToSpec["to-spec"]
+        ToTickets["to-tickets"]
     end
 
-    subgraph Model["Model-invoked｜模型可自动选择，用户也可显式调用"]
-        Grilling["grilling"]
-        Domain["domain-modeling"]
-        Design["codebase-design"]
-        Prototype["prototype"]
+    subgraph Delivery["实现、测试与审查"]
+        Implement["implement"]
         TDD["tdd"]
+        Diagnose["diagnosing-bugs"]
         Review["code-review"]
     end
 
-    GrillDocs --> Grilling
-    GrillDocs --> Domain
-    GrillMe --> Grilling
-    Triage -->|"需要补全请求时"| Grilling
-    Triage -->|"需要补全请求时"| Domain
-    Wayfinder --> Grilling
-    Wayfinder --> Domain
-    Wayfinder -->|"prototype 类型调查票"| Prototype
-    Improve --> Design
-    Improve --> Grilling
-    Improve --> Domain
-    Implement --> TDD
-    Implement --> Review
+    subgraph Architecture["领域知识与架构设计"]
+        Domain["domain-modeling"]
+        Design["codebase-design"]
+        Improve["improve-codebase-architecture"]
+    end
+
+    subgraph Knowledge["知识获取与跨会话协作"]
+        Research["research"]
+        Handoff["handoff"]
+        Teach["teach"]
+        WriteSkills["writing-great-skills"]
+    end
 ```
 
-`ask-matt` 未作为调用源画入：它只推荐 user-invoked 路线，不能替用户启动这些路线。
+每个正式 Skill 在图中恰好出现一次，能力范围只帮助读者选择入口。调用方式是单项属性，未作为一级分类，也不应从节点相邻关系推断自动调用。
 
-## 4. 稳定产物交接
+## 2. 产物生命周期与主要读写关系
 
-这张图展示多会话主链中的持久交接物。原型、研究和 handoff 是按需证据或跨上下文桥，不取代这些正式产物。
+这张图回答“协作依靠哪些持久或临时产物接续”。实线标签中的 `C/U/R` 分别表示创建、更新和读取；为保持可读性，只画正文矩阵中的主要生产与消费关系。
 
 ```mermaid
 flowchart LR
-    Setup["setup-matt-pocock-skills"]
-
-    subgraph Config["Setup 配置｜仓库级长期约定"]
-        Tracker["docs/agents/<br/>issue-tracker.md"]
-        Labels["docs/agents/<br/>triage-labels.md<br/>仅安装 triage 时"]
-        DomainConfig["docs/agents/<br/>domain.md"]
+    subgraph ProjectConfig["项目级配置"]
+        AgentConfig["AGENTS.md / CLAUDE.md"]
+        TrackerConfig["docs/agents/issue-tracker.md"]
+        DomainConfig["docs/agents/domain.md"]
+        LabelConfig["docs/agents/triage-labels.md"]
     end
 
-    subgraph Language["领域语言与决策"]
-        Glossary["CONTEXT.md<br/>Glossary"]
-        ADR["docs/adr/*.md<br/>达到三项门槛才创建"]
+    subgraph DomainKnowledge["长期领域知识"]
+        Context["CONTEXT.md"]
+        ContextMap["CONTEXT-MAP.md（可选）"]
+        ADR["docs/adr/NNNN-*.md"]
     end
 
-    Spec["Spec issue<br/>需求基线"]
-    Tickets["Tracer-bullet tickets<br/>+ blocking edges"]
-    Build["Code + Tests<br/>逐票可执行行为"]
-    Review["Code Review<br/>Standards + Spec 报告"]
-    Commit["Commit<br/>持久版本边界"]
+    subgraph Planning["工作规划产物"]
+        Spec["Spec Issue"]
+        Tickets["Ticket Issues"]
+        LocalTickets[".scratch/&lt;feature&gt;/issues/NN-&lt;ticket&gt;.md"]
+    end
 
-    Setup --> Tracker
-    Setup --> Labels
-    Setup --> DomainConfig
-    DomainConfig --> Glossary
-    DomainConfig --> ADR
-    Glossary --> Spec
-    ADR --> Spec
-    Tracker --> Spec
-    Labels -. "源码要求读取；仅安装 triage 时生成" .-> Spec
-    Spec --> Tickets
-    Tracker --> Tickets
-    Labels -. "源码要求读取；仅安装 triage 时生成" .-> Tickets
-    Tickets --> Build
-    Glossary --> Build
-    ADR --> Build
-    Build --> Review
-    Spec --> Review
-    Tracker --> Review
-    Review --> Commit
+    subgraph DesignResearch["设计与研究产物"]
+        ResearchDoc["Research Markdown"]
+        PrototypeBranch["Prototype branch"]
+        ArchitectureReport["Architecture HTML report"]
+    end
+
+    subgraph Session["临时会话产物"]
+        HandoffDoc["OS 临时目录/handoff-*.md"]
+    end
+
+    subgraph Verification["实现与验证产物"]
+        Tests["Tests"]
+        Commits["Code commits"]
+        ReviewReport["Code Review report"]
+    end
+
+    Setup["setup-matt-pocock-skills"] -->|"C/U 项目配置"| AgentConfig
+    Setup -->|"C/U tracker 配置"| TrackerConfig
+    Setup -->|"C/U 领域配置"| DomainConfig
+    Setup -->|"C/U 标签映射（安装 triage 时）"| LabelConfig
+    Domain["domain-modeling"] -->|"C/U 领域词汇"| Context
+    Domain -->|"C 长期决策"| ADR
+    ToSpec["to-spec"] -->|"C 需求基线"| Spec
+    ToTickets["to-tickets"] -->|"C 远程票据"| Tickets
+    ToTickets -->|"C 本地票据"| LocalTickets
+    Research["research"] -->|"C 带引用事实"| ResearchDoc
+    Prototype["prototype"] -->|"C/U 抛弃式证据"| PrototypeBranch
+    Improve["improve-codebase-architecture"] -->|"C 临时报告"| ArchitectureReport
+    Handoff["handoff"] -->|"C 会话桥"| HandoffDoc
+    TDD["tdd / diagnosing-bugs"] -->|"C/U 行为契约"| Tests
+    Implement["implement"] -->|"C 已验证版本"| Commits
+    Review["code-review"] -->|"C 双轴结论"| ReviewReport
+
+    TrackerConfig -->|"R tracker 操作"| ToSpec
+    DomainConfig -->|"R 知识位置"| Domain
+    Context -->|"R 领域语言"| ToSpec
+    ADR -->|"R 决策约束"| Implement
+    Spec -->|"R 拆票输入"| ToTickets
+    Tickets -->|"R/U 实现任务"| Implement
+    LocalTickets -->|"R/U 实现任务"| Implement
+    Tests -->|"R 反馈证据"| Review
+    Spec -->|"R 规格轴"| Review
+    ReviewReport -->|"R 修正依据"| Implement
+    HandoffDoc -->|"R 状态与正式产物指针"| NewSession["新会话"]
 ```
 
-Spec 与 Tickets 只服务多会话工作；单会话小改可在 `grill-with-docs` 后直接实施，但仍应读取领域文档，并以 Tests、Review 和 Commit 收尾。固定源码在这里存在未决张力：Setup 未安装 `triage` 时不生成 `triage-labels.md`，而 `to-spec`、`to-tickets` 声明需要 triage label vocabulary 并应用 `ready-for-agent`；源码没有给出回退行为，因此虚线只表示已声明依赖，不表示该前置一定已满足。
+`CONTEXT-MAP.md` 没有固定创建者或更新者，因此只保留在生命周期分组中；它不是 Setup 自动生成物。Research Markdown 与 Wayfinder Research Ticket 也没有固定 C/U/R 关系，二者若组合只能作为可选路线。
 
-## 5. 正式暴露与目录状态分层
+## 3. 新功能开发与 Bug 修复
 
-正式边界只由固定提交的 `plugin.json` 决定；目录桶是维护快照，不能用目录存在替代发布状态。
+这张图并列展示两条交付路径：新功能先沉淀需求与规划，Bug 先建立可复现反馈环。两条路径共享实现、测试和审查节点，所有实线边都以标签说明传递的产物。
 
 ```mermaid
 flowchart LR
-    Snapshot["固定提交<br/>391a2701…"]
+    subgraph Feature["新功能开发"]
+        GrillDocs["grill-with-docs"] -->|"CONTEXT.md / ADR / 已确认需求"| ToSpec["to-spec"]
+        ToSpec -->|"Spec Issue"| ToTickets["to-tickets"]
+        ToTickets -->|"带 blocking edges 的 Ticket Issues / 本地票据 Markdown"| FeatureJoin["可执行工作"]
+        GrillDocs -.->|"可选：单会话小改的已确认需求"| FeatureJoin
+    end
 
-    Snapshot --> Manifest["plugin.json<br/>正式暴露 21 个"]
-    Manifest --> User["User-invoked<br/>13 个"]
-    Manifest --> Model["Model-invoked<br/>8 个"]
+    subgraph Bugfix["Bug 修复"]
+        Diagnose["diagnosing-bugs"] -->|"反馈命令 / 最小复现 / 根因"| BugJoin["可验证修复工作"]
+        Diagnose -->|"失败的 Regression Test"| Regression["回归测试入口"]
+        Diagnose -.->|"可选：post-mortem 中的架构发现"| Improve["improve-codebase-architecture"]
+    end
 
-    Snapshot --> Tree["skills/ 目录快照<br/>39 个直接技能目录"]
-    Tree --> Published["进入正式清单<br/>21 个"]
-
-    Tree --> Unpublished["未正式暴露分支<br/>7 个"]
-    Unpublished --> Misc["misc<br/>4 个零散可用技能"]
-    Unpublished --> Personal["personal<br/>2 个个人环境技能"]
-    Unpublished --> EngineeringOne["engineering<br/>1 个目录存在但未暴露<br/>不推断原因"]
-
-    Tree --> Developing["开发中分支<br/>in-progress：7 个"]
-    Tree --> Deprecated["废弃分支<br/>deprecated：4 个"]
+    FeatureJoin -->|"Ticket / Spec / 明确工作说明"| SharedImplement["implement"]
+    BugJoin -->|"根因与修复范围"| SharedImplement
+    SharedImplement -->|"确认的 test seam 与行为切片"| SharedTDD["tdd / Tests"]
+    Regression -->|"失败的 Regression Test"| SharedTDD
+    SharedTDD -->|"Tests + Code"| SharedReview["code-review"]
+    SharedReview -->|"Standards / Spec 双轴结论"| SharedImplement
+    SharedImplement -->|"已验证实现"| Commit["Code commit"]
 ```
 
-`engineering`、`productivity`、`misc`、`personal`、`in-progress`、`deprecated` 六桶合计 39 个目录；其中正式清单覆盖 21 个，其余 18 个分别处于未正式暴露、开发中或废弃分支。
+虚线是按范围或诊断结果选择的组合：小改可跳过正式 Spec/Tickets，缺少正确 test seam 时可把架构发现交给架构维护。Bug 路径仍应先完成可验证修复，架构扫描不是修复的替代品。
+
+## 4. 大型项目与外部请求治理
+
+这张图回答两类“尚不能直接实现”的工作如何被治理：Wayfinder 消散大型项目的未知，Triage 将外部请求分流到明确状态。实线表示票据、评论、brief 或状态记录的传递，虚线只表示分析建议中的可选组合。
+
+```mermaid
+flowchart LR
+    subgraph LargeProject["大型模糊项目｜Wayfinder"]
+        Destination["destination"] -->|"destination / Map Issue"| Wayfinder["wayfinder"]
+        Wayfinder -->|"Research Ticket"| ResearchTicket["Research Ticket"]
+        Wayfinder -->|"Prototype Ticket"| PrototypeTicket["Prototype Ticket"]
+        Wayfinder -->|"Grilling Ticket"| GrillingTicket["Grilling Ticket"]
+        Wayfinder -->|"Task Ticket"| TaskTicket["Task Ticket"]
+        ResearchTicket -->|"resolution comment / linked asset / decision"| Map["Map Issue：Decisions so far / frontier"]
+        PrototypeTicket -->|"resolution comment / linked asset / decision"| Map
+        GrillingTicket -->|"resolution comment / decision"| Map
+        TaskTicket -->|"resolution comment / decision"| Map
+        ResearchTicket -.->|"可选组合：研究问题"| Research["research → Research Markdown"]
+        Map -->|"已确认决策与清晰路线"| ToSpec["to-spec"]
+        ToSpec -->|"Spec Issue"| ToTickets["to-tickets"]
+        ToTickets -->|"Ticket Issues"| ImplementLarge["implement"]
+        Map -.->|"可选：缩小到单会话的明确工作"| ImplementLarge
+    end
+
+    subgraph ExternalRequest["外部请求治理｜Triage"]
+        Incoming["Incoming Issue / external PR"] -->|"原始描述与现有 diff"| Triage["triage"]
+        Triage -->|"Triage Notes / 补充问题"| NeedsInfo["needs-info"]
+        NeedsInfo -->|"报告者回复"| NeedsTriage["needs-triage"]
+        NeedsTriage -->|"更新后的请求"| Triage
+        Triage -->|"Agent Brief"| ReadyAgent["ready-for-agent"]
+        ReadyAgent -->|"agent-ready 请求"| ImplementExternal["implement / 继续既有 PR"]
+        Triage -->|"Human Brief"| ReadyHuman["ready-for-human → 人类处理/合并"]
+        Triage -->|"Close / out-of-scope record"| Wontfix["wontfix"]
+    end
+```
+
+Research Ticket 是 Wayfinder 的票据类型，图中没有把它画成对 `/research` 的固定调用；通往 `research` 的虚线明确是可选路线。Triage 处理外部原始 Issue/PR，`to-tickets` 生成的规划票据不再进入 Triage。
+
+## 5. 架构维护与跨会话桥
+
+这张图把架构维护的正式产物链与通用跨会话桥放在一起。架构链的实线标签写明报告、领域文档、模块设计和实现入口；handoff 只引用正式产物并传递状态，不取代任何业务流程。
+
+```mermaid
+flowchart LR
+    Improve["improve-codebase-architecture"] -->|"Architecture HTML report"| Choose["用户选择候选"]
+    Choose -->|"设计问题与证据"| Grilling["grilling"]
+    Choose -->|"设计问题与证据"| Domain["domain-modeling"]
+    Grilling -->|"已确认模块边界"| Design["codebase-design"]
+    Domain -->|"CONTEXT.md / ADR"| Design
+    Design -->|"深模块接口与 test seam"| Scale{"工作规模"}
+    Scale -->|"单会话明确工作"| Implement["implement"]
+    Scale -->|"多会话规划输入"| ToSpec["to-spec"]
+    ToSpec -->|"Spec Issue"| ToTickets["to-tickets"]
+    ToTickets -->|"Ticket Issues"| Implement
+
+    AnySession["任意流程中的当前会话"] -->|"当前状态 / 下一目标 / 正式产物指针 / 未决项"| Handoff["handoff"]
+    Handoff -->|"handoff Markdown"| NewSession["新会话"]
+    NewSession -->|"读取指针后继续原流程"| Resume["原流程下一节点"]
+```
+
+Architecture HTML report 与 handoff Markdown 都位于 OS 临时目录，但生命周期职责不同：前者帮助用户选择架构候选，后者只做会话间桥接。跨会话时应引用 Spec、ADR、Issue、commit 或 diff 等事实源，而不是把它们复制进 handoff。
