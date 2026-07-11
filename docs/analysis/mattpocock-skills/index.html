@@ -867,8 +867,8 @@
       id:"context",
       title:"CONTEXT.md",
       location:"单上下文项目根目录，或各上下文根",
-      creator:"domain-modeling（常由组合流程驱动）",
-      updater:"domain-modeling",
+      creator:"domain-modeling（可由 grill-with-docs 驱动）",
+      updater:"domain-modeling、grill-with-docs、triage、wayfinder",
       consumers:"grilling、规划、实现、TDD、诊断、审查、架构扫描",
       structure:"严格领域 glossary：术语、定义、边界与关系",
       lifecycle:"长期且持续演化",
@@ -889,7 +889,7 @@
       id:"adr",
       title:"docs/adr/NNNN-*.md",
       location:"docs/adr/ 或 domain 配置指定位置",
-      creator:"domain-modeling",
+      creator:"domain-modeling（可由 grill-with-docs、triage、wayfinder 驱动）",
       updater:"无固定更新者",
       consumers:"后续领域建模、规划、实现、诊断、审查与架构工作",
       structure:"编号/标题、上下文、决策、备选与后果",
@@ -911,8 +911,8 @@
       id:"ticket-issues",
       title:"Ticket Issues",
       location:"真实 tracker 的子/关联 Issue",
-      creator:"to-tickets",
-      updater:"无固定更新者",
+      creator:"wayfinder、to-tickets",
+      updater:"wayfinder、prototype、implement",
       consumers:"独立 implement 会话、frontier 查询",
       structure:"单会话 tracer bullet、验收、上下文、测试 seam、blocking edges、parent 指针",
       lifecycle:"阶段性",
@@ -923,7 +923,7 @@
       title:".scratch/&lt;feature&gt;/issues/NN-&lt;ticket&gt;.md",
       location:"本地 Markdown tracker",
       creator:"to-tickets",
-      updater:"无固定更新者",
+      updater:"implement",
       consumers:"独立 implement 会话、人工 blockers-first 调度",
       structure:"与 Ticket Issue 等价的正文，加文本化依赖与状态",
       lifecycle:"阶段性",
@@ -977,9 +977,9 @@
       id:"tests",
       title:"Tests",
       location:"项目既有测试目录",
-      creator:"tdd、diagnosing-bugs",
-      updater:"tdd、implement",
-      consumers:"实现反馈环、code-review、CI、未来回归",
+      creator:"implement、tdd、diagnosing-bugs",
+      updater:"implement、tdd、diagnosing-bugs",
+      consumers:"implement、tdd、diagnosing-bugs、code-review、CI、未来回归",
       structure:"从 public seam 表达外部行为；诊断时包含最小回归场景",
       lifecycle:"长期可执行契约",
       purpose:"先红后绿证明行为"
@@ -990,7 +990,7 @@
       location:"Git 历史",
       creator:"implement",
       updater:"无固定更新者",
-      consumers:"后续 Ticket/PR/review/发布",
+      consumers:"diagnosing-bugs、code-review、后续 Ticket/PR/发布",
       structure:"聚焦实现 diff、测试与说明；固定 SHA/父提交形成边界",
       lifecycle:"长期版本记录",
       purpose:"测试和双轴 review 后产生"
@@ -1034,9 +1034,7 @@
     },
     "prototype": {
       "ticket-issues":"U",
-      "prototype-branch":"C/U",
-      "tests":"C/U",
-      "code-commits":"U"
+      "prototype-branch":"C/U"
     },
     "triage": {
       "issue-tracker":"R",
@@ -1094,15 +1092,14 @@
       "context":"R",
       "context-map":"R",
       "adr":"R",
-      "tests":"C/U/R",
-      "code-commits":"C/U/R"
+      "tests":"C/U/R"
     },
     "diagnosing-bugs": {
       "context":"R",
       "context-map":"R",
       "adr":"R",
       "tests":"C/U/R",
-      "code-commits":"C/U/R"
+      "code-commits":"R"
     },
     "code-review": {
       "agent-config":"R",
@@ -1122,7 +1119,7 @@
     "domain-modeling": {
       "domain-config":"R",
       "context":"C/U/R",
-      "context-map":"C/U/R",
+      "context-map":"R",
       "adr":"C/R",
       "tests":"R",
       "code-commits":"R"
@@ -1158,8 +1155,25 @@
 
     },
     "writing-great-skills": {
-      }
+    }
   };
+  function validateArtifactResponsibilities() {
+    artifactFields.forEach(artifact => {
+      Object.entries(matrix).forEach(([skill, relations]) => {
+        const relation = relations[artifact.id] || "";
+        if (relation.includes("C") && !artifact.creator.includes(skill)) {
+          throw new Error(`${artifact.id}: creator 缺少 ${skill}`);
+        }
+        if (relation.includes("U") && !artifact.updater.includes(skill)) {
+          throw new Error(`${artifact.id}: updater 缺少 ${skill}`);
+        }
+        if (relation.includes("U") && artifact.updater === "无固定更新者") {
+          throw new Error(`${artifact.id}: 无固定更新者却存在 U`);
+        }
+      });
+    });
+  }
+  validateArtifactResponsibilities();
   const flowData = [
     ["新功能开发", ["grill-with-docs", "CONTEXT.md / ADR / 已确认需求", "to-spec", "Spec Issue", "to-tickets", "带 blocking edges 的 Tickets", "implement", "Tests + Code", "code-review", "双轴结论 → Code commit"]],
     ["Bug 修复", ["diagnosing-bugs", "反馈命令 / 最小复现 / 根因 / 失败回归测试", "implement", "修复 Code + Regression Test", "code-review", "审查结论 → Code commit"]],
