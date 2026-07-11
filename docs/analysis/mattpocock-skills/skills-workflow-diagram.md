@@ -1,6 +1,6 @@
 # mattpocock/skills 能力、产物与协作关系图
 
-本文把 [`skills-analysis.md`](./skills-analysis.md) 中已经审定的六类能力、产物生命周期和五条协作流程压缩为五张关系图。所有名称与关系固定到 `mattpocock/skills` 提交 `391a2701dd948f94f56a39f7533f8eea9a859c87`；箭头表示产物交接，不表示相邻 Skill 会自动互相调用。
+本文把 [`skills-analysis.md`](./skills-analysis.md) 中的六类能力、产物生命周期和五条协作流程压缩为五张关系图。内容以 `mattpocock/skills` 当前 `main` 为准；箭头表示产物交接，不表示相邻 Skill 会自动互相调用。
 
 ## 1. 六类能力地图
 
@@ -123,7 +123,7 @@ flowchart LR
     HandoffDoc -->|"R 状态与正式产物指针"| NewSession["新会话"]
 ```
 
-`CONTEXT-MAP.md` 没有固定创建者或更新者，因此只保留在生命周期分组中；它不是 Setup 自动生成物。Setup 仅在安装 `triage` 时创建 `triage-labels.md`，而 `to-spec`、`to-tickets` 声明需要这套 label vocabulary 和 `ready-for-agent` 配置；固定源码没有定义文件缺失时的回退。Research Markdown 与 Wayfinder Research Ticket 没有固定 C/U/R 关系，二者若组合只能作为可选路线。
+`CONTEXT-MAP.md` 没有固定创建者或更新者，因此只保留在生命周期分组中；它不是 Setup 自动生成物。Setup 仅在安装 `triage` 时创建 `triage-labels.md`，而 `to-spec`、`to-tickets` 声明需要这套 label vocabulary 和 `ready-for-agent` 配置；源代码没有定义文件缺失时的回退。Research Markdown 与 Wayfinder Research Ticket 没有固定 C/U/R 关系，二者若组合只能作为可选路线。
 
 ## 3. 新功能开发与 Bug 修复
 

@@ -1,8 +1,12 @@
 import asyncio, json, re, shutil
+import posixpath
 from collections.abc import Awaitable, Callable
 from pathlib import Path
 from html import unescape
 from jinja2 import Environment, FileSystemLoader
+from markdown import markdown
+from markupsafe import Markup
+import yaml
 from ..core.database import Database
 from ..core.time import now_bj, now_bj_iso
 from ..db.operations import search_articles, get_stats
@@ -36,6 +40,56 @@ def _html_title(path: Path, fallback: str) -> str:
     return clean_text(match.group(1), 80) if match else fallback
 
 
+def _render_analysis_topic(project_dir: Path, output_dir: Path, env: Environment) -> dict | None:
+    config_path = project_dir / "topic.yaml"
+    if not config_path.exists():
+        return None
+
+    config = yaml.safe_load(config_path.read_text(encoding="utf-8")) or {}
+    pages = config.get("pages") or []
+    if not config.get("title") or not pages:
+        raise ValueError(f"Invalid analysis topic config: {config_path}")
+
+    output_by_source = {page["source"]: page["output"] for page in pages}
+    template = env.get_template("analysis-topic.html")
+    for index, page in enumerate(pages):
+        page_dir = posixpath.dirname(page["output"]) or "."
+        navigation = [
+            {
+                "title": item["title"],
+                "url": posixpath.relpath(item["output"], page_dir),
+            }
+            for item in pages
+        ]
+        source_path = project_dir / page["source"]
+        raw = source_path.read_text(encoding="utf-8")
+        for source, target in output_by_source.items():
+            rendered_target = posixpath.relpath(target, page_dir)
+            for markdown_target in (source, f"./{source}"):
+                raw = raw.replace(
+                    f"]({markdown_target})",
+                    f"]({rendered_target})",
+                )
+        body = markdown(raw, extensions=["fenced_code", "tables", "toc"])
+        destination = output_dir / page["output"]
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        destination.write_text(
+            template.render(
+                topic_title=config["title"],
+                page_title=page["title"],
+                content=Markup(body),
+                navigation=navigation,
+                previous=navigation[index - 1] if index else None,
+                next=navigation[index + 1] if index + 1 < len(navigation) else None,
+            ),
+            encoding="utf-8",
+        )
+    return {
+        "title": config["title"],
+        "url": f"/analysis/{project_dir.name}/{pages[0]['output']}",
+    }
+
+
 class SiteBuilder:
     def __init__(
         self,
@@ -63,12 +117,21 @@ class SiteBuilder:
         analysis_pages = []
         if self.analysis_dir.exists():
             shutil.copytree(self.analysis_dir, tmp_dir / "analysis", dirs_exist_ok=True)
-            for index_path in sorted(self.analysis_dir.glob("*/index.html")):
-                slug = index_path.parent.name
-                analysis_pages.append({
-                    "title": _html_title(index_path, slug),
-                    "url": f"/analysis/{slug}/index.html",
-                })
+            for project_dir in sorted(path for path in self.analysis_dir.iterdir() if path.is_dir()):
+                topic = _render_analysis_topic(
+                    project_dir,
+                    tmp_dir / "analysis" / project_dir.name,
+                    self.env,
+                )
+                if topic:
+                    analysis_pages.append(topic)
+                    continue
+                index_path = project_dir / "index.html"
+                if index_path.exists():
+                    analysis_pages.append({
+                        "title": _html_title(index_path, project_dir.name),
+                        "url": f"/analysis/{project_dir.name}/index.html",
+                    })
 
         all_articles = await search_articles(self.db, "", days=3650, limit=100000)
         stats = await get_stats(self.db, days=30)

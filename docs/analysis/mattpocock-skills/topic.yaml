@@ -1,0 +1,20 @@
+title: mattpocock/skills 使用手册
+pages:
+  - source: README.md
+    output: index.html
+    title: 快速入门
+  - source: usage-guide.md
+    output: usage-guide.html
+    title: 完整工作流
+  - source: file-management.md
+    output: file-management.html
+    title: 文件管理
+  - source: skills-analysis.md
+    output: skills-reference.html
+    title: Skill 图鉴
+  - source: skills-workflow-diagram.md
+    output: workflow-diagrams.html
+    title: 关系图
+  - source: examples/article-favorites.md
+    output: examples/article-favorites.html
+    title: 文章收藏案例

@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{{ page_title }} · {{ topic_title }}</title>
+    <link rel="stylesheet" href="/static/css/analysis-topic.css">
+    <script defer src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+    <script defer src="/static/js/analysis-topic.js"></script>
+</head>
+<body>
+    <header class="topic-header">
+        <a class="back-link" href="/analysis.html">← 返回分析</a>
+        <p class="eyebrow">{{ topic_title }}</p>
+        <nav aria-label="专题导航">
+            {% for item in navigation %}
+            <a href="{{ item.url }}"{% if item.title == page_title %} aria-current="page"{% endif %}>{{ item.title }}</a>
+            {% endfor %}
+        </nav>
+    </header>
+    <main class="topic-layout">
+        <article class="topic-content">{{ content }}</article>
+    </main>
+    <button class="detail-backdrop" data-detail-close hidden aria-label="关闭详情遮罩"></button>
+    <aside id="detail-panel" class="detail-panel" hidden aria-labelledby="detail-title">
+        <button class="detail-close" data-detail-close aria-label="关闭详情">×</button>
+        <h2 id="detail-title">详细信息</h2>
+        <div id="detail-content"></div>
+    </aside>
+    <footer class="topic-pagination">
+        {% if previous %}<a href="{{ previous.url }}">← {{ previous.title }}</a>{% endif %}
+        <a href="{{ navigation[0].url }}">返回专题首页</a>
+        {% if next %}<a href="{{ next.url }}">{{ next.title }} →</a>{% endif %}
+    </footer>
+</body>
+</html>
