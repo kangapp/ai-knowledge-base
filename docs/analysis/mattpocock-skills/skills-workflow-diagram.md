@@ -127,33 +127,31 @@ flowchart LR
 
 ## 3. 新功能开发与 Bug 修复
 
-这张图并列展示两条交付路径：新功能先沉淀需求与规划，Bug 先建立可复现反馈环。两条路径共享实现、测试和审查节点，所有实线边都以标签说明传递的产物。
+这张图并列展示两条交付路径：新功能先沉淀需求与规划，并由 `implement` 在内部驱动测试和审查；Bug 则由 `diagnosing-bugs` 自身完成反馈环、回归测试与修复，审查仅为可选质量门。所有实线边都以标签说明传递的产物。
 
 ```mermaid
 flowchart LR
     subgraph Feature["新功能开发"]
         GrillDocs["grill-with-docs"] -->|"CONTEXT.md / ADR / 已确认需求"| ToSpec["to-spec"]
-        ToSpec -->|"Spec Issue"| ToTickets["to-tickets"]
-        ToTickets -->|"带 blocking edges 的 Ticket Issues / 本地票据 Markdown"| FeatureJoin["可执行工作"]
-        GrillDocs -.->|"可选：单会话小改的已确认需求"| FeatureJoin
+        ToSpec -->|"Spec"| ToTickets["to-tickets"]
+        ToTickets -->|"Tickets"| SharedImplement["implement"]
+        GrillDocs -.->|"可选：单会话小改的已确认需求"| SharedImplement
+        SharedImplement -->|"内部驱动"| SharedTDD["tdd"]
+        SharedTDD -->|"Tests + Code"| SharedImplement
+        SharedImplement -->|"内部调用：固定点实现 diff"| SharedReview["code-review"]
+        SharedReview -->|"Code Review report（双轴结论）"| SharedImplement
+        SharedImplement -->|"修正"| Commit["Commit"]
     end
 
     subgraph Bugfix["Bug 修复"]
-        Diagnose["diagnosing-bugs"] -->|"反馈命令 / 最小复现 / 根因"| BugJoin["可验证修复工作"]
-        Diagnose -->|"失败的 Regression Test"| Regression["回归测试入口"]
+        Diagnose["diagnosing-bugs"] -->|"feedback loop / 最小复现 / 根因"| Fix["Regression Test + 修复 Code"]
+        Fix -.->|"可选：固定点修复 diff"| BugReview["code-review"]
+        BugReview -->|"Code Review report，不产出 commit"| Fix
         Diagnose -.->|"可选：post-mortem 中的架构发现"| Improve["improve-codebase-architecture"]
     end
-
-    FeatureJoin -->|"Ticket / Spec / 明确工作说明"| SharedImplement["implement"]
-    BugJoin -->|"根因与修复范围"| SharedImplement
-    SharedImplement -->|"确认的 test seam 与行为切片"| SharedTDD["tdd / Tests"]
-    Regression -->|"失败的 Regression Test"| SharedTDD
-    SharedTDD -->|"Tests + Code"| SharedReview["code-review"]
-    SharedReview -->|"Standards / Spec 双轴结论"| SharedImplement
-    SharedImplement -->|"已验证实现"| Commit["Code commit"]
 ```
 
-虚线是按范围或诊断结果选择的组合：小改可跳过正式 Spec/Tickets，缺少正确 test seam 时可把架构发现交给架构维护。Bug 路径仍应先完成可验证修复，架构扫描不是修复的替代品。
+虚线是按范围或诊断结果选择的组合：小改可跳过正式 Spec/Tickets；Bug 修复后可选择 `code-review`，缺少正确 test seam 时也可把架构发现交给架构维护。Bug 路径不串入 `tdd` 或 `implement`，且 `code-review` 只报告固定点 diff 的双轴结论，不创建 commit。
 
 ## 4. 大型项目与外部请求治理
 

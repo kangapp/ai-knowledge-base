@@ -249,24 +249,29 @@
 
 只列固定源码能直接支持的关系；空白表示没有明确的创建、更新或读取关系，而不是证明 Skill 永远不会接触该产物。
 
-| Skill | 项目配置 | 领域文档 | ADR | Spec | Tickets | Research Markdown | Prototype branch | Architecture report | Handoff | Tests/Code | Review report |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| `setup-matt-pocock-skills` | C/U | R | R |  |  |  |  |  |  |  |  |
-| `grill-with-docs` | R | C/U/R | C/R |  |  |  |  |  |  |  |  |
-| `triage` | R | U/R | C/R |  |  |  |  |  |  | R |  |
-| `wayfinder` | R | U/R | C/R |  | C/U/R |  |  |  |  |  |  |
-| `to-spec` | R | R | R | C |  |  | R |  |  |  |  |
-| `to-tickets` | R | R |  | R | C |  |  |  |  |  |  |
-| `implement` | R | R | R | R | R/U |  |  |  |  | C/U/R | R |
-| `tdd` |  | R | R |  |  |  |  |  |  | C/U/R |  |
-| `diagnosing-bugs` |  | R | R |  |  |  |  |  |  | C/U/R |  |
-| `code-review` | R | R | R | R | R |  |  |  |  | R | C |
-| `domain-modeling` | R | C/U/R | C/R |  |  |  |  |  |  | R |  |
-| `codebase-design` |  | R | R |  |  |  |  |  |  | R |  |
-| `improve-codebase-architecture` |  | R | R |  |  |  |  | C |  | R |  |
-| `research` |  |  |  |  |  | C |  |  |  |  |  |
-| `prototype` |  |  |  |  | U |  | C/U |  |  | C/U |  |
-| `handoff` |  |  | R | R | R |  |  |  | C | R |  |
+| Skill | AGENTS.md / CLAUDE.md | docs/agents/issue-tracker.md | docs/agents/domain.md | docs/agents/triage-labels.md | CONTEXT.md | CONTEXT-MAP.md | docs/adr/NNNN-*.md | Spec Issue | Ticket Issues | .scratch/&lt;feature&gt;/issues/NN-&lt;ticket&gt;.md | Research Markdown | Prototype branch | Architecture HTML report | handoff Markdown | Tests | Code commits | Code Review report |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| `ask-matt` |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |
+| `setup-matt-pocock-skills` | C/U | C/U | C/U | C/U | R | R | R |  |  |  |  |  |  |  |  |  |  |
+| `grill-me` |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |
+| `grill-with-docs` |  |  | R |  | C/U/R | R | C/R |  |  |  |  |  |  |  |  |  |  |
+| `grilling` |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |
+| `prototype` |  |  |  |  |  |  |  |  | U |  |  | C/U |  |  |  |  |  |
+| `triage` |  | R | R | R | U/R | R | C/R |  |  |  |  |  |  |  |  | R |  |
+| `wayfinder` |  | R | R |  | U/R | R | C/R |  | C/U/R |  |  |  |  |  |  |  |  |
+| `to-spec` |  | R | R | R | R | R | R | C |  |  |  | R |  |  |  |  |  |
+| `to-tickets` |  | R | R | R | R | R |  | R | C | C |  |  |  |  |  |  |  |
+| `implement` | R | R | R | R | R | R | R | R | R/U | R/U |  |  |  |  | C/U/R | C | R |
+| `tdd` |  |  |  |  | R | R | R |  |  |  |  |  |  |  | C/U/R |  |  |
+| `diagnosing-bugs` |  |  |  |  | R | R | R |  |  |  |  |  |  |  | C/U/R | R |  |
+| `code-review` | R | R | R | R | R | R | R | R | R | R |  |  |  |  | R | R | C |
+| `domain-modeling` |  |  | R |  | C/U/R | R | C/R |  |  |  |  |  |  |  | R | R |  |
+| `codebase-design` |  |  |  |  | R | R | R |  |  |  |  |  |  |  | R | R |  |
+| `improve-codebase-architecture` |  |  |  |  | R | R | R |  |  |  |  |  | C |  | R | R |  |
+| `research` |  |  |  |  |  |  |  |  |  |  | C |  |  |  |  |  |  |
+| `handoff` |  |  |  |  |  |  | R | R | R | R |  |  |  | C | R | R |  |
+| `teach` |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |
+| `writing-great-skills` |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |
 
 图例：`C` = Create（创建），`U` = Update（更新），`R` = Read（读取）。同一格可包含多种关系。
 
@@ -279,17 +284,17 @@
 ### 6.1 新功能开发
 
 1. `grill-with-docs` → `CONTEXT.md` / ADR / 已确认需求 → `to-spec`（小型单会话改动可直接交给 `implement`）。
-2. `to-spec` → Spec Issue → `to-tickets`。
-3. `to-tickets` → 带 blocking edges 的 Ticket Issues 或本地票据 Markdown → 每票新的 `implement` 会话。
-4. `implement` → 确认的 test seam 与行为切片 → `tdd`。
-5. `tdd` → Tests + Code → `code-review`。
-6. `code-review` → Standards / Spec 双轴结论 → `implement` 修正并产生 Code commit。
+2. `to-spec` → Spec → `to-tickets`。
+3. `to-tickets` → Tickets → 每票新的 `implement` 会话。
+4. `implement` 内部驱动 `tdd` → Tests + Code。
+5. `implement` 内部调用 `code-review` → Code Review report（从固定点对实现 diff 做 Standards / Spec 双轴审查）。
+6. `implement` 按审查结论修正 → Commit。
 
 ### 6.2 Bug 修复
 
-1. `diagnosing-bugs` → red-capable 反馈命令 / 最小复现 / 排序假设 → 根因。
-2. `diagnosing-bugs` → 失败的 Regression Test → 修复 Code。
-3. 修复 Code + Regression Test → `code-review` → 审查结论 → `implement` 修正并产生 Code commit。
+1. `diagnosing-bugs` → feedback loop / 最小复现 / 根因。
+2. `diagnosing-bugs` → Regression Test + 修复 Code。
+3. 可选 `code-review`（固定点 diff 双轴审查）→ Code Review report；它不产出 commit。
 4. 若没有正确 test seam：`diagnosing-bugs` → post-mortem 中的架构发现 → `improve-codebase-architecture`，但先完成可验证修复。
 
 ### 6.3 大型模糊项目

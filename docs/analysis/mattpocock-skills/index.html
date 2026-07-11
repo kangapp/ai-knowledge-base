@@ -1175,8 +1175,8 @@
   }
   validateArtifactResponsibilities();
   const flowData = [
-    ["新功能开发", ["grill-with-docs", "CONTEXT.md / ADR / 已确认需求", "to-spec", "Spec Issue", "to-tickets", "带 blocking edges 的 Tickets", "implement", "Tests + Code", "code-review", "双轴结论 → Code commit"]],
-    ["Bug 修复", ["diagnosing-bugs", "反馈命令 / 最小复现 / 根因 / 失败回归测试", "implement", "修复 Code + Regression Test", "code-review", "审查结论 → Code commit"]],
+    ["新功能开发", ["grill-with-docs", "CONTEXT.md / ADR / 已确认需求", "to-spec", "Spec", "to-tickets", "Tickets", "implement", "内部驱动 tdd → Tests + Code", "内部调用 code-review → Code Review report（双轴结论）", "implement 修正 → Commit"]],
+    ["Bug 修复", ["diagnosing-bugs", "feedback loop / 最小复现 / 根因", "Regression Test + 修复 Code", "可选 code-review：固定点 diff 双轴审查", "Code Review report（不产出 commit）"]],
     ["大型模糊项目", ["wayfinder", "Map Issue + Research/Prototype/Grilling/Task Tickets", "Decisions so far / frontier", "已确认决策与清晰路线", "to-spec → to-tickets → implement"]],
     ["外部请求治理", ["Incoming Issue / PR", "原始描述与现有 diff", "triage", "Triage Notes / Agent Brief / Human Brief / out-of-scope record", "needs-info / ready-for-agent / ready-for-human / wontfix"]],
     ["架构维护", ["improve-codebase-architecture", "Architecture HTML report", "grilling + domain-modeling", "已确认模块边界 / CONTEXT.md / ADR", "codebase-design", "深模块接口与 test seam → 主开发流程"]]
