@@ -110,6 +110,8 @@ flowchart LR
 
     TrackerConfig -->|"R tracker 操作"| ToSpec
     DomainConfig -->|"R 知识位置"| Domain
+    LabelConfig -->|"R label vocabulary / ready-for-agent 配置"| ToSpec
+    LabelConfig -->|"R label vocabulary / ready-for-agent 配置"| ToTickets
     Context -->|"R 领域语言"| ToSpec
     ADR -->|"R 决策约束"| Implement
     Spec -->|"R 拆票输入"| ToTickets
@@ -121,7 +123,7 @@ flowchart LR
     HandoffDoc -->|"R 状态与正式产物指针"| NewSession["新会话"]
 ```
 
-`CONTEXT-MAP.md` 没有固定创建者或更新者，因此只保留在生命周期分组中；它不是 Setup 自动生成物。Research Markdown 与 Wayfinder Research Ticket 也没有固定 C/U/R 关系，二者若组合只能作为可选路线。
+`CONTEXT-MAP.md` 没有固定创建者或更新者，因此只保留在生命周期分组中；它不是 Setup 自动生成物。Setup 仅在安装 `triage` 时创建 `triage-labels.md`，而 `to-spec`、`to-tickets` 声明需要这套 label vocabulary 和 `ready-for-agent` 配置；固定源码没有定义文件缺失时的回退。Research Markdown 与 Wayfinder Research Ticket 没有固定 C/U/R 关系，二者若组合只能作为可选路线。
 
 ## 3. 新功能开发与 Bug 修复
 
@@ -209,7 +211,7 @@ flowchart LR
 
     AnySession["任意流程中的当前会话"] -->|"当前状态 / 下一目标 / 正式产物指针 / 未决项"| Handoff["handoff"]
     Handoff -->|"handoff Markdown"| NewSession["新会话"]
-    NewSession -->|"读取指针后继续原流程"| Resume["原流程下一节点"]
+    NewSession -->|"正式产物指针 / 下一目标"| Resume["原流程下一节点"]
 ```
 
-Architecture HTML report 与 handoff Markdown 都位于 OS 临时目录，但生命周期职责不同：前者帮助用户选择架构候选，后者只做会话间桥接。跨会话时应引用 Spec、ADR、Issue、commit 或 diff 等事实源，而不是把它们复制进 handoff。
+Architecture HTML report 与 handoff Markdown 都位于 OS 临时目录，但生命周期职责不同：前者帮助用户选择架构候选，后者只做会话间桥接。新会话读取 handoff 中的正式产物指针和下一目标后，再从原流程的下一节点继续。跨会话时应引用 Spec、ADR、Issue、commit 或 diff 等事实源，而不是把它们复制进 handoff。
