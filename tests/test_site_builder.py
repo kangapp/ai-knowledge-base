@@ -95,6 +95,14 @@ def test_homepage_source_filter_uses_source_id_for_github_subsources():
     assert "a.source_id === state.source" in app_js
 
 
+def test_skills_workflow_cards_stay_within_their_grid():
+    index_html = (
+        ROOT / "docs/analysis/mattpocock-skills/index.html"
+    ).read_text(encoding="utf-8")
+
+    assert ".flow-card{\n    min-width:0;" in index_html
+
+
 @pytest.mark.asyncio
 async def test_homepage_uses_hotlist_source_detail_as_label(tmp_path, monkeypatch):
     articles = [
