@@ -3,751 +3,401 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>mattpocock/skills 使用工作流分析</title>
+  <title>mattpocock/skills 能力图鉴</title>
   <style>
-    :root {
-      --ink: #111827;
-      --muted: #4b5563;
-      --line: #1f2937;
-      --blue: #2563eb;
-      --blue-soft: #eff6ff;
-      --green: #059669;
-      --green-soft: #ecfdf5;
-      --amber: #d97706;
-      --amber-soft: #fffbeb;
-      --panel: #ffffff;
-      --page: #f8fafc;
-    }
-
-    * { box-sizing: border-box; }
-
-    body {
-      margin: 0;
-      background: var(--page);
-      color: var(--ink);
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans SC", "PingFang SC", Arial, sans-serif;
-      line-height: 1.55;
-    }
-
-    button, a { font: inherit; }
-    a { color: var(--blue); }
-    code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
-
-    .poster {
-      width: min(1200px, 100%);
-      margin: 0 auto;
-      padding: 28px 24px 44px;
-      background: linear-gradient(180deg, #fff 0%, #f8fafc 100%);
-    }
-
-    header { text-align: center; margin-bottom: 18px; }
-    h1 { margin: 0; font-size: clamp(32px, 5vw, 48px); line-height: 1.15; font-weight: 850; }
-    .subtitle { max-width: 850px; margin: 10px auto 0; color: var(--muted); font-size: 18px; font-weight: 600; }
-    .eyebrow { margin: 0 0 8px; color: var(--blue); font-size: 13px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; }
-
-    section {
-      margin-top: 14px;
-      padding: 16px;
-      border: 2px solid var(--line);
-      border-radius: 10px;
-      background: rgba(255, 255, 255, .94);
-    }
-
-    h2 { display: flex; align-items: center; gap: 10px; margin: 0 0 12px; font-size: 24px; line-height: 1.25; }
-    h3 { margin: 0 0 7px; font-size: 17px; line-height: 1.3; }
-    p { margin: 0; }
-    p + p { margin-top: 8px; }
-    ul { margin: 0; padding-left: 20px; }
-    li + li { margin-top: 5px; }
-
-    .icon {
-      display: inline-grid;
-      flex: 0 0 auto;
-      place-items: center;
-      width: 36px;
-      height: 36px;
-      border: 2px solid var(--line);
-      border-radius: 8px;
-      background: #fff;
-      font-size: 20px;
-    }
-
-    .grid { display: grid; gap: 10px; }
-    .cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-    .cols-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-    .cols-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
-
-    .card {
-      min-width: 0;
-      padding: 13px;
-      border: 1.7px solid var(--line);
-      border-radius: 8px;
-      background: var(--panel);
-    }
-
-    .blue { border-color: var(--blue); background: var(--blue-soft); }
-    .green { border-color: var(--green); background: var(--green-soft); }
-    .amber { border-color: var(--amber); background: var(--amber-soft); }
-    .muted { color: var(--muted); }
-    .small { font-size: 13px; }
-    .wide { grid-column: 1 / -1; }
-
-    .stat { text-align: center; }
-    .stat strong { display: block; font-size: 31px; line-height: 1; }
-    .stat span { display: block; margin-top: 7px; color: var(--muted); font-size: 13px; font-weight: 700; }
-
-    .skill-button {
-      width: 100%;
-      min-height: 86px;
-      padding: 12px;
-      border: 1.7px solid var(--line);
-      border-radius: 8px;
-      background: #fff;
-      color: var(--ink);
-      text-align: left;
-      cursor: pointer;
-      transition: box-shadow .15s ease, transform .15s ease;
-    }
-
-    .skill-button:hover { box-shadow: 0 6px 18px rgba(15, 23, 42, .14); transform: translateY(-1px); }
-    .skill-button:focus-visible, .detail-close:focus-visible, .source-link:focus-visible { outline: 3px solid #2563eb; outline-offset: 2px; }
-    .skill-button strong { display: block; overflow-wrap: anywhere; font-size: 15px; }
-    .skill-button span { display: block; margin-top: 5px; color: var(--muted); font-size: 13px; }
-    .skill-button.user { border-color: var(--blue); background: var(--blue-soft); }
-    .skill-button.model { border-color: var(--green); background: var(--green-soft); }
-
-    .route-grid { display: grid; grid-template-columns: 1.1fr repeat(3, minmax(0, 1fr)); gap: 10px; }
-    .router-card { grid-row: span 2; display: flex; flex-direction: column; justify-content: space-between; }
-    .route-note { margin-top: 10px; padding: 10px 12px; border: 1.7px solid var(--amber); border-radius: 8px; background: var(--amber-soft); font-size: 14px; font-weight: 700; }
-
-    .flow { display: flex; align-items: stretch; gap: 7px; overflow-x: auto; padding-bottom: 5px; }
-    .flow-step { flex: 1 0 135px; }
-    .flow-step .skill-button { height: 100%; }
-    .arrow { display: grid; flex: 0 0 24px; place-items: center; font-size: 23px; font-weight: 900; }
-    .decision { display: grid; place-items: center; flex: 1 0 150px; border-style: dashed; text-align: center; font-size: 14px; font-weight: 800; }
-    .branch { margin-top: 10px; padding: 12px; border: 1.7px dashed #64748b; border-radius: 8px; background: #f8fafc; }
-    .branch h3 { text-align: center; }
-    .branch .flow { justify-content: center; }
-
-    .dependency { display: flex; align-items: center; gap: 8px; }
-    .dependency .skill-button { min-height: 72px; }
-    .dependency-mark { flex: 0 0 auto; color: var(--muted); font-weight: 850; }
-    .legend { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; }
-    .pill { padding: 5px 9px; border: 1.5px solid #94a3b8; border-radius: 999px; background: #fff; font-size: 13px; font-weight: 750; }
-
-    .artifact-chain { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 7px; align-items: stretch; }
-    .artifact { position: relative; padding: 11px; border: 1.6px solid var(--line); border-radius: 8px; background: #fff; font-size: 13px; }
-    .artifact:not(:last-child)::after { content: "→"; position: absolute; top: 50%; right: -19px; z-index: 1; transform: translateY(-50%); font-size: 20px; font-weight: 900; }
-    .artifact strong { display: block; margin-bottom: 4px; font-size: 14px; }
-    .side-artifacts { margin-top: 10px; }
-
-    .matrix-group { padding: 12px; border: 1.7px solid var(--line); border-radius: 8px; }
-    .matrix-group h3 { display: flex; justify-content: space-between; gap: 10px; }
-    .matrix { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
-    .matrix .skill-button { min-height: 75px; }
-
-    .bucket strong { display: block; font-size: 27px; }
-    .bucket span { color: var(--muted); font-size: 13px; }
-    .judgement { padding-left: 15px; border-left: 4px solid var(--blue); }
-    .judgement.green-line { border-color: var(--green); }
-
-    .detail-backdrop {
-      position: fixed;
-      inset: 0;
-      z-index: 40;
-      width: 100%;
-      height: 100%;
-      padding: 0;
-      border: 0;
-      background: rgba(15, 23, 42, .42);
-      cursor: default;
-    }
-
-    .detail-panel {
-      position: fixed;
-      top: 0;
-      right: 0;
-      bottom: 0;
-      z-index: 41;
-      width: 580px;
-      max-width: calc(100vw - 48px);
-      padding: 22px;
-      border-left: 2px solid var(--blue);
-      background: #fff;
-      box-shadow: -10px 0 30px rgba(15, 23, 42, .2);
-      overflow-y: auto;
-    }
-
-    .detail-backdrop[hidden], .detail-panel[hidden] { display: none; }
-    .detail-panel h2 { padding-right: 46px; overflow-wrap: anywhere; }
-    .detail-close { position: absolute; top: 15px; right: 15px; width: 38px; height: 38px; border: 1.5px solid #94a3b8; border-radius: 8px; background: #fff; color: var(--ink); font-size: 24px; line-height: 1; cursor: pointer; }
-    .detail-close:hover { background: #f1f5f9; }
-    .detail-summary { margin-bottom: 14px; color: var(--muted); }
-    .detail-list { margin: 0; }
-    .detail-list div { padding: 10px 0; border-top: 1px solid #cbd5e1; }
-    .detail-list dt { font-size: 13px; font-weight: 800; color: var(--blue); }
-    .detail-list dd { margin: 3px 0 0; }
-    .source-link { display: inline-block; margin-top: 14px; padding: 8px 10px; border: 1.5px solid var(--blue); border-radius: 7px; background: var(--blue-soft); font-weight: 750; text-decoration: none; }
-
-    @media (max-width: 760px) {
-      .poster { padding: 20px 12px 32px; }
-      section { padding: 13px; }
-      .cols-2, .cols-3, .cols-4, .route-grid, .matrix, .artifact-chain { grid-template-columns: 1fr; }
-      .router-card { grid-row: auto; }
-      .artifact:not(:last-child)::after { content: "↓"; top: auto; right: 50%; bottom: -24px; transform: translateX(50%); }
-      .artifact-chain { gap: 20px; }
-      .dependency { align-items: stretch; flex-direction: column; }
-      .dependency-mark { text-align: center; }
-      .detail-panel { width: 100%; max-width: 100%; }
-    }
-
-    @media print {
-      body { background: #fff; }
-      .poster { width: 100%; padding: 0; }
-      .detail-backdrop, .detail-panel { display: none !important; }
-    }
+    :root{--ink:#111827;--muted:#4b5563;--line:#1f2937;--blue:#2563eb;--blue-soft:#eff6ff;--green:#059669;--green-soft:#ecfdf5;--amber:#d97706;--amber-soft:#fffbeb;--page:#f8fafc}
+    *{box-sizing:border-box}body{margin:0;background:var(--page);color:var(--ink);font:15px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans SC",sans-serif}button,a{font:inherit}a{color:var(--blue)}code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace}.poster{width:min(1200px,100%);margin:auto;padding:28px 24px 44px}header{text-align:center;margin-bottom:18px}h1{margin:0;font-size:clamp(32px,5vw,48px);line-height:1.15}.subtitle{max-width:850px;margin:10px auto;color:var(--muted);font-size:18px;font-weight:600}.eyebrow{margin:0 0 8px;color:var(--blue);font-size:13px;font-weight:800;letter-spacing:.12em;text-transform:uppercase}section{margin-top:14px;padding:16px;border:2px solid var(--line);border-radius:10px;background:#fff}h2{display:flex;align-items:center;gap:10px;margin:0 0 12px;font-size:24px}h3{margin:0 0 7px;font-size:17px}p{margin:0}p+p{margin-top:8px}.icon{display:inline-grid;place-items:center;width:36px;height:36px;border:2px solid var(--line);border-radius:8px}.grid{display:grid;gap:10px}.cols-2{grid-template-columns:repeat(2,minmax(0,1fr))}.cols-3{grid-template-columns:repeat(3,minmax(0,1fr))}.card{padding:13px;border:1.7px solid var(--line);border-radius:8px;background:#fff}.blue{border-color:var(--blue);background:var(--blue-soft)}.green{border-color:var(--green);background:var(--green-soft)}.amber{border-color:var(--amber);background:var(--amber-soft)}.muted{color:var(--muted)}.small{font-size:13px}.stats{grid-template-columns:repeat(3,1fr)}.stat{text-align:center}.stat strong{display:block;font-size:31px}.ability-card code{display:block;margin-top:8px}.filters{display:flex;flex-wrap:wrap;gap:8px;margin:14px 0}.filter,.skill-button,.detail-close{cursor:pointer}.filter{padding:7px 11px;border:1.5px solid #94a3b8;border-radius:999px;background:#fff}.filter[aria-pressed="true"]{border-color:var(--blue);background:var(--blue);color:#fff}.filter:focus-visible,.skill-button:focus-visible,.detail-close:focus-visible,.source-link:focus-visible,summary:focus-visible{outline:3px solid #2563eb;outline-offset:2px}.skill-grid{grid-template-columns:repeat(3,minmax(0,1fr))}.skill-button{width:100%;height:100%;padding:13px;border:1.7px solid var(--line);border-radius:8px;background:#fff;color:var(--ink);text-align:left}.skill-button:hover{box-shadow:0 6px 18px #0f172a24}.skill-button strong{display:block;overflow-wrap:anywhere;font-size:16px}.skill-button span{display:block;margin-top:5px;color:var(--muted);font-size:13px}.tag{display:inline-block!important;width:max-content;padding:2px 6px;border-radius:5px;background:var(--blue-soft);color:var(--blue)!important;font-weight:700}.tree{white-space:pre-wrap;padding:14px;border-radius:8px;background:#0f172a;color:#e2e8f0;overflow:auto}.artifact-list{margin-top:10px}.artifact-detail{border:1.5px solid #94a3b8;border-radius:8px;background:#fff}.artifact-detail+*{margin-top:8px}.artifact-detail summary{padding:11px 13px;cursor:pointer;font-weight:800}.artifact-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;padding:0 13px 13px}.artifact-fields div{padding:8px;background:#f8fafc;border-radius:6px}.artifact-fields strong{display:block;color:var(--blue);font-size:12px}.matrix-scroll{overflow-x:auto;border:1.5px solid var(--line);border-radius:8px}.matrix-scroll table{width:100%;min-width:1050px;border-collapse:collapse}.matrix-scroll caption{padding:10px;text-align:left;font-weight:800}.matrix-scroll th,.matrix-scroll td{padding:8px;border:1px solid #cbd5e1;text-align:center;white-space:nowrap}.matrix-scroll th:first-child,.matrix-scroll td:first-child{position:sticky;left:0;z-index:1;background:#fff;text-align:left}.legend{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px}.pill{padding:5px 9px;border:1.5px solid #94a3b8;border-radius:999px}.flow-card{border-left:5px solid var(--blue)}.flow-line{display:flex;align-items:stretch;gap:7px;overflow-x:auto;padding:4px 0}.flow-node,.flow-edge{flex:1 0 140px;padding:10px;border:1.5px solid var(--line);border-radius:7px}.flow-node{font-weight:800;background:var(--blue-soft)}.flow-edge{border-style:dashed;background:#fff;color:var(--muted)}.arrow{display:grid;place-items:center;flex:0 0 20px;font-weight:900}.handoff{margin-top:10px;text-align:center}.tension{margin-top:10px;padding:12px;border:1.7px solid var(--amber);border-radius:8px;background:var(--amber-soft)}.detail-backdrop{position:fixed;inset:0;z-index:40;border:0;background:#0f172a6b}.detail-panel{position:fixed;inset:0 0 0 auto;z-index:41;width:580px;max-width:calc(100vw - 48px);padding:22px;border-left:2px solid var(--blue);background:#fff;box-shadow:-10px 0 30px #0f172a33;overflow-y:auto}.detail-backdrop[hidden],.detail-panel[hidden]{display:none}.detail-close{position:absolute;top:15px;right:15px;width:38px;height:38px;border:1.5px solid #94a3b8;border-radius:8px;background:#fff;font-size:24px}.detail-list{margin:0}.detail-list div{padding:10px 0;border-top:1px solid #cbd5e1}.detail-list dt{font-size:13px;font-weight:800;color:var(--blue)}.detail-list dd{margin:3px 0}.source-link{display:inline-block;margin-top:14px;padding:8px 10px;border:1.5px solid var(--blue);border-radius:7px;background:var(--blue-soft);font-weight:750;text-decoration:none}
+    @media (max-width: 760px){.poster{padding:20px 12px 32px}section{padding:13px}.cols-2,.cols-3,.stats,.skill-grid,.artifact-fields{grid-template-columns:1fr}.detail-panel{width:100%;max-width:100%}.matrix-scroll{max-width:100%}.flow-line{scroll-snap-type:x proximity}.flow-node,.flow-edge{scroll-snap-align:start}}
+    @media print{.detail-backdrop,.detail-panel{display:none!important}}
   </style>
 </head>
 <body>
-  <main class="poster">
-    <header>
-      <p class="eyebrow">固定源码快照 · 2026-07-10</p>
-      <h1>mattpocock/skills 使用工作流分析</h1>
-      <p class="subtitle">从“目录里有什么”转向“此刻该走哪条路”：用情境路由、稳定产物与人工决策门组织 21 个正式技能。</p>
-    </header>
-
-    <section aria-labelledby="section-1">
-      <h2 id="section-1"><span class="icon" aria-hidden="true">①</span>项目定位与快照</h2>
-      <div class="grid cols-4">
-        <div class="card stat blue"><strong>21</strong><span>plugin.json 正式暴露</span></div>
-        <div class="card stat blue"><strong>13</strong><span>user-invoked</span></div>
-        <div class="card stat green"><strong>8</strong><span>model-invoked</span></div>
-        <div class="card stat amber"><strong>39</strong><span>六个目录桶的直接技能目录</span></div>
-        <div class="card wide">
-          <h3>研究口径</h3>
-          <p>结论固定到 <code>mattpocock/skills</code> 提交 <code>391a2701dd948f94f56a39f7533f8eea9a859c87</code>，不追踪浮动 <code>main</code>。正式技能只认插件清单；目录树仅表示维护、试验和归档状态。</p>
-          <p class="muted small">安装：<code>npx skills@latest add mattpocock/skills</code>，安装时选中 <code>/setup-matt-pocock-skills</code>，随后在目标仓库运行它。</p>
-        </div>
-      </div>
-    </section>
-
-    <section aria-labelledby="section-2">
-      <h2 id="section-2"><span class="icon" aria-hidden="true">②</span>六个业务入口与跨会话桥</h2>
-      <div class="route-grid">
-        <div class="card router-card amber">
-          <div>
-            <h3>先描述你现在的处境</h3>
-            <p><code>ask-matt</code> 是正式技能之上的显式路由器，缓解 13 个命令的记忆负担。</p>
-          </div>
-          <button class="skill-button user" type="button" data-detail="ask-matt"><strong>ask-matt</strong><span>只推荐路线，不代替用户启动下一项 user-invoked 技能</span></button>
-        </div>
-        <button class="skill-button user" type="button" data-detail="grill-with-docs"><strong>新需求</strong><span>→ grill-with-docs：澄清并维护领域文档</span></button>
-        <button class="skill-button model" type="button" data-detail="diagnosing-bugs"><strong>Bug / 性能回归</strong><span>→ diagnosing-bugs：先建立精确红灯</span></button>
-        <button class="skill-button user" type="button" data-detail="triage"><strong>外部 Issue / PR</strong><span>→ triage：验证、分类、改变状态</span></button>
-        <button class="skill-button user" type="button" data-detail="wayfinder"><strong>巨大模糊工作</strong><span>→ wayfinder：先画决策地图、消除未知</span></button>
-        <button class="skill-button user" type="button" data-detail="improve-codebase-architecture"><strong>架构维护</strong><span>→ improve-codebase-architecture：扫描 deepening opportunities</span></button>
-        <button class="skill-button model" type="button" data-detail="research"><strong>研究</strong><span>→ research：用一手来源产出带引用事实材料</span></button>
-      </div>
-      <p class="route-note">跨会话不是第七种业务情境，而是任意节点可用的桥：用 <code>handoff</code> 引用正式产物并转入新会话；<code>/compact</code> 是 agent 内建能力，不属于 21 个技能。</p>
-    </section>
-
-    <section aria-labelledby="section-3">
-      <h2 id="section-3"><span class="icon" aria-hidden="true">③</span>端到端主流程</h2>
-      <div class="flow" aria-label="Idea-to-ship 主流程">
-        <div class="flow-step"><button class="skill-button user" type="button" data-detail="setup-matt-pocock-skills"><strong>Setup</strong><span>首次仓库配置</span></button></div>
-        <div class="arrow" aria-hidden="true">→</div>
-        <div class="flow-step"><button class="skill-button user" type="button" data-detail="grill-with-docs"><strong>grill-with-docs</strong><span>同一 idea 会话</span></button></div>
-        <div class="arrow" aria-hidden="true">→</div>
-        <div class="card decision">单会话小改<br>还是多会话工作？</div>
-      </div>
-      <div class="grid cols-2" style="margin-top:10px;">
-        <div class="branch blue">
-          <h3>单会话小改</h3>
-          <button class="skill-button user" type="button" data-detail="implement"><strong>直接进入 implement</strong><span>留在同一上下文，不制造 Spec 和 Tickets</span></button>
-        </div>
-        <div class="branch blue">
-          <h3>多会话工作</h3>
-          <div class="flow">
-            <div class="flow-step"><button class="skill-button user" type="button" data-detail="to-spec"><strong>to-spec</strong><span>发布需求基线</span></button></div>
-            <div class="arrow" aria-hidden="true">→</div>
-            <div class="flow-step"><button class="skill-button user" type="button" data-detail="to-tickets"><strong>to-tickets</strong><span>tracer bullets + blocking edges</span></button></div>
-            <div class="arrow" aria-hidden="true">→</div>
-            <div class="flow-step"><button class="skill-button user" type="button" data-detail="implement"><strong>implement</strong><span>逐票使用干净上下文</span></button></div>
-          </div>
-        </div>
-        <div class="branch">
-          <h3>可选原型支线</h3>
-          <div class="flow">
-            <div class="flow-step"><button class="skill-button user" type="button" data-detail="handoff"><strong>handoff</strong><span>离开 idea 会话</span></button></div>
-            <div class="arrow" aria-hidden="true">→</div>
-            <div class="flow-step"><button class="skill-button model" type="button" data-detail="prototype"><strong>prototype</strong><span>抛弃式证据</span></button></div>
-            <div class="arrow" aria-hidden="true">→</div>
-            <div class="flow-step"><button class="skill-button user" type="button" data-detail="handoff"><strong>handoff</strong><span>结论回原会话</span></button></div>
-          </div>
-        </div>
-        <div class="branch">
-          <h3>implement 内部反馈与收尾</h3>
-          <div class="flow">
-            <div class="flow-step"><button class="skill-button model" type="button" data-detail="tdd"><strong>tdd</strong><span>red → green 垂直切片</span></button></div>
-            <div class="arrow" aria-hidden="true">→</div>
-            <div class="flow-step"><button class="skill-button model" type="button" data-detail="code-review"><strong>code-review</strong><span>Standards + Spec</span></button></div>
-            <div class="arrow" aria-hidden="true">→</div>
-            <div class="card flow-step"><strong>Commit</strong><span class="small muted">持久版本边界</span></div>
-          </div>
-        </div>
-      </div>
-      <p class="route-note">箭头表示推荐路线。相邻的 user-invoked 技能仍须由人类逐步启动；只有 model-invoked 技能能被编排流程采用。单会话小改可从 grill-with-docs 直接进入 implement，不制造 Spec 和 Tickets。</p>
-    </section>
-
-    <section aria-labelledby="section-4">
-      <h2 id="section-4"><span class="icon" aria-hidden="true">④</span>调用模型</h2>
-      <div class="legend"><span class="pill blue">蓝色：人类显式启动</span><span class="pill green">绿色：模型可自动选择，用户也可显式启动</span></div>
-      <div class="grid cols-2">
-        <div class="card blue">
-          <h3>user-invoked · 13</h3>
-          <p>不让 description 常驻模型上下文，但把索引责任交给人类。它可以编排 model-invoked 技能，却不能自动启动另一个 user-invoked 技能。</p>
-        </div>
-        <div class="card green">
-          <h3>model-invoked · 8</h3>
-          <p>description 常驻上下文，模型可按任务自动选择；它们提供可复用纪律、设计词汇或执行环。</p>
-        </div>
-      </div>
-      <h3 style="margin-top:12px;">固定源码明确存在的组合边</h3>
-      <div class="grid cols-3">
-        <div class="dependency"><button class="skill-button user" type="button" data-detail="grill-with-docs"><strong>grill-with-docs</strong></button><span class="dependency-mark">→</span><button class="skill-button model" type="button" data-detail="grilling"><strong>grilling</strong><span>+ domain-modeling</span></button></div>
-        <div class="dependency"><button class="skill-button user" type="button" data-detail="triage"><strong>triage</strong></button><span class="dependency-mark">→</span><button class="skill-button model" type="button" data-detail="grilling"><strong>grilling</strong><span>必要时还采用 domain-modeling 补全领域词汇</span></button></div>
-        <div class="dependency"><button class="skill-button user" type="button" data-detail="wayfinder"><strong>wayfinder</strong></button><span class="dependency-mark">→</span><button class="skill-button model" type="button" data-detail="grilling"><strong>grilling</strong><span>还采用 domain-modeling；prototype 类型调查票可采用 prototype</span></button></div>
-        <div class="dependency"><button class="skill-button user" type="button" data-detail="improve-codebase-architecture"><strong>improve-codebase-architecture</strong></button><span class="dependency-mark">→</span><button class="skill-button model" type="button" data-detail="codebase-design"><strong>codebase-design</strong><span>+ grilling + domain-modeling</span></button></div>
-        <div class="dependency"><button class="skill-button user" type="button" data-detail="implement"><strong>implement</strong></button><span class="dependency-mark">→</span><button class="skill-button model" type="button" data-detail="tdd"><strong>tdd</strong><span>+ code-review</span></button></div>
-        <div class="dependency"><button class="skill-button user" type="button" data-detail="grill-me"><strong>grill-me</strong></button><span class="dependency-mark">→</span><button class="skill-button model" type="button" data-detail="grilling"><strong>grilling</strong><span>无代码库、不写领域文档</span></button></div>
-      </div>
-    </section>
-
-    <section aria-labelledby="section-5">
-      <h2 id="section-5"><span class="icon" aria-hidden="true">⑤</span>产物交接链</h2>
-      <div class="artifact-chain">
-        <div class="artifact blue"><strong>Setup 配置</strong>两个：<code>issue-tracker.md</code>、<code>domain.md</code><br>安装 <code>triage</code> 时为三个，增加 <code>triage-labels.md</code></div>
-        <div class="artifact green"><strong>领域语言</strong><code>CONTEXT.md</code><br><code>docs/adr/*.md</code></div>
-        <div class="artifact blue"><strong>Spec issue</strong>多会话工作的需求基线</div>
-        <div class="artifact amber"><strong>Tickets</strong>tracer bullets + blocking edges</div>
-        <div class="artifact green"><strong>Code + Tests</strong>逐票可执行行为契约</div>
-        <div class="artifact blue"><strong>Review</strong>Standards 与 Spec 并排报告</div>
-        <div class="artifact"><strong>Commit</strong>一个实现单元的版本边界</div>
-      </div>
-      <div class="grid cols-3 side-artifacts">
-        <div class="card"><h3>prototype branch</h3><p>主分支之外保存可运行证据；主链只吸收被验证的决策。</p></div>
-        <div class="card"><h3>handoff Markdown</h3><p>OS 临时目录中的脱敏跨会话桥；引用正式产物，不复制第二份事实源。</p></div>
-        <div class="card"><h3>research Markdown</h3><p>仓库内带一手来源引用的事实快照；提供输入，不代替人类决策。</p></div>
-      </div>
-      <p class="route-note">Spec 与 Tickets 只服务多会话工作；单会话小改仍读取领域文档，并以 Tests、Review 和 Commit 收尾。固定源码存在未决前置张力：Setup 未安装 <code>triage</code> 时不生成 <code>triage-labels.md</code>，但 <code>to-spec</code> 与 <code>to-tickets</code> 声明需要 triage label vocabulary 并应用 <code>ready-for-agent</code>；源码未给出回退行为。</p>
-    </section>
-
-    <section aria-labelledby="section-6">
-      <h2 id="section-6"><span class="icon" aria-hidden="true">⑥</span>正式技能矩阵</h2>
-      <p class="muted" style="margin-bottom:10px;">点击任一技能查看调用方式、输入输出、依赖、前后关系和上游源码。</p>
-      <div class="grid cols-2">
-        <div class="matrix-group blue">
-          <h3><span>工程 · user-invoked</span><span>9</span></h3>
-          <div class="matrix">
-            <button class="skill-button user" type="button" data-detail="ask-matt"><strong>ask-matt</strong></button>
-            <button class="skill-button user" type="button" data-detail="grill-with-docs"><strong>grill-with-docs</strong></button>
-            <button class="skill-button user" type="button" data-detail="triage"><strong>triage</strong></button>
-            <button class="skill-button user" type="button" data-detail="improve-codebase-architecture"><strong>improve-codebase-architecture</strong></button>
-            <button class="skill-button user" type="button" data-detail="setup-matt-pocock-skills"><strong>setup-matt-pocock-skills</strong></button>
-            <button class="skill-button user" type="button" data-detail="to-spec"><strong>to-spec</strong></button>
-            <button class="skill-button user" type="button" data-detail="to-tickets"><strong>to-tickets</strong></button>
-            <button class="skill-button user" type="button" data-detail="wayfinder"><strong>wayfinder</strong></button>
-            <button class="skill-button user" type="button" data-detail="implement"><strong>implement</strong></button>
-          </div>
-          <p class="small muted" style="margin-top:8px;">工程桶内共 9 个；另 4 个 user-invoked 位于 productivity，共 13 个。</p>
-        </div>
-        <div class="matrix-group green">
-          <h3><span>工程 · model-invoked</span><span>7</span></h3>
-          <div class="matrix">
-            <button class="skill-button model" type="button" data-detail="diagnosing-bugs"><strong>diagnosing-bugs</strong></button>
-            <button class="skill-button model" type="button" data-detail="tdd"><strong>tdd</strong></button>
-            <button class="skill-button model" type="button" data-detail="prototype"><strong>prototype</strong></button>
-            <button class="skill-button model" type="button" data-detail="research"><strong>research</strong></button>
-            <button class="skill-button model" type="button" data-detail="domain-modeling"><strong>domain-modeling</strong></button>
-            <button class="skill-button model" type="button" data-detail="codebase-design"><strong>codebase-design</strong></button>
-            <button class="skill-button model" type="button" data-detail="code-review"><strong>code-review</strong></button>
-          </div>
-          <p class="small muted" style="margin-top:8px;">工程桶内 7 个；另 1 个 model-invoked 是 productivity 的 grilling。</p>
-        </div>
-        <div class="matrix-group wide">
-          <h3><span>Productivity · 正式技能</span><span>5</span></h3>
-          <div class="matrix">
-            <button class="skill-button user" type="button" data-detail="grill-me"><strong>grill-me</strong><span>user-invoked</span></button>
-            <button class="skill-button model" type="button" data-detail="grilling"><strong>grilling</strong><span>model-invoked</span></button>
-            <button class="skill-button user" type="button" data-detail="handoff"><strong>handoff</strong><span>user-invoked</span></button>
-            <button class="skill-button user" type="button" data-detail="teach"><strong>teach</strong><span>user-invoked</span></button>
-            <button class="skill-button user" type="button" data-detail="writing-great-skills"><strong>writing-great-skills</strong><span>user-invoked</span></button>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <section aria-labelledby="section-7">
-      <h2 id="section-7"><span class="icon" aria-hidden="true">⑦</span>非正式状态区</h2>
-      <div class="grid cols-3">
-        <div class="card bucket blue"><strong>engineering · 17</strong><span>16 项正式；resolving-merge-conflicts 目录存在但未暴露</span></div>
-        <div class="card bucket green"><strong>productivity · 5</strong><span>5 项全部进入正式插件清单</span></div>
-        <div class="card bucket"><strong>misc · 4</strong><span>零散可用，不在正式插件清单</span></div>
-        <div class="card bucket"><strong>personal · 2</strong><span>绑定作者个人环境，未推广到插件</span></div>
-        <div class="card bucket amber"><strong>in-progress · 7</strong><span>正在形成中，不在正式插件清单</span></div>
-        <div class="card bucket"><strong>deprecated · 4</strong><span>已弃用的历史技能</span></div>
-      </div>
-      <p class="route-note">六桶共 39 个目录，正式暴露 21 个。其余 18 个不能统称“未完成”：它们分别是未正式暴露、个人/环境特定、开发中或已弃用。对 <code>resolving-merge-conflicts</code> 不推断未发布原因。</p>
-    </section>
-
-    <section aria-labelledby="section-8">
-      <h2 id="section-8"><span class="icon" aria-hidden="true">⑧</span>关键判断与本项目借鉴</h2>
-      <div class="grid cols-2">
-        <div class="judgement">
-          <h3>对上游体系的判断</h3>
-          <ul>
-            <li>稳定产物让小技能可组合，也让失败位置可见；代价是用户必须理解调用边界。</li>
-            <li>Setup、grilling、Spec、Tickets、triage 与架构选择都设人工决策门，提升控制权但降低无人值守程度。</li>
-            <li>前期保留上下文、实施逐票清空，是决策连续性与实现专注度之间的成熟分段。</li>
-            <li>Issue Tracker 配置是关键可移植 seam；真实平台能力差异仍会影响可靠性。</li>
-            <li>TDD、诊断和 review 以可执行证据优先；最难且最有价值的是选择代表用户行为的 public seam。</li>
-          </ul>
-        </div>
-        <div class="judgement green-line">
-          <h3>对 AI Knowledge Base 的结构借鉴</h3>
-          <ul>
-            <li>在模块目录之外补充“采集异常、分析质量、Prompt 回归、API 展示、部署故障”等情境入口。</li>
-            <li>为采集结果、分析结果、Reviewer 评分、数据库记录与静态站输出明确生产者、消费者和生命周期。</li>
-            <li>用单独清单区分正式、试验中、环境特定与已弃用能力，不让目录位置替代发布状态。</li>
-            <li>保留来源仓库、完整 SHA、研究日期和精确文件链接，面对上游变化时显式更新快照。</li>
-            <li>保持 Collector → LangGraph → Reviewer → 入库 → 静态站/API 主链简洁，把例外入口单独表达并允许回流。</li>
-          </ul>
-        </div>
-      </div>
-      <p class="route-note">这些借鉴用于补充导航与产物说明，不替换本项目现有 <code>AGENTS.md</code> 的权威约束。</p>
-    </section>
-  </main>
-
-  <button class="detail-backdrop" id="detail-backdrop" type="button" hidden aria-label="关闭技能详情"></button>
-  <aside class="detail-panel" id="detail-panel" role="dialog" aria-modal="true" aria-labelledby="detail-title" hidden>
-    <button class="detail-close" id="detail-close" type="button" aria-label="关闭技能详情">×</button>
-    <p class="eyebrow">正式技能详情</p>
-    <h2 id="detail-title">技能详情</h2>
-    <p class="detail-summary" id="detail-summary"></p>
-    <dl class="detail-list" id="detail-list"></dl>
-    <a class="source-link" id="detail-source" href="#" target="_blank" rel="noreferrer">查看上游 SKILL.md</a>
-  </aside>
-
-  <script>
-    const skillDetails = {
+<main class="poster">
+  <header><p class="eyebrow">固定源码快照 · 2026-07-11</p><h1>mattpocock/skills 能力图鉴</h1><p class="subtitle">先认识 Skill，再理解输入输出与中间产物，最后看它们如何协作。</p></header>
+  <section aria-labelledby="section-1"><h2 id="section-1"><span class="icon">①</span>快速认识</h2><div class="grid stats"><div class="card stat blue"><strong>21</strong><span>正式 Skill</span></div><div class="card stat green"><strong>6</strong><span>能力类型</span></div><div class="card stat amber"><strong>5</strong><span>典型协作流程</span></div></div><p style="margin-top:12px">Skill 是过程单元，产物是跨 Skill、跨会话接续工作的协作契约。推荐顺序：能力地图 → Skill 图鉴 → 产物 → 矩阵 → 协作流程。调用方式仅是单项属性，不是一级分类。</p></section>
+  <section aria-labelledby="section-2"><h2 id="section-2"><span class="icon">②</span>能力地图</h2><div class="grid cols-3" id="ability-map"></div><div class="filters" aria-label="按能力筛选 Skill"><button class="filter" type="button" data-ability-filter="all" aria-pressed="true">全部（21）</button><button class="filter" type="button" data-ability-filter="navigation" aria-pressed="false">导航与项目配置</button><button class="filter" type="button" data-ability-filter="discovery" aria-pressed="false">需求澄清与方案探索</button><button class="filter" type="button" data-ability-filter="planning" aria-pressed="false">请求治理与规划拆分</button><button class="filter" type="button" data-ability-filter="delivery" aria-pressed="false">实现、测试与审查</button><button class="filter" type="button" data-ability-filter="architecture" aria-pressed="false">领域知识与架构设计</button><button class="filter" type="button" data-ability-filter="knowledge" aria-pressed="false">知识获取与跨会话协作</button></div><p class="muted small">能力类型用于找入口，不表示调用顺序；每个正式 Skill 只归入一类。</p></section>
+  <section aria-labelledby="section-3"><h2 id="section-3"><span class="icon">③</span>Skill 图鉴</h2><p>卡片默认展示核心作用、适用场景、调用方式、输出与中间产物；打开详情可查看完整 13 字段。</p><div class="grid skill-grid" id="skill-grid" style="margin-top:12px"></div></section>
+  <section aria-labelledby="section-4"><h2 id="section-4"><span class="icon">④</span>文件与产物图鉴</h2><pre class="tree">项目级配置
+├── AGENTS.md / CLAUDE.md
+└── docs/agents/{issue-tracker.md,domain.md,triage-labels.md}
+长期领域知识
+├── CONTEXT.md / CONTEXT-MAP.md
+└── docs/adr/NNNN-*.md
+工作规划产物
+├── Spec Issue / Ticket Issues
+└── .scratch/&lt;feature&gt;/issues/NN-&lt;ticket&gt;.md
+设计与研究产物
+├── Research Markdown / Prototype branch
+└── Architecture HTML report
+临时会话产物 ── OS 临时目录/handoff-*.md
+实现与验证产物 ── Tests / Code commits / Code Review report</pre><div class="artifact-list" id="artifact-list"></div></section>
+  <section aria-labelledby="section-5"><h2 id="section-5"><span class="icon">⑤</span>Skill × 产物矩阵</h2><div class="legend"><span class="pill">C：创建</span><span class="pill">U：更新</span><span class="pill">R：读取</span><span class="pill">空白：无固定源码关系</span></div><div class="matrix-scroll" data-artifact-matrix><table><caption>固定 SHA 源码支持的 Skill 与产物关系</caption><thead><tr><th>Skill</th><th>项目配置</th><th>领域文档</th><th>ADR</th><th>Spec</th><th>Tickets</th><th>Research Markdown</th><th>Prototype branch</th><th>Architecture report</th><th>Handoff</th><th>Tests/Code</th><th>Review report</th></tr></thead><tbody id="matrix-body"></tbody></table></div><p class="muted small" style="margin-top:8px">证据边界：Wayfinder Research Ticket 不等于固定调用 research；二者组合只能标作可选路线。</p></section>
+  <section aria-labelledby="section-6"><h2 id="section-6"><span class="icon">⑥</span>Skill 协作流程</h2><div class="grid" id="flows"></div><div class="card amber handoff"><strong>跨会话桥（不是第六条业务流程）</strong><p>任意会话 → 当前状态 / 下一目标 / 正式产物指针 / 未决项 → <code>handoff</code> → handoff Markdown → 新会话</p></div></section>
+  <section aria-labelledby="section-7"><h2 id="section-7"><span class="icon">⑦</span>安装与调用参考</h2><div class="grid cols-2"><div class="card blue"><h3>安装与 Setup</h3><p><code>npx skills@latest add mattpocock/skills</code></p><p>选择所需 Skill 和目标 coding agent，确保选中 <code>/setup-matt-pocock-skills</code>，随后在目标仓库运行它。Setup 先探测、展示草稿，经确认后写入。</p></div><div class="card green"><h3>调用只是属性</h3><p><strong>13 个 user-invoked</strong> 仅由人显式输入名称；<strong>8 个 model-invoked</strong> 可由模型自动选择，也可由人输入。相邻的 user-invoked Skill 不会自动互调。</p></div></div><div class="tension"><strong>Setup / Triage 前置张力</strong><p>Setup 在未安装 <code>triage</code> 时不生成 <code>docs/agents/triage-labels.md</code>；但 <code>to-spec</code> 与 <code>to-tickets</code> 要求 triage label vocabulary 和 <code>ready-for-agent</code>。固定源码未定义缺失时的回退来源，因此这里只记录张力，不虚构默认映射。</p></div></section>
+  <section aria-labelledby="section-8"><h2 id="section-8"><span class="icon">⑧</span>非正式 Skill 附录</h2><div class="grid cols-3"><div class="card"><h3>未推广</h3><p><code>misc</code> 4 项、<code>personal</code> 2 项；内容存在但未进入插件。</p></div><div class="card"><h3>开发中</h3><p><code>in-progress</code> 7 项；不提升为正式 Skill。</p></div><div class="card"><h3>废弃</h3><p><code>deprecated</code> 4 项。另有 <code>engineering/resolving-merge-conflicts</code> 未被插件暴露，原因不作推断。</p></div></div><p class="muted small" style="margin-top:10px">固定提交含 39 个 Skill 目录；正式边界只认 <code>.claude-plugin/plugin.json</code> 中的 21 项。</p></section>
+</main>
+<button class="detail-backdrop" id="detail-backdrop" type="button" hidden aria-label="关闭 Skill 详情"></button>
+<aside class="detail-panel" id="detail-panel" role="dialog" aria-modal="true" aria-labelledby="detail-title" hidden><button class="detail-close" id="detail-close" type="button" aria-label="关闭 Skill 详情">×</button><p class="eyebrow">正式 Skill 详情</p><h2 id="detail-title">Skill 详情</h2><dl class="detail-list" id="detail-list"></dl><a class="source-link" id="detail-source" href="#" target="_blank" rel="noreferrer">查看固定源码 SKILL.md</a></aside>
+<script>
+  const SHA = "391a2701dd948f94f56a39f7533f8eea9a859c87";
+  const source = (bucket, name) => `https://github.com/mattpocock/skills/blob/${SHA}/skills/${bucket}/${name}/SKILL.md`;
+  const skillDetails = {
       "ask-matt": {
-        title: "ask-matt",
-        summary: "正式技能之上的情境路由器：根据当前处境推荐 skill 或 flow，但不代替用户启动下一项显式命令。",
-        invocation: "用户：/ask-matt",
-        input: "用户当前情境、工作规模、是否有代码库",
-        output: "推荐的 skill 或 flow",
-        requires: "21 项技能的路由知识、调用规则",
-        previous: "任意工程工作开始前；先检查是否已完成 Setup",
-        next: "由用户显式启动被推荐的 user-invoked 技能",
-        source: "https://github.com/mattpocock/skills/blob/391a2701dd948f94f56a39f7533f8eea9a859c87/skills/engineering/ask-matt/SKILL.md"
-      },
-      "diagnosing-bugs": {
-        title: "diagnosing-bugs",
-        summary: "困难 Bug 与性能回归的诊断纪律：先构造捕获精确症状的 tight feedback loop，再最小化、验证假设并留下回归测试。",
-        invocation: "模型/用户",
-        input: "Bug、异常、失败、性能回归及可访问环境",
-        output: "最小复现、已验证修复、回归测试、清理与 post-mortem",
-        requires: "CONTEXT.md、相关 ADR、可运行测试/脚本/浏览器/trace",
-        previous: "Bug 或性能回归入口",
-        next: "通常进入 code-review → commit；若暴露测试 seam 问题则转架构维护",
-        source: "https://github.com/mattpocock/skills/blob/391a2701dd948f94f56a39f7533f8eea9a859c87/skills/engineering/diagnosing-bugs/SKILL.md"
-      },
-      "grill-with-docs": {
-        title: "grill-with-docs",
-        summary: "在有代码库时逐问压力测试计划，并把澄清出的术语和难逆决策即时写入领域文档。",
-        invocation: "用户：/grill-with-docs",
-        input: "有代码库的计划或设计",
-        output: "共享理解、更新后的 CONTEXT.md 与必要 ADR",
-        requires: "grilling、domain-modeling、代码与已有领域文档",
-        previous: "Setup 之后的新需求主链起点；研究结果也可在此汇入",
-        next: "小改直达 implement；多会话工作进入 to-spec；必要时走 prototype 支线",
-        source: "https://github.com/mattpocock/skills/blob/391a2701dd948f94f56a39f7533f8eea9a859c87/skills/engineering/grill-with-docs/SKILL.md"
-      },
-      "triage": {
-        title: "triage",
-        summary: "把外部 Issue/PR 放入小型状态机：分类、验证主张、必要时澄清，并在人类确认后改变状态。",
-        invocation: "用户：/triage",
-        input: "外部 issue/PR、tracker 状态、维护者指示",
-        output: "category/state、验证结果、triage notes 或 durable agent brief",
-        requires: "Issue Tracker、Triage Labels、领域文档；必要时 grilling、domain-modeling",
-        previous: "外部请求入口",
-        next: "ready-for-agent → implement；已有 PR 可处理后进入 code-review；ready-for-human 交给人类",
-        source: "https://github.com/mattpocock/skills/blob/391a2701dd948f94f56a39f7533f8eea9a859c87/skills/engineering/triage/SKILL.md"
-      },
-      "improve-codebase-architecture": {
-        title: "improve-codebase-architecture",
-        summary: "用 deep-module 词汇扫描架构摩擦，生成临时 HTML 候选报告，待用户选择后再深入设计。",
-        invocation: "用户：/improve-codebase-architecture",
-        input: "代码库、CONTEXT.md、相关 ADR",
-        output: "OS 临时目录中的视觉候选报告；被选中的架构问题与设计决策",
-        requires: "codebase-design、代码探索、grilling、domain-modeling",
-        previous: "架构维护入口；也可承接诊断发现的 seam 问题",
-        next: "候选想法回到 grill-with-docs，再按规模走 implement 或 Spec/Tickets",
-        source: "https://github.com/mattpocock/skills/blob/391a2701dd948f94f56a39f7533f8eea9a859c87/skills/engineering/improve-codebase-architecture/SKILL.md"
+        title:"ask-matt",
+        ability:"navigation",
+        purpose:"按当前情境推荐 Skill 或流程。",
+        scenarios:"不确定从哪个入口开始。",
+        invocation:"用户显式 /ask-matt",
+        input:"当前问题、代码库有无、工作规模",
+        actions:"区分主流程、入口、维护与独立工具并给出路线",
+        output:"推荐路线",
+        intermediates:"无",
+        requires:"仓库 Skill 与调用规则知识",
+        collaboration:"位于所有流程之前，指向 Setup 或具体入口",
+        boundary:"只路由，不执行另一个 user-invoked Skill",
+        source:"https://github.com/mattpocock/skills/blob/391a2701dd948f94f56a39f7533f8eea9a859c87/skills/engineering/ask-matt/SKILL.md"
       },
       "setup-matt-pocock-skills": {
-        title: "setup-matt-pocock-skills",
-        summary: "首次工程流程前的提示驱动配置：探测仓库、展示草稿、逐节确认后写入两个配置；安装 triage 时为三个，增加 labels 约定。",
-        invocation: "用户：/setup-matt-pocock-skills",
-        input: "仓库结构、remote、现有 agent/domain 文件、用户选择",
-        output: "docs/agents/*.md 与现有 CLAUDE.md/AGENTS.md 中的 Agent skills 配置块",
-        requires: "Git 与文件探测；用户逐节确认",
-        previous: "安装插件并选中该技能",
-        next: "grill-with-docs 或其它工程情境入口",
-        source: "https://github.com/mattpocock/skills/blob/391a2701dd948f94f56a39f7533f8eea9a859c87/skills/engineering/setup-matt-pocock-skills/SKILL.md"
-      },
-      "tdd": {
-        title: "tdd",
-        summary: "在预先确认的 public seam 上，以一次一个 red-green 垂直切片构建外部可观察行为。",
-        invocation: "模型/用户",
-        input: "已确认的 public seam、一个具体外部行为",
-        output: "一次一个 red-green 垂直切片及可长期保留的测试",
-        requires: "CONTEXT.md、ADR、测试工具、用户预先确认 seam",
-        previous: "通常由 implement 内部采用；也可独立构建具体行为",
-        next: "持续局部验证；实现结束进入 code-review",
-        source: "https://github.com/mattpocock/skills/blob/391a2701dd948f94f56a39f7533f8eea9a859c87/skills/engineering/tdd/SKILL.md"
-      },
-      "to-spec": {
-        title: "to-spec",
-        summary: "把已经讨论清楚的当前对话综合成 Spec 并发布到 tracker；不重新访谈。",
-        invocation: "用户：/to-spec",
-        input: "当前完整对话和代码库理解",
-        output: "发布到 tracker、带 ready-for-agent 的 Spec issue",
-        requires: "Issue Tracker、Triage Labels、领域术语、用户确认测试 seams",
-        previous: "grill-with-docs 后的多会话分支",
-        next: "由用户显式启动 to-tickets",
-        source: "https://github.com/mattpocock/skills/blob/391a2701dd948f94f56a39f7533f8eea9a859c87/skills/engineering/to-spec/SKILL.md"
-      },
-      "to-tickets": {
-        title: "to-tickets",
-        summary: "把 Spec、plan 或讨论拆成单会话可完成的 tracer-bullet tickets，并声明 blocking edges。",
-        invocation: "用户：/to-tickets",
-        input: "已有 Spec、plan、issue 或当前讨论",
-        output: "获用户批准的 tracer-bullet tickets 与 blocking edges",
-        requires: "Issue Tracker、Triage Labels、领域术语、tracker 阻塞能力",
-        previous: "多会话工作的 to-spec 之后",
-        next: "每张已解锁 ticket 由用户在干净上下文启动 implement",
-        source: "https://github.com/mattpocock/skills/blob/391a2701dd948f94f56a39f7533f8eea9a859c87/skills/engineering/to-tickets/SKILL.md"
-      },
-      "wayfinder": {
-        title: "wayfinder",
-        summary: "为单会话装不下的模糊工作定义 destination，建立调查地图、blocking edges 与 frontier，逐票消除未知。",
-        invocation: "用户：/wayfinder",
-        input: "超大、模糊、路线尚不可见的 destination",
-        output: "map issue、调查 tickets、blocking frontier、逐票决策",
-        requires: "Issue Tracker、grilling、domain-modeling；按票型使用 research/prototype",
-        previous: "巨大模糊工作入口",
-        next: "路线清楚后进入 to-spec；范围已变小时可直接 implement",
-        source: "https://github.com/mattpocock/skills/blob/391a2701dd948f94f56a39f7533f8eea9a859c87/skills/engineering/wayfinder/SKILL.md"
-      },
-      "implement": {
-        title: "implement",
-        summary: "按 ticket、Spec 或明确说明实施，在确认的 seams 上驱动 TDD，完整验证并双轴 review 后提交。",
-        invocation: "用户：/implement",
-        input: "一张 ticket、Spec 或明确工作说明",
-        output: "实现、测试结果、review、commit",
-        requires: "tdd、code-review、类型检查和测试命令",
-        previous: "单会话 grilling 后，或每张已解锁 ticket 的干净上下文",
-        next: "下一张已解锁 ticket 使用新会话；全部完成则结束本轮交付",
-        source: "https://github.com/mattpocock/skills/blob/391a2701dd948f94f56a39f7533f8eea9a859c87/skills/engineering/implement/SKILL.md"
-      },
-      "prototype": {
-        title: "prototype",
-        summary: "为必须通过运行才能回答的逻辑、状态或 UI 问题制作抛弃式证据，而不是提前建设生产实现。",
-        invocation: "模型/用户",
-        input: "一个需要可运行答案的逻辑/状态或 UI 设计问题",
-        output: "可运行 CLI 或同一路由 UI 变体；throwaway branch、结论与 context pointer",
-        requires: "现有项目运行方式和路由约定",
-        previous: "grilling 中无法仅靠对话解决的问题；通常先 handoff 到新会话",
-        next: "handoff 结论回原 idea/Spec/implementation 会话",
-        source: "https://github.com/mattpocock/skills/blob/391a2701dd948f94f56a39f7533f8eea9a859c87/skills/engineering/prototype/SKILL.md"
-      },
-      "research": {
-        title: "research",
-        summary: "针对一项问题调查高信任一手资料，并把逐项可追溯的事实写成单一 Markdown。",
-        invocation: "模型/用户",
-        input: "需要查证的一项问题",
-        output: "仓库中带逐项引用的单一 research Markdown",
-        requires: "后台 agent、高信任一手来源、仓库既有笔记约定",
-        previous: "研究入口；也可作为 wayfinder research 类型调查票",
-        next: "把研究文件带入 grill-with-docs 或其它决策会话",
-        source: "https://github.com/mattpocock/skills/blob/391a2701dd948f94f56a39f7533f8eea9a859c87/skills/engineering/research/SKILL.md"
-      },
-      "domain-modeling": {
-        title: "domain-modeling",
-        summary: "主动澄清模糊或冲突术语、探索边界案例，并即时维护 glossary 与达到门槛的 ADR。",
-        invocation: "模型/用户",
-        input: "模糊、重载或冲突术语，具体边界场景，难逆决策",
-        output: "即时更新的 CONTEXT.md、达到三项门槛的 ADR",
-        requires: "single/multi-context 布局、用户决策、代码事实",
-        previous: "贯穿 grilling、triage、wayfinder 与架构工作的词汇层",
-        next: "更新后的领域语言被 Spec、实现、测试、诊断和评审消费",
-        source: "https://github.com/mattpocock/skills/blob/391a2701dd948f94f56a39f7533f8eea9a859c87/skills/engineering/domain-modeling/SKILL.md"
-      },
-      "codebase-design": {
-        title: "codebase-design",
-        summary: "用 module、interface、depth、seam、adapter、leverage、locality 的精确词汇设计 deep modules。",
-        invocation: "模型/用户",
-        input: "module/interface/seam 的设计或重构问题",
-        output: "统一设计词汇、候选 interface 与 seam 评价",
-        requires: "当前调用关系和可变 adapter 事实；需要时 design-it-twice agent",
-        previous: "架构扫描与 TDD 下方的设计词汇层",
-        next: "为 improve-codebase-architecture 候选或 TDD seam 选择提供依据",
-        source: "https://github.com/mattpocock/skills/blob/391a2701dd948f94f56a39f7533f8eea9a859c87/skills/engineering/codebase-design/SKILL.md"
-      },
-      "code-review": {
-        title: "code-review",
-        summary: "从用户给定 fixed point 到 HEAD，分别按 Standards 与 Spec 两轴审查，结果并排呈现而不合并重排。",
-        invocation: "模型/用户",
-        input: "用户给定 fixed point、HEAD diff、Spec、仓库 standards",
-        output: "并排的 Standards report 与 Spec report",
-        requires: "可解析 Git fixed point、Issue Tracker、标准文件、两个并行 sub-agents",
-        previous: "implement 提交前；也可独立 review 分支或 PR",
-        next: "修正问题并重新验证，然后 commit",
-        source: "https://github.com/mattpocock/skills/blob/391a2701dd948f94f56a39f7533f8eea9a859c87/skills/engineering/code-review/SKILL.md"
+        title:"setup-matt-pocock-skills",
+        ability:"navigation",
+        purpose:"为工程 Skill 建立仓库级配置。",
+        scenarios:"每个仓库首次使用工程流程。",
+        invocation:"用户显式 /setup-matt-pocock-skills",
+        input:"remote、仓库结构、现有 agent/domain 文件、已安装 Skill 与用户选择",
+        actions:"探测、展示草稿、逐节确认后写入",
+        output:"可被工程 Skill 消费的项目配置",
+        intermediates:"AGENTS.md/CLAUDE.md 配置块及 docs/agents/*.md 草稿",
+        requires:"Git/文件探测与用户确认",
+        collaboration:"为 triage、wayfinder、to-spec、to-tickets、领域 Skill 提供前置",
+        boundary:"不同时新建两种 agent 文件；未安装 triage 时跳过标签配置",
+        source:"https://github.com/mattpocock/skills/blob/391a2701dd948f94f56a39f7533f8eea9a859c87/skills/engineering/setup-matt-pocock-skills/SKILL.md"
       },
       "grill-me": {
-        title: "grill-me",
-        summary: "无代码库时运行无状态 grilling，会逐个解决设计树分支，但不维护 CONTEXT.md。",
-        invocation: "用户：/grill-me",
-        input: "无代码库的计划或设计",
-        output: "直到共享理解为止的决策树",
-        requires: "grilling",
-        previous: "无代码库的通用澄清入口",
-        next: "确认共享理解后再进入适合的实施流程",
-        source: "https://github.com/mattpocock/skills/blob/391a2701dd948f94f56a39f7533f8eea9a859c87/skills/productivity/grill-me/SKILL.md"
+        title:"grill-me",
+        ability:"discovery",
+        purpose:"用持续访谈澄清通用计划或设计。",
+        scenarios:"没有代码库的方案讨论。",
+        invocation:"用户显式 /grill-me",
+        input:"计划、设计与逐题回答",
+        actions:"运行 grilling",
+        output:"共享理解与已解决决策树",
+        intermediates:"对话中的问题与答案",
+        requires:"grilling",
+        collaboration:"通用澄清入口",
+        boundary:"无状态，不写领域文档，确认前不实施",
+        source:"https://github.com/mattpocock/skills/blob/391a2701dd948f94f56a39f7533f8eea9a859c87/skills/productivity/grill-me/SKILL.md"
+      },
+      "grill-with-docs": {
+        title:"grill-with-docs",
+        ability:"discovery",
+        purpose:"澄清工程计划并同步固化领域语言和决策。",
+        scenarios:"有代码库的功能或架构讨论。",
+        invocation:"用户显式 /grill-with-docs",
+        input:"计划、代码事实、领域文档与用户决策",
+        actions:"组合 grilling 和 domain-modeling",
+        output:"共享理解、更新后的领域文档",
+        intermediates:"CONTEXT.md、必要 ADR、对话决策",
+        requires:"grilling、domain-modeling",
+        collaboration:"新功能主链起点，可交给 to-spec 或小改的 implement",
+        boundary:"负责澄清与记录，不实施计划",
+        source:"https://github.com/mattpocock/skills/blob/391a2701dd948f94f56a39f7533f8eea9a859c87/skills/engineering/grill-with-docs/SKILL.md"
       },
       "grilling": {
-        title: "grilling",
-        summary: "逐问压力测试计划：事实自行查，决策交给用户，每次只推进一个问题并给出推荐答案。",
-        invocation: "模型/用户",
-        input: "待压力测试的计划、设计及用户答复",
-        output: "逐分支解决的决策与共享理解",
-        requires: "代码库可查事实、用户对决策的回答",
-        previous: "被 grill-me、grill-with-docs、triage、wayfinder 等流程采用",
-        next: "共享理解确认后返回编排流程；自身不实施计划",
-        source: "https://github.com/mattpocock/skills/blob/391a2701dd948f94f56a39f7533f8eea9a859c87/skills/productivity/grilling/SKILL.md"
+        title:"grilling",
+        ability:"discovery",
+        purpose:"逐分支、逐问题压力测试计划。",
+        scenarios:"需要消除设计分歧或未决项。",
+        invocation:"模型自动或用户显式",
+        input:"计划、可查事实和用户回答",
+        actions:"事实自行查证，决策每次只问一题并给推荐答案",
+        output:"共享理解",
+        intermediates:"对话中的决策树",
+        requires:"用户参与和可访问代码库",
+        collaboration:"被 grill-me、grill-with-docs、triage、wayfinder 等复用",
+        boundary:"不替用户作决策，不实施计划",
+        source:"https://github.com/mattpocock/skills/blob/391a2701dd948f94f56a39f7533f8eea9a859c87/skills/productivity/grilling/SKILL.md"
+      },
+      "prototype": {
+        title:"prototype",
+        ability:"discovery",
+        purpose:"用抛弃式可运行代码回答一个设计问题。",
+        scenarios:"状态/逻辑需 CLI 验证，或 UI 必须看见多个差异方案。",
+        invocation:"模型自动或用户显式",
+        input:"单一设计问题与现有项目约定",
+        actions:"建立隔离分支，做最小 CLI 或同一路由多种 UI，记录结论",
+        output:"可运行原型与已验证决策",
+        intermediates:"Prototype branch、问题/答案和返回原线程的 context pointer",
+        requires:"项目运行方式、路由与 Git",
+        collaboration:"由 grilling 支线进入，结论回到原想法/Spec",
+        boundary:"代码从第一天即抛弃，默认不做持久化、测试、抽象或 polish",
+        source:"https://github.com/mattpocock/skills/blob/391a2701dd948f94f56a39f7533f8eea9a859c87/skills/engineering/prototype/SKILL.md"
+      },
+      "triage": {
+        title:"triage",
+        ability:"planning",
+        purpose:"把外部 Issue/PR 推进到明确类别与状态。",
+        scenarios:"维护者处理未经治理的请求。",
+        invocation:"用户显式 /triage",
+        input:"外部 Issue/PR、tracker 状态、标签映射和维护者指示",
+        actions:"分类、验证、补问、写 notes/brief，经人确认后变更状态",
+        output:"needs-info、ready-for-agent、ready-for-human 或 wontfix 结果",
+        intermediates:"Triage Notes、Agent/Human Brief、标签和评论",
+        requires:"Issue Tracker、Triage Labels，必要时 grilling/domain-modeling",
+        collaboration:"agent-ready 请求交给 implement",
+        boundary:"仅治理外来原始请求；to-tickets 产出的票不再 triage；发布内容带 AI 声明",
+        source:"https://github.com/mattpocock/skills/blob/391a2701dd948f94f56a39f7533f8eea9a859c87/skills/engineering/triage/SKILL.md"
+      },
+      "wayfinder": {
+        title:"wayfinder",
+        ability:"planning",
+        purpose:"把超大模糊工作变成共享决策地图。",
+        scenarios:"目的地已知但单会话看不清路线。",
+        invocation:"用户显式 /wayfinder",
+        input:"destination、tracker 配置、领域知识和用户决策",
+        actions:"创建 Map 与子票、连接阻塞边、每会话解决至多一票、更新 frontier",
+        output:"逐步消散 fog of war 的决策地图",
+        intermediates:"Map Issue、Research/Prototype/Grilling/Task Tickets、resolution comments、Decisions so far",
+        requires:"Issue Tracker、grilling、domain-modeling",
+        collaboration:"路线清晰后交给 to-spec 或小范围 implement",
+        boundary:"默认产出决策而非目的地交付物；Research Ticket 不等于固定调用 research",
+        source:"https://github.com/mattpocock/skills/blob/391a2701dd948f94f56a39f7533f8eea9a859c87/skills/engineering/wayfinder/SKILL.md"
+      },
+      "to-spec": {
+        title:"to-spec",
+        ability:"planning",
+        purpose:"把已经讨论清楚的内容综合成可执行 Spec。",
+        scenarios:"多会话工作进入正式规划。",
+        invocation:"用户显式 /to-spec",
+        input:"当前完整对话、代码库理解和领域文档",
+        actions:"综合目标、范围、行为与测试 seams，确认后发布",
+        output:"带 ready-for-agent 的 Spec Issue",
+        intermediates:"Spec 草稿与 seam 确认",
+        requires:"Issue Tracker、Triage Labels、领域术语",
+        collaboration:"承接 grilling/wayfinder，交给 to-tickets",
+        boundary:"不重新访谈，通常不写具体实现文件或代码",
+        source:"https://github.com/mattpocock/skills/blob/391a2701dd948f94f56a39f7533f8eea9a859c87/skills/engineering/to-spec/SKILL.md"
+      },
+      "to-tickets": {
+        title:"to-tickets",
+        ability:"planning",
+        purpose:"把计划拆成单会话 tracer-bullet tickets。",
+        scenarios:"Spec 或计划需分阶段实现。",
+        invocation:"用户显式 /to-tickets",
+        input:"Spec、plan、issue 或当前讨论",
+        actions:"设计端到端切片、确认粒度与 blocking edges、发布到 tracker",
+        output:"带依赖关系和 ready-for-agent 的 Ticket Issues",
+        intermediates:"票据草稿；本地 tracker 为 .scratch/<feature>/issues/NN-<ticket>.md",
+        requires:"Issue Tracker、Triage Labels 与阻塞能力",
+        collaboration:"每票由新的 implement 会话消费",
+        boundary:"不修改/关闭 parent；wide refactor 用 expand-contract；发布前经用户确认",
+        source:"https://github.com/mattpocock/skills/blob/391a2701dd948f94f56a39f7533f8eea9a859c87/skills/engineering/to-tickets/SKILL.md"
+      },
+      "implement": {
+        title:"implement",
+        ability:"delivery",
+        purpose:"完成一张明确票据并以测试、审查和提交收尾。",
+        scenarios:"Spec/Ticket 已足够可执行。",
+        invocation:"用户显式 /implement",
+        input:"Ticket、Spec 或明确工作说明",
+        actions:"理解范围，在确认 seam 上驱动 tdd，运行反馈命令，以 code-review 收尾并提交",
+        output:"已验证实现和 Code commit",
+        intermediates:"Tests、Code、测试输出、Code Review report",
+        requires:"tdd、code-review、项目测试/类型检查",
+        collaboration:"承接 agent-ready 工作，逐票完成主链",
+        boundary:"不得跳过预定 seam、完整测试或提交前双轴审查",
+        source:"https://github.com/mattpocock/skills/blob/391a2701dd948f94f56a39f7533f8eea9a859c87/skills/engineering/implement/SKILL.md"
+      },
+      "tdd": {
+        title:"tdd",
+        ability:"delivery",
+        purpose:"以 red-green-refactor 垂直切片实现外部行为。",
+        scenarios:"功能或修复有已确认 public seam。",
+        invocation:"模型自动或用户显式",
+        input:"一个行为、确认过的 seam、领域文档",
+        actions:"先写一个失败测试，再写最小实现使其通过并重复",
+        output:"通过的行为切片",
+        intermediates:"失败后转绿并保留的 Tests 与 Code",
+        requires:"测试工具、CONTEXT.md/ADR",
+        collaboration:"由 implement 驱动，也可独立使用",
+        boundary:"不测试实现细节、不横向批量铺测试、不在未确认 seam 上开始",
+        source:"https://github.com/mattpocock/skills/blob/391a2701dd948f94f56a39f7533f8eea9a859c87/skills/engineering/tdd/SKILL.md"
+      },
+      "diagnosing-bugs": {
+        title:"diagnosing-bugs",
+        ability:"delivery",
+        purpose:"用紧反馈环诊断困难 Bug/性能回归并验证修复。",
+        scenarios:"错误、失败、变慢、间歇性问题。",
+        invocation:"模型自动或用户显式",
+        input:"用户精确症状、环境、代码与历史状态",
+        actions:"建立 red-capable 命令、复现并最小化、排序可证伪假设、单变量探测、先回归测试后修复",
+        output:"根因、已验证修复与 post-mortem",
+        intermediates:"最小复现、反馈命令、临时 instrumentation、Regression Test",
+        requires:"可运行环境、CONTEXT.md/ADR",
+        collaboration:"修复后交给 review/commit；无正确 seam 时把发现交给架构维护",
+        boundary:"没有捕获精确症状的紧红灯命令，不进入假设阶段",
+        source:"https://github.com/mattpocock/skills/blob/391a2701dd948f94f56a39f7533f8eea9a859c87/skills/engineering/diagnosing-bugs/SKILL.md"
+      },
+      "code-review": {
+        title:"code-review",
+        ability:"delivery",
+        purpose:"从固定点对 diff 做 Standards 与 Spec 双轴审查。",
+        scenarios:"实现收尾或独立检查分支/PR。",
+        invocation:"模型自动或用户显式",
+        input:"可解析 fixed point、HEAD diff、仓库 standards 与可选 Spec",
+        actions:"两个独立并行审查分别核对标准/气味和规格忠实度",
+        output:"并排的双轴 Code Review report",
+        intermediates:"两个 sub-agent 报告",
+        requires:"Git、Issue Tracker/Spec、标准文件与并行 agent 能力",
+        collaboration:"implement 提交前质量门",
+        boundary:"缺 fixed point 先问；空 diff 停止；无 Spec 明示跳过该轴；两轴不合并重排",
+        source:"https://github.com/mattpocock/skills/blob/391a2701dd948f94f56a39f7533f8eea9a859c87/skills/engineering/code-review/SKILL.md"
+      },
+      "domain-modeling": {
+        title:"domain-modeling",
+        ability:"architecture",
+        purpose:"建立并持续校准项目统一领域语言。",
+        scenarios:"术语模糊、重载、边界冲突或决策需要固化。",
+        invocation:"模型自动或用户显式",
+        input:"领域术语、边界场景、代码事实和用户决策",
+        actions:"挑战定义、用反例压力测试、即时更新 glossary，达到门槛才写 ADR",
+        output:"清晰领域模型",
+        intermediates:"CONTEXT.md、可选 CONTEXT-MAP.md、docs/adr/NNNN-*.md",
+        requires:"docs/agents/domain.md 与用户裁决",
+        collaboration:"贯穿 grilling、triage、wayfinder、架构工作",
+        boundary:"被动读取 glossary 不算调用；CONTEXT.md 不放实现细节；ADR 需满足三项门槛",
+        source:"https://github.com/mattpocock/skills/blob/391a2701dd948f94f56a39f7533f8eea9a859c87/skills/engineering/domain-modeling/SKILL.md"
+      },
+      "codebase-design": {
+        title:"codebase-design",
+        ability:"architecture",
+        purpose:"提供 deep module、interface 与 seam 的统一设计纪律。",
+        scenarios:"模块边界、抽象、adapter 或可测试性设计。",
+        invocation:"模型自动或用户显式",
+        input:"调用关系、行为、变化轴与候选接口",
+        actions:"以 module/interface/depth/seam/adapter/leverage/locality 评价设计，必要时 design-it-twice",
+        output:"深模块接口与测试 seam 设计",
+        intermediates:"候选接口、边界方案与比较",
+        requires:"现有代码事实",
+        collaboration:"为 tdd 和架构扫描提供词汇，选定设计回主开发流程",
+        boundary:"只有一个 adapter 时不凭空制造 seam，不把浅包装当深模块",
+        source:"https://github.com/mattpocock/skills/blob/391a2701dd948f94f56a39f7533f8eea9a859c87/skills/engineering/codebase-design/SKILL.md"
+      },
+      "improve-codebase-architecture": {
+        title:"improve-codebase-architecture",
+        ability:"architecture",
+        purpose:"扫描代码库并可视化 deepening opportunities。",
+        scenarios:"周期性架构维护或缺少测试 seam。",
+        invocation:"用户显式 /improve-codebase-architecture",
+        input:"代码库、CONTEXT.md、相关 ADR",
+        actions:"用 codebase-design 词汇探索候选，生成 HTML，由用户选择后 grilling",
+        output:"Architecture HTML report 与选定架构问题",
+        intermediates:"OS 临时目录中的报告、候选列表与设计对话",
+        requires:"codebase-design、代码探索、grilling/domain-modeling",
+        collaboration:"选题后经领域/边界澄清回主开发流程",
+        boundary:"扫描时不先定具体 interface；报告不落仓库；不绕过 ADR 冲突",
+        source:"https://github.com/mattpocock/skills/blob/391a2701dd948f94f56a39f7533f8eea9a859c87/skills/engineering/improve-codebase-architecture/SKILL.md"
+      },
+      "research": {
+        title:"research",
+        ability:"knowledge",
+        purpose:"针对一个问题查阅高信任一手资料并固化引用。",
+        scenarios:"决策前需要外部事实。",
+        invocation:"模型自动或用户显式",
+        input:"清晰研究问题、仓库笔记约定",
+        actions:"后台 agent 搜索、筛选 primary sources、逐项引用并写文件",
+        output:"仓库内单一 Research Markdown",
+        intermediates:"来源列表、检索笔记和引用",
+        requires:"后台 agent、网络/资料访问",
+        collaboration:"结果可带入 grill-with-docs 或其他决策会话",
+        boundary:"只做事实调研；不以二手摘要替代一手来源；不代替决策或实现",
+        source:"https://github.com/mattpocock/skills/blob/391a2701dd948f94f56a39f7533f8eea9a859c87/skills/engineering/research/SKILL.md"
       },
       "handoff": {
-        title: "handoff",
-        summary: "把当前对话压缩成脱敏的临时 Markdown，通过引用正式产物把工作交给新会话。",
-        invocation: "用户：/handoff",
-        input: "当前对话、下一会话目标、已有正式产物指针",
-        output: "OS 临时目录中的 handoff Markdown 与 suggested skills",
-        requires: "对 Spec、ADR、issue、commit、diff 等已有产物的引用",
-        previous: "任意阶段上下文接近上限；prototype 支线双向桥",
-        next: "新会话从被中断节点继续，不在原会话继续",
-        source: "https://github.com/mattpocock/skills/blob/391a2701dd948f94f56a39f7533f8eea9a859c87/skills/productivity/handoff/SKILL.md"
+        title:"handoff",
+        ability:"knowledge",
+        purpose:"把当前会话压缩成新会话可接续的文档。",
+        scenarios:"上下文将满、需要分支或换会话。",
+        invocation:"用户显式 /handoff",
+        input:"当前对话、下一会话目标和正式产物指针",
+        actions:"总结、引用既有产物、建议 Skill、脱敏并写入临时目录",
+        output:"handoff Markdown",
+        intermediates:"无",
+        requires:"OS 临时目录与现有 Spec/ADR/Issue/commit/diff 指针",
+        collaboration:"任意流程、任意节点到新会话的桥",
+        boundary:"不在原会话继续；不复制正式产物；不写当前 workspace；不携带敏感信息",
+        source:"https://github.com/mattpocock/skills/blob/391a2701dd948f94f56a39f7533f8eea9a859c87/skills/productivity/handoff/SKILL.md"
       },
       "teach": {
-        title: "teach",
-        summary: "把当前目录作为有状态、多会话教学 workspace，以 mission、可信资源与学习记录组织课程。",
-        invocation: "用户：/teach",
-        input: "学习主题、学习动机、现有学习记录和可信资源",
-        output: "MISSION.md、RESOURCES.md、HTML lessons/reference、assets、learning records",
-        requires: "当前目录作为教学 workspace、一手资料、用户反馈",
-        previous: "独立教学流入口",
-        next: "依据学习记录与最近发展区规划后续 lesson",
-        source: "https://github.com/mattpocock/skills/blob/391a2701dd948f94f56a39f7533f8eea9a859c87/skills/productivity/teach/SKILL.md"
+        title:"teach",
+        ability:"knowledge",
+        purpose:"在当前目录维护多会话教学工作区。",
+        scenarios:"持续学习一个概念或技能。",
+        invocation:"用户显式 /teach",
+        input:"主题、mission、学习记录、可信资源与反馈",
+        actions:"确定最近发展区，制作短 lesson、reference、练习和学习记录",
+        output:"状态化教学工作区与 HTML lessons",
+        intermediates:"MISSION.md、RESOURCES.md、NOTES.md、lessons/、reference/、assets/、learning-records/",
+        requires:"当前目录、一手资源和用户反馈",
+        collaboration:"独立多会话教学流",
+        boundary:"每课服务 mission；mission 变更先确认；不属于工程交付链",
+        source:"https://github.com/mattpocock/skills/blob/391a2701dd948f94f56a39f7533f8eea9a859c87/skills/productivity/teach/SKILL.md"
       },
       "writing-great-skills": {
-        title: "writing-great-skills",
-        summary: "以可预测调用为目标，规范 skill 的 invocation、信息层级、拆分、裁剪和 leading words。",
-        invocation: "用户：/writing-great-skills",
-        input: "待编写、修改或评估的 skill",
-        output: "关于可预测调用、信息层级、拆分与裁剪的规范",
-        requires: "同目录 GLOSSARY.md 及被编辑技能",
-        previous: "独立参考层入口",
-        next: "按规范修改或评估 skill；不属于工程交付主链",
-        source: "https://github.com/mattpocock/skills/blob/391a2701dd948f94f56a39f7533f8eea9a859c87/skills/productivity/writing-great-skills/SKILL.md"
+        title:"writing-great-skills",
+        ability:"knowledge",
+        purpose:"提供可预测 Skill 的编写与裁剪规范。",
+        scenarios:"编写、修改或评估 Skill。",
+        invocation:"用户显式 /writing-great-skills",
+        input:"待处理 Skill 与调用需求",
+        actions:"检查 invocation、description、信息层级、拆分、单一事实源、leading words 与 failure modes",
+        output:"Skill 设计/编辑规范或改进结论",
+        intermediates:"被编辑 Skill 与检查笔记",
+        requires:"同目录 GLOSSARY.md",
+        collaboration:"独立参考能力",
+        boundary:"追求过程可预测，不承诺输出逐字一致，不混淆 context load 与 cognitive load",
+        source:"https://github.com/mattpocock/skills/blob/391a2701dd948f94f56a39f7533f8eea9a859c87/skills/productivity/writing-great-skills/SKILL.md"
       }
-    };
-
-    const detailPanel = document.getElementById("detail-panel");
-    const detailBackdrop = document.getElementById("detail-backdrop");
-    const detailClose = document.getElementById("detail-close");
-    const detailTitle = document.getElementById("detail-title");
-    const detailSummary = document.getElementById("detail-summary");
-    const detailList = document.getElementById("detail-list");
-    const detailSource = document.getElementById("detail-source");
-    let lastTrigger = null;
-
-    const labels = {
-      invocation: "调用方式",
-      input: "核心输入",
-      output: "核心输出",
-      requires: "关键依赖",
-      previous: "从哪里来",
-      next: "到哪里去"
-    };
-
-    function openDetail(key, trigger) {
-      const detail = skillDetails[key];
-      if (!detail) return;
-      lastTrigger = trigger;
-      detailTitle.textContent = detail.title;
-      detailSummary.textContent = detail.summary;
-      detailList.replaceChildren();
-      Object.entries(labels).forEach(([field, label]) => {
-        const row = document.createElement("div");
-        const term = document.createElement("dt");
-        const description = document.createElement("dd");
-        term.textContent = label;
-        description.textContent = detail[field];
-        row.append(term, description);
-        detailList.append(row);
-      });
-      detailSource.href = detail.source;
-      detailPanel.hidden = false;
-      detailBackdrop.hidden = false;
-      document.body.style.overflow = "hidden";
-      detailPanel.scrollTop = 0;
-      detailClose.focus();
-    }
-
-    function closeDetail() {
-      if (detailPanel.hidden) return;
-      detailPanel.hidden = true;
-      detailBackdrop.hidden = true;
-      document.body.style.overflow = "";
-      if (lastTrigger) lastTrigger.focus();
-    }
-
-    document.addEventListener("click", event => {
-      const trigger = event.target.closest("[data-detail]");
-      if (trigger) openDetail(trigger.dataset.detail, trigger);
-    });
-
-    detailClose.addEventListener("click", closeDetail);
-    detailBackdrop.addEventListener("click", closeDetail);
-    document.addEventListener("keydown", event => {
-      if (event.key === "Escape") closeDetail();
-      if (event.key === "Tab" && !detailPanel.hidden) {
-        const focusable = detailPanel.querySelectorAll("button:not([disabled]), a[href]");
-        const first = focusable[0];
-        const last = focusable[focusable.length - 1];
-        if (event.shiftKey && document.activeElement === first) {
-          event.preventDefault();
-          last.focus();
-        } else if (!event.shiftKey && document.activeElement === last) {
-          event.preventDefault();
-          first.focus();
-        } else if (!detailPanel.contains(document.activeElement)) {
-          event.preventDefault();
-          first.focus();
-        }
-      }
-    });
-  </script>
+  };
+  const abilities={navigation:["导航与项目配置","选择入口，建立 tracker、标签与领域配置"],discovery:["需求澄清与方案探索","用对话或可运行原型回答设计问题"],planning:["请求治理与规划拆分","治理请求，形成 Spec 与 Tickets"],delivery:["实现、测试与审查","实现代码、建立反馈环并审查"],architecture:["领域知识与架构设计","维护领域语言，设计深模块"],knowledge:["知识获取与跨会话协作","调研、会话传递、教学和 Skill 编写"]};
+  const artifactFields=[
+    ["AGENTS.md / CLAUDE.md","仓库根目录","setup-matt-pocock-skills","setup-matt-pocock-skills","工程 Skill/agent","## Agent skills 配置块，指向 tracker 与 domain 配置","长期","让 agent 知道配置入口"],
+    ["docs/agents/issue-tracker.md","仓库内固定路径","setup-matt-pocock-skills","setup-matt-pocock-skills","to-spec、to-tickets、triage、wayfinder、code-review","tracker 类型及 Issue、标签、子票、阻塞、查询操作","长期","隔离平台差异"],
+    ["docs/agents/domain.md","仓库内固定路径","setup-matt-pocock-skills","setup-matt-pocock-skills","领域相关工程 Skill","single/multi-context 布局、上下文与 ADR 路径","长期","定位领域知识"],
+    ["docs/agents/triage-labels.md","仓库内固定路径；仅安装 triage 时","setup-matt-pocock-skills","setup-matt-pocock-skills","triage、to-spec、to-tickets","category/state 到真实 label 的映射","长期","统一请求状态词汇"],
+    ["CONTEXT.md","单上下文根目录或各上下文根","domain-modeling","domain-modeling","grilling、规划、实现、TDD、诊断、审查、架构扫描","严格领域 glossary：术语、定义、边界与关系","长期持续演化","跨会话统一语言"],
+    ["CONTEXT-MAP.md","多包项目根目录，可选","无固定创建者","无固定更新者","需选择上下文的工程 Skill","子上下文名称、范围及 CONTEXT.md 指针","长期","多上下文导航"],
+    ["docs/adr/NNNN-*.md","docs/adr/ 或指定位置","domain-modeling","无固定更新者","后续领域建模、规划、实现、诊断、审查、架构工作","编号/标题、上下文、决策、备选与后果","长期不可变","记录难逆且有真实权衡的决策"],
+    ["Spec Issue","配置的 Issue Tracker","to-spec","无固定更新者","to-tickets、implement、code-review","背景/目标、范围、行为、词汇、模块/seams、验收与测试策略","阶段性","agent-ready 规格基线"],
+    ["Ticket Issues / 本地票据","Tracker 或 .scratch/<feature>/issues/NN-<ticket>.md","to-tickets","无固定更新者","独立 implement 会话、frontier 查询","单会话 tracer bullet、验收、上下文、test seam、blocking edges","阶段性","拆解并调度可领取工作"],
+    ["Research Markdown","仓库既有研究/笔记位置","research","无固定更新者","grilling 或其他决策会话","研究问题、结论、逐项一手来源引用","阶段性","提供事实证据，不替代决策"],
+    ["Prototype branch","Git 隔离抛弃式分支","prototype","prototype","原 idea/Spec/implementation 会话","可运行 CLI 或 UI 变体、问题/答案、分支指针","临时","以可运行证据回答设计问题"],
+    ["Architecture HTML report","OS 临时目录","improve-codebase-architecture","无固定更新者","用户、后续 grilling/架构设计","候选机会、before/after、证据、收益、ADR 冲突","一次性临时","帮助选择架构候选"],
+    ["handoff Markdown","OS 临时目录/handoff-*.md","handoff","无固定更新者","新会话","状态、下一目标、未决项、正式产物指针、suggested skills","临时","引用事实源连接会话"],
+    ["Tests","项目既有测试目录","tdd、diagnosing-bugs","tdd、implement","实现反馈环、code-review、CI、未来回归","从 public seam 表达外部行为与最小回归场景","长期","可执行行为契约"],
+    ["Code commits","Git 历史","implement","无固定更新者","后续 Ticket/PR/review/发布","聚焦 diff、测试与说明；SHA/父提交形成边界","长期","已验证版本记录"],
+    ["Code Review report","当前会话/agent 输出","code-review","无固定更新者","实现者和人类审阅者","Standards 与 Spec 报告并排，按严重度定位","阶段性一次性","双轴质量门"]
+  ];
+  const matrix={"setup-matt-pocock-skills":["C/U","R","R"],"grill-with-docs":["R","C/U/R","C/R"],triage:["R","U/R","C/R","","","","","","","R"],wayfinder:["R","U/R","C/R","","C/U/R"],"to-spec":["R","R","R","C","","","R"],"to-tickets":["R","R","","R","C"],implement:["R","R","R","R","R/U","","","","","C/U/R","R"],tdd:["","R","R","","","","","","","C/U/R"],"diagnosing-bugs":["","R","R","","","","","","","C/U/R"],"code-review":["R","R","R","R","R","","","","","R","C"],"domain-modeling":["R","C/U/R","C/R","","","","","","","R"],"codebase-design":["","R","R","","","","","","","R"],"improve-codebase-architecture":["","R","R","","","","","C","","R"],research:["","","","","","C"],prototype:["","","","","U","","C/U","","","C/U"],handoff:["","","R","R","R","","","","C","R"]};
+  const flowData=[
+    ["新功能开发",["grill-with-docs","CONTEXT.md / ADR / 已确认需求","to-spec","Spec Issue","to-tickets","带 blocking edges 的 Tickets","implement","Tests + Code","code-review","双轴结论 → Code commit"]],
+    ["Bug 修复",["diagnosing-bugs","反馈命令 / 最小复现 / 根因 / 失败回归测试","implement","修复 Code + Regression Test","code-review","审查结论 → Code commit"]],
+    ["大型模糊项目",["wayfinder","Map Issue + Research/Prototype/Grilling/Task Tickets","Decisions so far / frontier","已确认决策与清晰路线","to-spec → to-tickets → implement"]],
+    ["外部请求治理",["Incoming Issue / PR","原始描述与现有 diff","triage","Triage Notes / Agent Brief / Human Brief / out-of-scope record","needs-info / ready-for-agent / ready-for-human / wontfix"]],
+    ["架构维护",["improve-codebase-architecture","Architecture HTML report","grilling + domain-modeling","已确认模块边界 / CONTEXT.md / ADR","codebase-design","深模块接口与 test seam → 主开发流程"]]
+  ];
+  const abilityMap=document.getElementById("ability-map"),skillGrid=document.getElementById("skill-grid");
+  Object.entries(abilities).forEach(([key,[title,desc]])=>{const names=Object.values(skillDetails).filter(x=>x.ability===key).map(x=>x.title);abilityMap.insertAdjacentHTML("beforeend",`<article class="card ability-card"><h3>${title} · ${names.length}</h3><p>${desc}</p><code>${names.join(" · ")}</code></article>`)});
+  Object.entries(skillDetails).forEach(([key,d])=>skillGrid.insertAdjacentHTML("beforeend",`<button class="skill-button" type="button" data-detail="${key}" data-ability="${d.ability}"><strong>${d.title}</strong><span>${d.purpose}</span><span><b>场景：</b>${d.scenarios}</span><span class="tag">${d.invocation}</span><span><b>输出：</b>${d.output}</span><span><b>中间产物：</b>${d.intermediates}</span></button>`));
+  document.getElementById("artifact-list").innerHTML=artifactFields.map(a=>`<details class="artifact-detail"><summary>${a[0]}</summary><div class="artifact-fields">${["位置","创建者","更新者","消费者","内部结构","生命周期","作用"].map((l,i)=>`<div><strong>${l}</strong>${a[i+1]}</div>`).join("")}</div></details>`).join("");
+  document.getElementById("matrix-body").innerHTML=Object.entries(matrix).map(([name,cells])=>`<tr><th scope="row">${name}</th>${Array.from({length:11},(_,i)=>`<td>${cells[i]||""}</td>`).join("")}</tr>`).join("");
+  document.getElementById("flows").innerHTML=flowData.map(([title,items])=>`<article class="card flow-card"><h3>${title}</h3><div class="flow-line">${items.map((x,i)=>`${i?'<span class="arrow" aria-hidden="true">→</span>':''}<div class="${i%2?'flow-edge':'flow-node'}">${x}</div>`).join("")}</div></article>`).join("");
+  document.querySelectorAll("[data-ability-filter]").forEach(button=>button.addEventListener("click",()=>{document.querySelectorAll("[data-ability-filter]").forEach(x=>x.setAttribute("aria-pressed",String(x===button)));document.querySelectorAll("[data-ability]").forEach(card=>card.hidden=button.dataset.abilityFilter!=="all"&&card.dataset.ability!==button.dataset.abilityFilter)}));
+  const panel=document.getElementById("detail-panel"),backdrop=document.getElementById("detail-backdrop"),closeButton=document.getElementById("detail-close"),title=document.getElementById("detail-title"),list=document.getElementById("detail-list"),sourceLink=document.getElementById("detail-source");let lastTrigger=null;
+  const labels={ability:"能力类型",purpose:"核心作用",scenarios:"适用场景",invocation:"调用方式",input:"输入",actions:"执行动作",output:"输出",intermediates:"中间产物",requires:"依赖",collaboration:"协作关系",boundary:"使用边界"};
+  function openDetail(key,trigger){const d=skillDetails[key];if(!d)return;lastTrigger=trigger;title.textContent=d.title;list.innerHTML=Object.entries(labels).map(([field,label])=>`<div><dt>${label}</dt><dd>${field==="ability"?abilities[d[field]][0]:d[field]}</dd></div>`).join("");sourceLink.href=d.source;panel.hidden=false;backdrop.hidden=false;document.body.style.overflow="hidden";panel.scrollTop=0;closeButton.focus()}
+  function closeDetail(){if(panel.hidden)return;panel.hidden=true;backdrop.hidden=true;document.body.style.overflow="";if(lastTrigger)lastTrigger.focus()}
+  document.addEventListener("click",e=>{const trigger=e.target.closest("[data-detail]");if(trigger)openDetail(trigger.dataset.detail,trigger)});closeButton.addEventListener("click",closeDetail);backdrop.addEventListener("click",closeDetail);
+  document.addEventListener("keydown",event=>{if(event.key==="Escape")closeDetail();if(event.key==="Tab"&&!panel.hidden){const focusable=panel.querySelectorAll("button:not([disabled]),a[href]");const first=focusable[0],last=focusable[focusable.length-1];if(event.shiftKey&&document.activeElement===first){event.preventDefault();last.focus()}else if(!event.shiftKey&&document.activeElement===last){event.preventDefault();first.focus()}else if(!panel.contains(document.activeElement)){event.preventDefault();first.focus()}}});
+</script>
 </body>
 </html>
