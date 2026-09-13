@@ -9,10 +9,12 @@
 ### `AGENTS.md`
 
 - **记录目的**：全项目必须遵守的协作与编码规则。
-- **内容**：项目边界、常用命令、硬规则、文档路由、Skills 配置入口。
+- **内容**：项目边界、硬规则、文档路由、Skills 配置入口，以及不能从环境直接查到的约定和原因。
 - **维护**：规则变化时由维护者更新；所有工程 Skill 读取。
 - **版本管理**：提交 Git，长期保留。
 - **不应记录**：单个功能的临时需求或当前会话进度。
+
+`writing-for-agents` 把重复配置、目录和命令的说明称为环境查询的缓存：只有查询代价较高时才值得维护。优先让 agent 读取实际配置，把文档空间留给隐含约定、选择原因和已知陷阱。这是上游编写建议，不要求删除项目已有且仍有用的命令说明。[编写定义](https://github.com/mattpocock/skills/blob/3cca18b368ae95cdbdebbff572ccafa662551015/skills/productivity/writing-for-agents/SKILL.md)
 
 ### `docs/agents/*.md`
 
@@ -22,7 +24,7 @@
 | `triage-labels.md` | 五类规范角色到实际标签字符串的映射 | `triage`、创建 Agent-ready 工作的 Skill |
 | `domain.md` | 术语表和 ADR 的位置及读取规则 | 领域、设计、实现、测试、诊断类 Skill |
 
-这些文件由 Setup 创建，工作方式改变时更新；都提交 Git。
+这些文件由 Setup 创建，工作方式改变时更新；都提交 Git。`triage-labels.md` 仅在安装 `triage` 时生成，领域布局默认 single-context。
 
 ## 长期领域知识
 
@@ -86,24 +88,47 @@ ADR 提交 Git，原则上不静默改写历史决定；决定失效时新增 AD
 
 记录一个可独立验证的纵向切片、验收标准、前置阻塞和来源 Spec。完成后关闭，不把后续无关需求不断追加到旧 Ticket。
 
+### Map Issue 与 Decision ticket：决策地图
+
+Wayfinder 的 Map 保存目的地、约定、已决事项的索引、未能具体化的问题和范围边界。子任务正文保存要解决的问题，答案写入 resolution comment，附件和研究分支通过链接引用。地图里的 frontier 是仍开放、没有未完成阻塞、尚未被认领的子任务。
+
+Decision ticket 的完成条件是问题有了答案；Implementation ticket 的完成条件是行为得到交付。二者不能混用。[Wayfinder 记录结构](https://github.com/mattpocock/skills/blob/3cca18b368ae95cdbdebbff572ccafa662551015/skills/engineering/wayfinder/SKILL.md)
+
 ### Agent Brief：AI 执行说明
 
-写在需要交给新会话的 Issue 评论中，包含背景、相关模块、约束、验收标准和验证命令。它引用 Spec 与 ADR，不复制全部历史讨论。
+`triage` 将它写在需要交给新会话的 Issue 评论中，包含背景、相关模块、约束、验收标准和验证命令。它引用 Spec 与 ADR，不复制全部历史讨论。`to-tickets` 已生成的自包含实施任务通常无需额外复制一份 Brief。
 
 ## 阶段性或临时产物
 
 | 产物 | 保存位置 | 记录内容 | 是否提交 |
 | --- | --- | --- | --- |
-| Research Markdown | 仓库已有研究目录 | 一手资料、引用、结论和未知项 | 是 |
-| Prototype branch | 独立临时分支 | 可运行验证代码、问题与结论 | 不合入主分支 |
+| Research Markdown | 仓库已有研究目录 | 一手资料、引用、结论和未知项 | 是否提交依项目约定；Skill 本身只要求写文件 |
+| Wayfinder research branch | `research/<name>` 分支 | 研究结果与决策任务中的指针 | 保存为分支证据；不默认合入主分支 |
+| Prototype branch | `prototype/<name>` 分支 | 可重跑的逻辑 HTML 或 UI 变体、问题与结论 | 提交到证据分支；页面外壳不合入主分支 |
 | Architecture report | 操作系统临时目录 | 架构候选与证据 | 否 |
 | Handoff Markdown | 操作系统临时目录 | 当前状态、下一目标、正式产物指针 | 否 |
 | Tests | 项目测试目录 | 通过公开接口表达的行为契约 | 是 |
 | Code Review report | 当前审查会话或 PR | 规范轴与需求轴结论 | 视团队流程 |
+| Questionnaire | 当前目录 `to-questionnaire-<slug>.md` | 收件人、用途、背景、按优先级排列的问题和回答位置 | 按项目约定，生成问卷不等于发送问卷 |
+| Wizard | scratch 或 `scripts/` 下的 Bash 脚本 | 人工操作阶段、输入值及写入位置 | 默认一次性；用户需要重复使用时才提交 |
+
+“抛弃式”描述原型的开发约束：范围小、不建设生产基础设施。已完成原型仍作为一手证据保留；经过验证的纯逻辑可提取到正式模块。[原型保存规则](https://github.com/mattpocock/skills/blob/3cca18b368ae95cdbdebbff572ccafa662551015/skills/engineering/prototype/SKILL.md)
 
 ## 本项目不使用的替代方案
 
 `.scratch/<feature>/issues/` 是没有远程事项系统时的本地 Markdown Tracker。本项目已经选择 GitHub Issues，因此不要同时维护 `.scratch/` 副本。
+
+其他项目若选择本地 Tracker，其具体结构为：
+
+```text
+.scratch/<feature>/
+├── spec.md
+└── issues/
+    ├── 01-<slug>.md
+    └── 02-<slug>.md
+```
+
+一张任务对应一个文件，按前置依赖编号，正文包含 `Blocked by`、状态和验收项。是否进 Git、何时归档按该项目约定，上游模板没有规定统一清理时间。[本地 Tracker 模板](https://github.com/mattpocock/skills/blob/3cca18b368ae95cdbdebbff572ccafa662551015/skills/engineering/setup-matt-pocock-skills/issue-tracker-local.md)
 
 ## 更新与清理检查表
 

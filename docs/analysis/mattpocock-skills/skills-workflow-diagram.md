@@ -1,10 +1,10 @@
 # mattpocock/skills 能力、产物与协作关系图
 
-本文把 [`skills-analysis.md`](./skills-analysis.md) 中的六类能力、产物生命周期和五条协作流程压缩为五张关系图。内容以 `mattpocock/skills` 当前 `main` 为准；箭头表示产物交接，不表示相邻 Skill 会自动互相调用。
+本文把 [`skills-analysis.md`](./skills-analysis.md) 中的六类能力、产物生命周期和五条协作流程整理为六张关系图。内容以 `mattpocock/skills` 当前 `main` 为准；箭头表示产物交接或明确标注的内部调用；相邻用户入口需要用户分别选择。
 
 ## 1. 六类能力地图
 
-这张图回答“21 个正式 Skill 分别解决哪类问题”。六个分组是导航视图，不代表调用顺序或上游目录结构。
+这张图回答“25 个正式 Skill 分别解决哪类问题”。六个分组是导航视图，不代表调用顺序或上游目录结构。
 
 ```mermaid
 flowchart TB
@@ -18,6 +18,7 @@ flowchart TB
         GrillDocs["grill-with-docs"]
         Grilling["grilling"]
         Prototype["prototype"]
+        Questionnaire["to-questionnaire"]
     end
 
     subgraph Governance["请求治理与规划拆分"]
@@ -32,6 +33,8 @@ flowchart TB
         TDD["tdd"]
         Diagnose["diagnosing-bugs"]
         Review["code-review"]
+        Resolve["resolving-merge-conflicts"]
+        Wizard["wizard"]
     end
 
     subgraph Architecture["领域知识与架构设计"]
@@ -44,7 +47,8 @@ flowchart TB
         Research["research"]
         Handoff["handoff"]
         Teach["teach"]
-        WriteSkills["writing-great-skills"]
+        WriteSkills["writing-for-agents"]
+        WaitWhat["wait-what"]
     end
 ```
 
@@ -101,7 +105,9 @@ flowchart LR
     ToTickets["to-tickets"] -->|"C 远程票据"| Tickets
     ToTickets -->|"C 本地票据"| LocalTickets
     Research["research"] -->|"C 带引用事实"| ResearchDoc
-    Prototype["prototype"] -->|"C/U 抛弃式证据"| PrototypeBranch
+    Wayfinder["wayfinder"] -->|"委派 research 子任务"| Research
+    ResearchDoc -->|"Wayfinder 场景：保存并回链"| ResearchBranch["research/name 证据分支"]
+    Prototype["prototype"] -->|"C/U 可重跑原型证据"| PrototypeBranch
     Improve["improve-codebase-architecture"] -->|"C 临时报告"| ArchitectureReport
     Handoff["handoff"] -->|"C 会话桥"| HandoffDoc
     TDD["tdd / diagnosing-bugs"] -->|"C/U 行为契约"| Tests
@@ -123,7 +129,7 @@ flowchart LR
     HandoffDoc -->|"R 状态与正式产物指针"| NewSession["新会话"]
 ```
 
-`CONTEXT-MAP.md` 没有固定创建者或更新者，因此只保留在生命周期分组中；它不是 Setup 自动生成物。Setup 仅在安装 `triage` 时创建 `triage-labels.md`，而 `to-spec`、`to-tickets` 声明需要这套 label vocabulary 和 `ready-for-agent` 配置；源代码没有定义文件缺失时的回退。Research Markdown 与 Wayfinder Research Ticket 没有固定 C/U/R 关系，二者若组合只能作为可选路线。
+`CONTEXT-MAP.md` 没有固定创建者或更新者，因此只保留在生命周期分组中；它不是 Setup 自动生成物。Setup 仅在安装 `triage` 时创建 `triage-labels.md`，而 `to-spec`、`to-tickets` 声明需要这套 label vocabulary 和 `ready-for-agent` 配置；源代码没有定义文件缺失时的回退。Wayfinder 明确委派 Research 子任务，结果保存到研究分支并从决策任务回链；独立 research 则按仓库已有笔记约定保存。
 
 ## 3. 新功能开发与 Bug 修复
 
@@ -144,14 +150,14 @@ flowchart LR
     end
 
     subgraph Bugfix["Bug 修复"]
-        Diagnose["diagnosing-bugs"] -->|"feedback loop / 最小复现 / 根因"| Fix["Regression Test + 修复 Code"]
+        Diagnose["diagnosing-bugs"] -->|"feedback loop / 最小复现 / 根因"| Fix["修复 Code + 合适 seam 上的回归测试"]
         Fix -.->|"可选：固定点修复 diff"| BugReview["code-review"]
         BugReview -->|"Code Review report，不产出 commit"| Fix
-        Diagnose -.->|"可选：post-mortem 中的架构发现"| Improve["improve-codebase-architecture"]
+        Diagnose -.->|"可选：根因说明中的架构发现"| Improve["improve-codebase-architecture"]
     end
 ```
 
-虚线是按范围或诊断结果选择的组合：小改可跳过正式 Spec/Tickets；Bug 修复后可选择 `code-review`，缺少正确 test seam 时也可把架构发现交给架构维护。Bug 路径不串入 `tdd` 或 `implement`，且 `code-review` 只报告固定点 diff 的双轴结论，不创建 commit。
+虚线是按范围或诊断结果选择的组合：小改可跳过正式 Spec/Tickets；Bug 修复后可选择 `code-review`，缺少正确 test seam 时也可把架构发现交给架构维护。缺少合适 seam 时记录限制并复跑原始反馈命令。Bug 路径不强制串入 `tdd` 或 `implement`，且 `code-review` 只报告固定点 diff 的双轴结论，不创建 commit。
 
 ## 4. 大型项目与外部请求治理
 
@@ -161,15 +167,17 @@ flowchart LR
 flowchart LR
     subgraph LargeProject["大型模糊项目｜Wayfinder"]
         Destination["destination"] -->|"destination / Map Issue"| Wayfinder["wayfinder"]
-        Wayfinder -->|"Research Ticket"| ResearchTicket["Research Ticket"]
-        Wayfinder -->|"Prototype Ticket"| PrototypeTicket["Prototype Ticket"]
-        Wayfinder -->|"Grilling Ticket"| GrillingTicket["Grilling Ticket"]
-        Wayfinder -->|"Task Ticket"| TaskTicket["Task Ticket"]
+        Wayfinder -->|"Research 决策任务"| ResearchTicket["Research Ticket / AFK"]
+        Wayfinder -->|"Prototype 决策任务"| PrototypeTicket["Prototype Ticket / HITL"]
+        Wayfinder -->|"Grilling 决策任务"| GrillingTicket["Grilling Ticket / HITL"]
+        Wayfinder -->|"解除决策阻塞的前置操作"| TaskTicket["Task Ticket"]
         ResearchTicket -->|"resolution comment / linked asset / decision"| Map["Map Issue：Decisions so far / frontier"]
         PrototypeTicket -->|"resolution comment / linked asset / decision"| Map
         GrillingTicket -->|"resolution comment / decision"| Map
         TaskTicket -->|"resolution comment / decision"| Map
-        ResearchTicket -.->|"可选组合：研究问题"| Research["research → Research Markdown"]
+        ResearchTicket -->|"明确委派：可并行"| Research["research 后台子任务"]
+        Research -->|"Markdown / research 分支 / 证据指针"| ResearchTicket
+        PrototypeTicket -->|"调用"| Prototype["prototype：可运行证据"]
         Map -->|"已确认决策与清晰路线"| ToSpec["to-spec"]
         ToSpec -->|"Spec Issue"| ToTickets["to-tickets"]
         ToTickets -->|"Ticket Issues"| ImplementLarge["implement"]
@@ -188,15 +196,16 @@ flowchart LR
     end
 ```
 
-Research Ticket 是 Wayfinder 的票据类型，图中没有把它画成对 `/research` 的固定调用；通往 `research` 的虚线明确是可选路线。Triage 处理外部原始 Issue/PR，`to-tickets` 生成的规划票据不再进入 Triage。
+Research 是 Wayfinder 明确委派后台研究的决策任务，可并行处理；其余决策任务每会话最多解决一张。HITL 表示需要真人参与，AFK 表示 agent 可独立处理。Triage 处理外部原始请求；外部 PR 只有在 tracker 配置开启该入口时才纳入，`to-tickets` 生成的实施票据不再进入 Triage。
 
 ## 5. 架构维护与跨会话桥
 
-这张图把架构维护的正式产物链与通用跨会话桥放在一起。架构链的实线标签写明报告、领域文档、模块设计和实现入口；handoff 只引用正式产物并传递状态，不取代任何业务流程。
+这张图把架构维护的正式产物链与跨环境交接桥放在一起。架构链的实线标签写明报告、领域文档、模块设计和实现入口；handoff 只引用正式产物并传递状态，不取代任何业务流程。
 
 ```mermaid
 flowchart LR
-    Improve["improve-codebase-architecture"] -->|"Architecture HTML report"| Choose["用户选择候选"]
+    Scope["用户指定方向或近期变更热点"] -->|"先限定扫描范围"| Improve["improve-codebase-architecture"]
+    Improve -->|"Architecture HTML report"| Choose["用户选择候选"]
     Choose -->|"设计问题与证据"| Grilling["grilling"]
     Choose -->|"设计问题与证据"| Domain["domain-modeling"]
     Grilling -->|"已确认模块边界"| Design["codebase-design"]
@@ -207,9 +216,30 @@ flowchart LR
     ToSpec -->|"Spec Issue"| ToTickets["to-tickets"]
     ToTickets -->|"Ticket Issues"| Implement
 
-    AnySession["任意流程中的当前会话"] -->|"当前状态 / 下一目标 / 正式产物指针 / 未决项"| Handoff["handoff"]
+    AnySession["换工具、目录、协作者或中途分出支线"] -->|"当前状态 / 下一目标 / 正式产物指针 / 未决项"| Handoff["handoff"]
     Handoff -->|"handoff Markdown"| NewSession["新会话"]
     NewSession -->|"正式产物指针 / 下一目标"| Resume["原流程下一节点"]
 ```
 
-Architecture HTML report 与 handoff Markdown 都位于 OS 临时目录，但生命周期职责不同：前者帮助用户选择架构候选，后者只做会话间桥接。新会话读取 handoff 中的正式产物指针和下一目标后，再从原流程的下一节点继续。跨会话时应引用 Spec、ADR、Issue、commit 或 diff 等事实源，而不是把它们复制进 handoff。
+Architecture HTML report 与 handoff Markdown 都位于 OS 临时目录，但生命周期职责不同：前者帮助用户选择架构候选，后者只做需要迁移上下文的交接。新会话读取 handoff 中的正式产物指针和下一目标后，再从原流程的下一节点继续。跨会话时应引用 Spec、ADR、Issue、commit 或 diff 等事实源，而不是把它们复制进 handoff。
+
+## 6. 阶段边界：上下文如何继续
+
+从上往下判断，首个适用项优先。清空和压缩是宿主会话操作，不属于正式 Skill；图中的顺序来自上游路由器，实际操作能力随宿主而异。
+
+```mermaid
+flowchart TB
+    Boundary["一个阶段已经完成"] --> ContinueQ{"仍需完整推理或空间足够？"}
+    ContinueQ -->|"是"| Continue["继续当前会话"]
+    ContinueQ -->|"否"| ClearQ{"已有上下文与下一任务无关？"}
+    ClearQ -->|"是"| Clear["清空，从自包含任务重新开始"]
+    ClearQ -->|"否"| TravelQ{"要迁移工具、目录或协作者？"}
+    TravelQ -->|"是"| Handoff["handoff：携带文件与事实源指针"]
+    TravelQ -->|"否"| AgentQ{"任务范围明确，可独立完成？"}
+    AgentQ -->|"是"| Agent["派给后台子任务"]
+    AgentQ -->|"否"| Compact["压缩：明确下一阶段需要保留什么"]
+```
+
+阶段中途优先继续，或分出可独立完成的工作；中途支线需要迁移时可用 handoff。压缩意味着用摘要替代原始讨论，应在阶段边界进行。[阶段边界原文](https://github.com/mattpocock/skills/blob/3cca18b368ae95cdbdebbff572ccafa662551015/skills/engineering/ask-matt/PHASE-BOUNDARIES.md)
+
+以上图表按 2026-09-13 核对的提交 `3cca18b368ae95cdbdebbff572ccafa662551015` 绘制。能力清单、条件性读写和调用来源见 [Skill 图鉴](skills-analysis.md)；Wayfinder 的实线研究委派见 [执行定义](https://github.com/mattpocock/skills/blob/3cca18b368ae95cdbdebbff572ccafa662551015/skills/engineering/wayfinder/SKILL.md)。
