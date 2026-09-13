@@ -1,0 +1,20 @@
+title: OpenSpec 使用手册与专题分析
+pages:
+  - source: README.md
+    output: index.html
+    title: 快速入门
+  - source: usage-guide.md
+    output: usage-guide.html
+    title: 完整工作流
+  - source: file-management.md
+    output: file-management.html
+    title: 文件管理
+  - source: commands-reference.md
+    output: commands-reference.html
+    title: 命令图鉴
+  - source: workflow-diagrams.md
+    output: workflow-diagrams.html
+    title: 关系图
+  - source: examples/article-favorites.md
+    output: examples/article-favorites.html
+    title: 文章收藏案例
