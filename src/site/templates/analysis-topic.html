@@ -4,18 +4,30 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>{{ page_title }} · {{ topic_title }}</title>
-    <link rel="stylesheet" href="/static/css/analysis-topic.css">
+    <link rel="stylesheet" href="/static/css/analysis-topic.css?v={{ asset_version }}">
     <script defer src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
-    <script defer src="/static/js/analysis-topic.js"></script>
+    <script defer src="/static/js/analysis-topic.js?v={{ asset_version }}"></script>
 </head>
 <body>
     <header class="topic-header">
         <a class="back-link" href="/analysis.html">← 返回分析</a>
         <p class="eyebrow">{{ topic_title }}</p>
         <nav aria-label="专题导航">
+            {% if compact_navigation %}
+            <a href="{{ navigation[0].url }}"{% if page_title == navigation[0].title %} aria-current="page"{% endif %}>{{ navigation[0].title }}</a>
+            <details class="topic-references">
+                <summary>按需参考</summary>
+                <div class="topic-reference-links">
+                    {% for item in navigation[1:] %}
+                    <a href="{{ item.url }}"{% if item.title == page_title %} aria-current="page"{% endif %}>{{ item.title }}</a>
+                    {% endfor %}
+                </div>
+            </details>
+            {% else %}
             {% for item in navigation %}
             <a href="{{ item.url }}"{% if item.title == page_title %} aria-current="page"{% endif %}>{{ item.title }}</a>
             {% endfor %}
+            {% endif %}
         </nav>
     </header>
     <main class="topic-layout">
@@ -28,9 +40,13 @@
         <div id="detail-content"></div>
     </aside>
     <footer class="topic-pagination">
+        {% if compact_navigation %}
+        <a href="{{ navigation[0].url }}">回到{{ navigation[0].title }}</a>
+        {% else %}
         {% if previous %}<a href="{{ previous.url }}">← {{ previous.title }}</a>{% endif %}
         <a href="{{ navigation[0].url }}">返回专题首页</a>
         {% if next %}<a href="{{ next.url }}">{{ next.title }} →</a>{% endif %}
+        {% endif %}
     </footer>
 </body>
 </html>

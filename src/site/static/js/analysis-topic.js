@@ -66,6 +66,21 @@
     document.addEventListener('keydown', (event) => {
         if (event.key === 'Escape' && panel && !panel.hidden) closeDetail();
     });
+    document.querySelectorAll('[data-copy-target]').forEach((button) => {
+        const target = document.getElementById(button.dataset.copyTarget);
+        if (!target) return;
+        const feedback = document.getElementById(button.getAttribute('aria-describedby'));
+        button.hidden = false;
+        button.addEventListener('click', async () => {
+            try {
+                await navigator.clipboard.writeText(target.textContent);
+                feedback.textContent = '已复制。粘贴到 AI 对话中，填入你的想法即可。';
+            } catch {
+                target.closest('details').open = true;
+                feedback.textContent = '未能自动复制，已展开提示词，请选中文字后手动复制。';
+            }
+        });
+    });
     enhanceDetailSections();
     renderMermaid();
 })();

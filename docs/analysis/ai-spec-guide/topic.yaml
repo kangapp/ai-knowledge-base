@@ -1,0 +1,21 @@
+title: 和 AI 共创 Spec 的指南
+compact_navigation: true
+pages:
+  - source: README.md
+    output: index.html
+    title: 开始共创
+  - source: workflow.md
+    output: workflow.html
+    title: 五步流程详解
+  - source: writing.md
+    output: writing.html
+    title: 结构与写作
+  - source: scenarios.md
+    output: scenarios.html
+    title: 场景指南
+  - source: example.md
+    output: example.html
+    title: 收藏功能案例
+  - source: prompts.md
+    output: prompts.html
+    title: 进阶 Prompt 工具箱

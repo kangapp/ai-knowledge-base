@@ -1,5 +1,6 @@
 import json
 import asyncio
+import re
 from pathlib import Path
 
 import pytest
@@ -198,12 +199,13 @@ async def test_site_builder_publishes_analysis_html_pages(tmp_path, monkeypatch)
 
 
 @pytest.mark.asyncio
-async def test_site_builder_renders_markdown_analysis_topic(tmp_path, monkeypatch):
+@pytest.mark.parametrize("compact_navigation", [False, True])
+async def test_site_builder_renders_markdown_analysis_topic(tmp_path, monkeypatch, compact_navigation):
     analysis_dir = tmp_path / "docs" / "analysis"
     project_dir = analysis_dir / "skills"
     project_dir.mkdir(parents=True)
     (project_dir / "topic.yaml").write_text(
-        """title: Skills 手册
+        f"compact_navigation: {str(compact_navigation).lower()}\n" + """title: Skills 手册
 pages:
   - source: README.md
     output: index.html
@@ -257,6 +259,43 @@ pages:
     assert 'aria-label="关闭详情"' in guide_html
     assert (output_dir / "static" / "css" / "analysis-topic.css").is_file()
     assert (output_dir / "static" / "js" / "analysis-topic.js").is_file()
+    navigation_html = index_html.split('<nav aria-label="专题导航">')[1].split('</nav>')[0]
+    if compact_navigation:
+        references = navigation_html.split('<details class="topic-references">')[1].split('</details>')[0]
+        assert 'href="usage-guide.html"' in references
+        assert 'href="usage-guide.html"' not in navigation_html.split('<details')[0]
+        assert ' open' not in navigation_html.split('<details')[1].split('>')[0]
+        assert '使用指南 →' not in index_html
+        assert '回到快速入门' in guide_html
+    else:
+        assert '<details' not in navigation_html
+        assert '使用指南 →' in index_html
+
+
+def test_analysis_topic_asset_urls_change_only_when_content_changes(tmp_path, monkeypatch):
+    site_dir = tmp_path / "site"
+    assets = [site_dir / "static/css/analysis-topic.css", site_dir / "static/js/analysis-topic.js"]
+    for asset in assets:
+        asset.parent.mkdir(parents=True, exist_ok=True)
+        asset.write_text("initial content")
+    monkeypatch.setattr(builder, "__file__", str(site_dir / "builder.py"))
+    site_builder = builder.SiteBuilder(object(), tmp_path / "output", ROOT / "src/site/templates")
+    topic = ROOT / "docs/analysis/ai-spec-guide"
+
+    def render_versions():
+        builder._render_analysis_topic(topic, tmp_path / "rendered", site_builder.env)
+        html = (tmp_path / "rendered/index.html").read_text()
+        versions = re.findall(r'/static/[^" ]+\?v=([a-f0-9]+)', html)
+        assert len(versions) == 2
+        return versions
+
+    versions = render_versions()
+    assert render_versions() == versions
+    for asset in assets:
+        asset.write_text("updated content")
+        updated = render_versions()
+        assert all(new != old for new, old in zip(updated, versions))
+        versions = updated
 
 
 @pytest.mark.asyncio

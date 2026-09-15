@@ -625,6 +625,8 @@ RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
 
 **关联发现**: Caddy 配置了 `Cache-Control: max-age=3600`，部署后浏览器可能缓存旧 CSS/JS 长达 1 小时，导致修复后仍需强制刷新才能看到效果。后续可考虑给静态资源 URL 添加版本查询参数。
 
+**分析专题处理（2026-09-14）**：Spec 指南更新后，浏览器仍加载旧 CSS/JS，表现为复制按钮不可见、五步流程未采用新布局。专题模板现按 CSS 与 JS 内容生成版本查询参数，让资源变化后使用新 URL；其他非专题页面仍沿用原有方式。验证：`uv run pytest tests/test_site_builder.py -q`，以及浏览器刷新后检查复制反馈和手机布局。
+
 ---
 
 ## Bug 28: CI/CD deploy job 未执行 docker pull 导致 VPS 镜像不更新
@@ -940,3 +942,17 @@ Unable to resolve action `astral-sh/setup-uv@v8`, unable to find version `v8`
 - 增加成功零结果仍写入来源汇总的回归测试。
 
 **经验**：健康状态的观测对象是“本轮被执行的数据源”，不能只依赖业务产出反推执行范围。
+
+---
+
+## Bug 44: 专题参考导航展开时拉伸首页入口
+
+**时间**：2026-09-15
+
+**现象**：展开“按需参考”后，“开始共创”被拉伸成与参考列表等高的长胶囊。
+
+**根因**：导航使用 Flex 布局，默认交叉轴拉伸使首页链接跟随展开的 `details` 高度；参考链接同时继承了顶级导航的胶囊样式。
+
+**修复**：导航设置 `align-items: flex-start`；参考链接改为紧凑列表，单独设置圆角和当前页高亮。
+
+**验证**：`uv run pytest tests/test_site_builder.py -q`；浏览器在 1280px 和 390px 宽度展开、收起参考列表，确认首页入口均保持约 43px 高，手机页面无横向溢出。

@@ -234,8 +234,10 @@
   - 手工分析专题列表，数据来自 `docs/analysis/*/index.html` 或 `topic.yaml`。
 - `src/site/templates/analysis-topic.html`
   - Markdown 分析专题的统一页面外壳，提供专题导航、前后页、详情抽屉与无脚本可读正文。
+  - `topic.yaml` 的 `compact_navigation: true` 将参考页收进“按需参考”，页脚只保留返回入口；默认仍展示全部页签和前后页。
+  - 专题 CSS / JS 链接携带内容摘要版本，避免页面更新后继续使用浏览器缓存的旧交互和样式。
 - `src/site/static/css/analysis-topic.css` / `src/site/static/js/analysis-topic.js`
-  - 分析专题共用视觉主题与渐进增强交互。
+  - 分析专题共用视觉主题与渐进增强交互；启动提示词支持复制，失败时展开文本供手动复制。
 
 - `src/site/static/js/deep-reports.js`
   - 深度报告列表/详情请求、安全转义、V2 决策漏斗、SVG 架构图和流程卡片渲染；移动端架构自动降级为节点卡片。
@@ -300,6 +302,10 @@
 
 - `docs/analysis/architecture/architecture.md`
   - 架构设计、DAG、数据流、前端渲染策略。
+
+- `docs/analysis/ai-spec-guide/`
+  - 《和 AI 共创 Spec 的指南》：面向已有 Spec 经验的产品与研发，以可交付实施为目标；首页提供启动提示词、带产物和完成条件的五步流程，以及重复收藏的决策、规则、图表与验收案例。
+  - `topic.yaml` 注册六个 Markdown 正文页并启用精简导航，构建后入口为 `/analysis/ai-spec-guide/index.html`。
 
 - `docs/task.md`
   - 当前任务拆解、优先级、状态。

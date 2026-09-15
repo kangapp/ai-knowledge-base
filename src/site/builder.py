@@ -1,4 +1,5 @@
 import asyncio, json, re, shutil
+import hashlib
 import posixpath
 from collections.abc import Awaitable, Callable
 from pathlib import Path
@@ -52,6 +53,11 @@ def _render_analysis_topic(project_dir: Path, output_dir: Path, env: Environment
 
     output_by_source = {page["source"]: page["output"] for page in pages}
     template = env.get_template("analysis-topic.html")
+    static_dir = Path(__file__).parent / "static"
+    asset_version = hashlib.sha256(
+        (static_dir / "css/analysis-topic.css").read_bytes()
+        + (static_dir / "js/analysis-topic.js").read_bytes()
+    ).hexdigest()[:12]
     for index, page in enumerate(pages):
         page_dir = posixpath.dirname(page["output"]) or "."
         navigation = [
@@ -79,6 +85,8 @@ def _render_analysis_topic(project_dir: Path, output_dir: Path, env: Environment
                 page_title=page["title"],
                 content=Markup(body),
                 navigation=navigation,
+                compact_navigation=config.get("compact_navigation", False),
+                asset_version=asset_version,
                 previous=navigation[index - 1] if index else None,
                 next=navigation[index + 1] if index + 1 < len(navigation) else None,
             ),
