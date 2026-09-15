@@ -1,0 +1,12 @@
+title: 和 AI 共创项目的指南
+compact_navigation: true
+pages:
+  - source: README.md
+    output: index.html
+    title: 开始共创
+  - source: reference.md
+    output: reference.html
+    title: 阶段检查与记录
+  - source: prompts.md
+    output: prompts.html
+    title: 项目 Prompt 工具箱

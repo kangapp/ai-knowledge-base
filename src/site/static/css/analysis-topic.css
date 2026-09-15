@@ -63,6 +63,9 @@ a { color: var(--blue); }
 .topic-content h1 { margin-top: 0; font-size: clamp(32px, 5vw, 52px); line-height: 1.15; }
 .topic-content h2 { margin-top: 42px; padding-top: 12px; border-top: 2px solid var(--line); }
 .topic-content table { width: 100%; border-collapse: collapse; overflow-x: auto; }
+.topic-content .table-scroll { overflow-x: auto; }
+.topic-content .table-scroll table { min-width: 680px; }
+.topic-content .table-scroll th[scope="row"] { min-width: 7.5em; }
 .topic-content th, .topic-content td { padding: 9px; border: 1px solid var(--line); text-align: left; }
 .topic-content pre { padding: 16px; border-radius: 10px; overflow: auto; background: #0f172a; color: #e2e8f0; }
 .topic-content blockquote { margin-left: 0; padding: 12px 16px; border-left: 4px solid var(--blue); background: var(--blue-soft); }

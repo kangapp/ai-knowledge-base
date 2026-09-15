@@ -307,6 +307,10 @@
   - 《和 AI 共创 Spec 的指南》：面向已有 Spec 经验的产品与研发，以可交付实施为目标；首页提供启动提示词、带产物和完成条件的五步流程，以及重复收藏的决策、规则、图表与验收案例。
   - `topic.yaml` 注册六个 Markdown 正文页并启用精简导航，构建后入口为 `/analysis/ai-spec-guide/index.html`。
 
+- `docs/analysis/ai-project-guide/`
+  - 《和 AI 共创项目的指南》：面向有基础编程能力的独立开发者，以从零创建项目为主线；首页包含启动提示词、从需求到运维的五阶段分工和收藏工具案例，另附阶段检查与记录，以及含 10 个可复制模板的项目 Prompt 工具箱。
+  - `topic.yaml` 注册三页并启用精简导航；`decisions.md` 保存共创决定和待定事项，构建后入口为 `/analysis/ai-project-guide/index.html`。
+
 - `docs/task.md`
   - 当前任务拆解、优先级、状态。
 
