@@ -311,6 +311,9 @@
   - 《和 AI 共创项目的指南》：面向有基础编程能力的独立开发者，以从零创建项目为主线；首页包含启动提示词、从需求到运维的五阶段分工和收藏工具案例，另附阶段检查与记录，以及含 10 个可复制模板的项目 Prompt 工具箱。
   - `topic.yaml` 注册三页并启用精简导航；`decisions.md` 保存共创决定和待定事项，构建后入口为 `/analysis/ai-project-guide/index.html`。
 
+- `docs/analysis/l01-workbench-practice/`
+  - 《L01 实践故事：造好档案柜，再记录自己的建设》独立交互页面，构建后入口为 `/analysis/l01-workbench-practice/index.html`。
+
 - `docs/task.md`
   - 当前任务拆解、优先级、状态。
 
