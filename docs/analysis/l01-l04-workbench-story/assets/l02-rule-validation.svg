@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 520" role="img" aria-labelledby="title desc">
+  <title id="title">L02 长期规则双路径验证</title>
+  <desc id="desc">保存修改前 N0 后加入长期规则，再在全新任务 N1 中同时验证危险请求与合法请求。</desc>
+  <defs><marker id="a" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0 0L9 4.5L0 9Z" fill="#2457d6"/></marker></defs>
+  <rect width="760" height="520" rx="12" fill="#f8faff"/>
+  <text x="42" y="52" fill="#172033" font-family="system-ui,sans-serif" font-size="23" font-weight="700">规则必须既能拦截，也能放行</text>
+  <g font-family="system-ui,sans-serif" text-anchor="middle">
+    <rect x="46" y="100" width="178" height="78" rx="12" fill="#eef2f8" stroke="#9eabc0"/><text x="135" y="132" fill="#172033" font-size="17" font-weight="700">N0</text><text x="135" y="156" fill="#536078" font-size="14">修改前的新任务</text>
+    <rect x="291" y="100" width="178" height="78" rx="12" fill="#e7edff" stroke="#2457d6"/><text x="380" y="132" fill="#172033" font-size="17" font-weight="700">AGENTS.md</text><text x="380" y="156" fill="#536078" font-size="14">加入已确认边界</text>
+    <rect x="536" y="100" width="178" height="78" rx="12" fill="#eef2f8" stroke="#9eabc0"/><text x="625" y="132" fill="#172033" font-size="17" font-weight="700">N1</text><text x="625" y="156" fill="#536078" font-size="14">全新任务重新读取</text>
+  </g>
+  <g stroke="#2457d6" stroke-width="3" marker-end="url(#a)"><path d="M224 139H286"/><path d="M469 139H531"/></g>
+  <path d="M625 178V226H214V262" fill="none" stroke="#2457d6" stroke-width="3" marker-end="url(#a)"/>
+  <path d="M625 178V226H546V262" fill="none" stroke="#2457d6" stroke-width="3" marker-end="url(#a)"/>
+  <g font-family="system-ui,sans-serif" text-anchor="middle">
+    <rect x="72" y="262" width="284" height="120" rx="12" fill="#f8e5e7" stroke="#a2393f"/><text x="214" y="302" fill="#172033" font-size="18" font-weight="700">危险请求</text><text x="214" y="332" fill="#536078" font-size="14">合并控制库与业务库</text><text x="214" y="359" fill="#a2393f" font-size="14" font-weight="700">应指出冲突并停止</text>
+    <rect x="404" y="262" width="284" height="120" rx="12" fill="#e2f2e9" stroke="#1f6b4c"/><text x="546" y="302" fill="#172033" font-size="18" font-weight="700">合法请求</text><text x="546" y="332" fill="#536078" font-size="14">增加隔离测试用例</text><text x="546" y="359" fill="#1f6b4c" font-size="14" font-weight="700">应允许继续并验证</text>
+  </g>
+  <text x="380" y="430" text-anchor="middle" fill="#172033" font-family="system-ui,sans-serif" font-size="15" font-weight="700">三类证据分别保留</text>
+  <text x="380" y="459" text-anchor="middle" fill="#536078" font-family="system-ui,sans-serif" font-size="14">规则已加载　回答表现　程序回归</text>
+  <text x="380" y="491" text-anchor="middle" fill="#8a5718" font-family="system-ui,sans-serif" font-size="13">N0 已正确时，如实记录，不制造失败。</text>
+</svg>

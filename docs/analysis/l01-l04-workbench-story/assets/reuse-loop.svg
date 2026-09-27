@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1120 560" role="img" aria-labelledby="title desc">
+  <title id="title">跨事项复用证据链</title>
+  <desc id="desc">事项 A 产生证据并形成候选方法，事项 B 明确采用对应版本。复用成功继续观察，失败则修订或停用。</desc>
+  <defs><marker id="a" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0 0L9 4.5L0 9Z" fill="#2457d6"/></marker></defs>
+  <rect width="1120" height="560" rx="12" fill="#f8faff"/>
+  <text x="54" y="56" fill="#172033" font-family="system-ui,sans-serif" font-size="25" font-weight="700">一次成功，只能产生候选方法</text>
+  <g font-family="system-ui,sans-serif" text-anchor="middle">
+    <rect x="54" y="120" width="220" height="132" rx="12" fill="#eef2f8" stroke="#9eabc0"/><text x="164" y="160" fill="#172033" font-size="18" font-weight="700">事项 A</text><text x="164" y="191" fill="#536078" font-size="14">真实交付与失败证据</text><text x="164" y="218" fill="#536078" font-size="14">具名审核结果</text>
+    <rect x="338" y="120" width="220" height="132" rx="12" fill="#e7edff" stroke="#2457d6"/><text x="448" y="160" fill="#172033" font-size="18" font-weight="700">候选方法 v1</text><text x="448" y="191" fill="#536078" font-size="14">来源、适用边界</text><text x="448" y="218" fill="#536078" font-size="14">可执行步骤与停用条件</text>
+    <rect x="622" y="120" width="220" height="132" rx="12" fill="#eef2f8" stroke="#9eabc0"/><text x="732" y="160" fill="#172033" font-size="18" font-weight="700">事项 B 明确采用</text><text x="732" y="191" fill="#536078" font-size="14">记录版本和选择理由</text><text x="732" y="218" fill="#536078" font-size="14">Harness 执行并复验</text>
+    <rect x="906" y="120" width="160" height="132" rx="12" fill="#e2f2e9" stroke="#1f6b4c"/><text x="986" y="160" fill="#172033" font-size="18" font-weight="700">结果</text><text x="986" y="191" fill="#536078" font-size="14">成功或失败</text><text x="986" y="218" fill="#536078" font-size="14">均保留证据</text>
+  </g>
+  <g stroke="#2457d6" stroke-width="3" marker-end="url(#a)"><path d="M274 186H333"/><path d="M558 186H617"/><path d="M842 186H901"/></g>
+  <rect x="226" y="348" width="280" height="106" rx="12" fill="#e2f2e9" stroke="#1f6b4c"/>
+  <text x="366" y="388" text-anchor="middle" fill="#172033" font-family="system-ui,sans-serif" font-size="17" font-weight="700">复用成功</text>
+  <text x="366" y="419" text-anchor="middle" fill="#536078" font-family="system-ui,sans-serif" font-size="14">继续观察，不把一次通过写成永远有效</text>
+  <rect x="614" y="348" width="280" height="106" rx="12" fill="#f8e5e7" stroke="#a2393f"/>
+  <text x="754" y="388" text-anchor="middle" fill="#172033" font-family="system-ui,sans-serif" font-size="17" font-weight="700">复用失败</text>
+  <text x="754" y="419" text-anchor="middle" fill="#536078" font-family="system-ui,sans-serif" font-size="14">修订版本、缩小边界或明确停用</text>
+  <path d="M986 252V302H366V343" fill="none" stroke="#1f6b4c" stroke-width="3" marker-end="url(#a)"/>
+  <path d="M986 252V302H754V343" fill="none" stroke="#a2393f" stroke-width="3" marker-end="url(#a)"/>
+  <path d="M614 401H554V498H448V257" fill="none" stroke="#a2393f" stroke-width="3" stroke-dasharray="9 7" marker-end="url(#a)"/>
+  <text x="560" y="526" text-anchor="middle" fill="#536078" font-family="system-ui,sans-serif" font-size="14">能被采用、反证、修订和停用，才接近可复用闭环。</text>
+</svg>

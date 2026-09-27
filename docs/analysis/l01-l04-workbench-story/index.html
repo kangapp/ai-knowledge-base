@@ -1,0 +1,946 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <meta name="description" content="从 L01 到 L04，理解并复建一个能组织人与 Codex 协同交付的个人研发工作台。">
+  <title>从一次绿灯，到可信交付 | L01-L04 工作台实践</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='12' fill='%232457d6'/%3E%3Cpath d='M16 20h32v7H16zm0 14h20v7H16zm27 0h5v14h-5z' fill='%23fff'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="styles.css">
+  <script src="app.js" defer></script>
+</head>
+<body>
+  <a class="skip-link" href="#main-content">跳到正文</a>
+  <div class="reading-progress" aria-hidden="true"></div>
+
+  <header class="site-header">
+    <div class="nav-shell">
+      <a class="brand" href="#prologue" aria-label="返回序章">
+        <span class="brand-mark" aria-hidden="true">W</span>
+        <span>工作台实践</span>
+      </a>
+      <nav class="desktop-nav" aria-label="章节导航">
+        <a href="#prologue">序章</a>
+        <a href="#l01">L01</a>
+        <a href="#l02">L02</a>
+        <a href="#l03">L03</a>
+        <a href="#l04">L04</a>
+        <a href="#overview">全景</a>
+        <a href="#rebuild">复建</a>
+        <a href="#conclusion">结语</a>
+      </nav>
+      <details class="mobile-nav">
+        <summary>目录</summary>
+        <nav aria-label="移动端章节导航">
+          <a href="#prologue">序章</a><a href="#l01">L01</a><a href="#l02">L02</a>
+          <a href="#l03">L03</a><a href="#l04">L04</a><a href="#overview">全景</a>
+          <a href="#rebuild">复建</a><a href="#conclusion">结语</a>
+        </nav>
+      </details>
+    </div>
+  </header>
+
+  <main id="main-content">
+    <section id="prologue" class="chapter hero" aria-labelledby="title-prologue" data-section>
+      <div class="hero-copy">
+        <p class="eyebrow">L01-L04 实践全景</p>
+        <h1 id="title-prologue">代码绿了，交付还没有完成</h1>
+        <p class="hero-lede">四次能力升级，把 AI 候选结果变成可追溯、可复验、可签收的交付。</p>
+        <div class="hero-actions">
+          <a class="button primary" href="#l01">进入故事</a>
+          <a class="button secondary" href="#rebuild">查看复建路线</a>
+        </div>
+      </div>
+      <figure class="hero-figure">
+        <img src="assets/candidate-to-delivery.svg" width="720" height="540" alt="从测试绿灯到可信交付的断桥图。测试绿灯只产生候选结果，仍需目标、范围、差异、复验和人工决定才能完成交付。">
+        <figcaption><strong>用途：</strong>找出测试绿灯与可信交付之间缺失的证据链。</figcaption>
+      </figure>
+    </section>
+
+    <section class="premise" aria-labelledby="premise-title">
+      <div>
+        <h2 id="premise-title">一次看起来完成的 AI 交付</h2>
+        <p>Codex 说任务已经完成，终端里的测试也是绿色。审核者却继续追问：最初目标是什么，哪些事情明确不做，修改发生在哪些文件，执行前是否真的失败，谁授权了范围，谁最终接受结果？</p>
+        <p>这些问题没有答案时，眼前的只是候选结果。它可能正确，却还不能被组织安全地接受。</p>
+      </div>
+      <figure class="premise-chain">
+        <img src="assets/delivery-evidence-chain.svg" width="1120" height="500" alt="可信交付证据链。原始诉求经人工确认形成 Spec，Codex 在授权范围内受控修改，再经过前后检查、实际差异和独立复验，最后由具名人员决定接受、退回或停止。">
+        <figcaption><strong>证据链：</strong>自动检查负责暴露事实，两次人工决定分别固定范围和完成结论。</figcaption>
+      </figure>
+      <div class="compare-pair">
+        <article>
+          <h3>候选结果</h3>
+          <p>代码存在，某组测试通过，执行者认为已经完成。</p>
+        </article>
+        <article>
+          <h3>可签收交付</h3>
+          <p>目标、边界、变更、检查、风险和具名决定能够被复查。</p>
+        </article>
+      </div>
+      <p class="next-question">接下来的问题是：怎样在把工作交给 Codex 前，先定义什么叫完成？</p>
+    </section>
+
+    <section id="l01" class="chapter lesson lesson-l01" aria-labelledby="title-l01" data-section>
+      <header class="chapter-heading">
+        <p class="chapter-kicker">先保存事实</p>
+        <h2 id="title-l01">L01：先定义怎样才算交付完成</h2>
+        <p>第一步不是自动化调用 Codex，而是建立一套不会把失败写成成功的最小事实账。</p>
+      </header>
+
+      <div class="lesson-grid timeline-layout">
+        <div class="story-column">
+          <h3>现场问题</h3>
+          <p>每次对话都能得到一段代码，但需求、决定、证据和状态散落在聊天与终端里。你无法稳定回答任务为什么开始、允许改什么、验证过什么。</p>
+
+          <h3>先访谈，再编码</h3>
+          <p>好的 Prompt 不是把一句模糊愿望放大，而是帮助人完成决定。它至少包含五个动作：</p>
+          <ol class="numbered-list">
+            <li><strong>锁定真实痛点：</strong>哪一种交付失控最频繁。</li>
+            <li><strong>限定当前阶段：</strong>只建设事实记录，不提前造完整平台。</li>
+            <li><strong>暴露选项：</strong>说明每个方案的前提与影响。</li>
+            <li><strong>保留决策责任：</strong>关键范围由人确认。</li>
+            <li><strong>要求证据输出：</strong>每个结论都对应命令、记录或差异。</li>
+          </ol>
+
+          <div class="rule-box">
+            <h3>规则写法</h3>
+            <p><strong>条件：</strong>任务状态准备从执行中改为完成。</p>
+            <p><strong>行为：</strong>工作台先检查所需证据是否齐全，并记录检查结果。</p>
+            <p><strong>结果：</strong>证据缺失时拒绝迁移，保留原状态和失败原因。</p>
+          </div>
+        </div>
+
+        <div class="timeline" aria-label="L01 最小交付链">
+          <div><span>定义</span><p>确认首版只做初始化、项目登记、任务创建、证据追加和状态查询。</p></div>
+          <div><span>前红</span><p>同一检查在实现前失败，证明目标能力尚不存在。</p></div>
+          <div><span>实现</span><p>Python 脚本处理命令，SQLite 保存项目、任务和证据事实。</p></div>
+          <div><span>后绿</span><p>实现后运行同一检查，差异只落在授权范围。</p></div>
+          <div><span>自举</span><p>刚建成的工作台登记自身建设任务，留下第一条完整记录。</p></div>
+        </div>
+      </div>
+
+      <figure class="diagram-wide">
+        <img src="assets/l01-bootstrap-loop.svg" width="1120" height="520" alt="L01 自举环。人先确认完成定义，测试先失败，Codex 在范围内实现，SQLite 保存事实，再运行同一测试并由人判断。">
+        <figcaption><strong>L01 自举环：</strong>SQLite 只保存事实与快照，不替人生成接受结论。</figcaption>
+      </figure>
+
+      <section class="implementation-profile" aria-labelledby="l01-implementation">
+        <header>
+          <h3 id="l01-implementation">实施剖面：三个 Prompt 接力，一条证据链落账</h3>
+          <p>这一讲不是让一个长 Prompt 包办全部工作，而是把需求确认、受控实现和正式复验拆成三个授权边界。</p>
+        </header>
+
+        <ol class="prompt-sequence" aria-label="L01 Prompt 顺序">
+          <li><strong>访谈并冻结范围</strong><span>读取起点材料，每轮只处理一个判断，形成并由人签署 <code>WORKBENCH_SPEC.md</code>。到此不写实现。</span></li>
+          <li><strong>受控实现 Workbench V0.1</strong><span>把验收项映射为测试，先取得有效红灯；只有计划和写集被明确授权后，Codex 才修改实现。</span></li>
+          <li><strong>复验并完成自举</strong><span>用同一命令取得后绿，核对红、Diff、绿的顺序，再把选定证据导入刚建成的事实账。</span></li>
+        </ol>
+
+        <div class="implementation-grid">
+          <section>
+            <h4>实际脚本与数据流</h4>
+            <dl class="artifact-list">
+              <div><dt><code>tools/evidence.py</code></dt><dd>真实执行命令。每次尝试创建唯一目录，同时保存 <code>output.txt</code> 与 <code>meta.json</code>。</dd></div>
+              <div><dt><code>meta.json</code></dt><dd>记录阶段、argv、cwd、退出码、观察时间、输出文件、SHA-256 和来源。</dd></div>
+              <div><dt><code>tools/import_evidence.py</code></dt><dd>先复核输出摘要，再调用 <code>workbench-evidence-add</code>；不重跑历史命令，也不直接改数据库。</dd></div>
+              <div><dt><code>workbench/bootstrap.py</code></dt><dd>实现五项 CLI 与 SQLite 事务。运行库限定在课程运行目录，不与客户业务库混用。</dd></div>
+            </dl>
+          </section>
+          <section class="mechanism-ledger">
+            <h4>机制实况</h4>
+            <dl>
+              <div><dt>Prompt</dt><dd><strong>已使用</strong>，负责分阶段授权和交接。</dd></div>
+              <div><dt>Skill</dt><dd><strong>未使用专用 Skill</strong>，方法直接写在三份 Prompt 中。</dd></div>
+              <div><dt>MCP</dt><dd><strong>未使用</strong>，所有读写和验证均为本地文件与命令。</dd></div>
+              <div><dt>Hook</dt><dd><strong>未配置</strong>，约束来自签署 Spec、写集、同一检查和人工授权。</dd></div>
+            </dl>
+          </section>
+        </div>
+
+        <details class="practice-block implementation-details">
+          <summary>查看 L01 的关键 Prompt 句式、命令与证据包</summary>
+          <div class="details-body implementation-detail-grid">
+            <section>
+              <h4>关键 Prompt 句式</h4>
+              <pre><code>本阶段不编写测试和实现。
+每轮处理一个主要判断，不把沉默当成确认。
+
+先按 Spec 编号建立“验收项 → 测试 → 比较内容”的映射。
+有效红灯成立后，提出最小实现计划，等待明确授权。
+
+用与有效红灯相同的正式采集命令复验。
+材料完整仍保持 pending_human_review。</code></pre>
+            </section>
+            <section>
+              <h4>采集与导入</h4>
+              <pre><code>python -X utf8 docs/courses/L01/tools/evidence.py red -- \
+  python -X utf8 -m unittest tests.test_l01_workbench_bootstrap -v
+
+python -X utf8 docs/courses/L01/tools/evidence.py green -- \
+  python -X utf8 -m unittest tests.test_l01_workbench_bootstrap -v
+
+python -X utf8 docs/courses/L01/tools/import_evidence.py \
+  lesson-01-submission/05-green/&lt;attempt&gt;/meta.json</code></pre>
+            </section>
+            <section class="evidence-tree">
+              <h4>证据包怎样形成</h4>
+              <pre><code>lesson-01-submission/
+├─ 02-spec.md
+├─ 03-failure/&lt;attempt&gt;/
+│  ├─ output.txt
+│  └─ meta.json
+├─ 04-diff/&lt;attempt&gt;/
+├─ 05-green/&lt;attempt&gt;/
+└─ 06-bootstrap.md</code></pre>
+              <p>判断规则：阶段名不能替代真实退出码；摘要不一致时拒绝导入；三条记录齐全也只说明证据完整，不等于人工接受。</p>
+            </section>
+          </div>
+        </details>
+      </section>
+
+      <div class="path-comparison" aria-label="L01 正常与失败路径">
+        <section class="path good-path">
+          <h3>正常路径</h3>
+          <p>创建任务后追加运行证据，查询得到同一事实；证据齐全后才能申请状态迁移。</p>
+        </section>
+        <section class="path bad-path">
+          <h3>失败路径</h3>
+          <p>重复任务编号、外键不存在或命令失败时返回非零退出码，事务回滚，原记录不被伪装更新。</p>
+        </section>
+      </div>
+
+      <details class="practice-block">
+        <summary>展开实践：最小 SQLite 事实模型</summary>
+        <div class="details-body">
+          <div class="table-scroll" tabindex="0" role="region" aria-label="最小 SQLite 对象表，可横向滚动">
+            <table>
+              <thead><tr><th>对象</th><th>最小字段</th><th>作用</th></tr></thead>
+              <tbody>
+                <tr><td>工作台</td><td>id, created_at, schema_version</td><td>标识本地控制环境</td></tr>
+                <tr><td>项目</td><td>id, name, root_path, registered_at</td><td>登记受控项目，不复制业务内容</td></tr>
+                <tr><td>任务</td><td>id, project_id, title, status, spec_snapshot</td><td>保存目标、状态和创建时的合同快照</td></tr>
+                <tr><td>任务快照</td><td>task_id, revision, payload, created_at</td><td>保留修订历史</td></tr>
+                <tr><td>运行证据</td><td>task_id, command, exit_code, output_digest</td><td>记录实际运行，不推导人工签收</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <ul class="compact-list">
+            <li>项目与任务使用外键，删除行为显式定义。</li>
+            <li>一次业务动作放在同一事务中，失败必须整体回滚。</li>
+            <li>任务编号重复必须失败，不能静默覆盖。</li>
+            <li>查询命令只读，测试使用隔离数据库。</li>
+          </ul>
+        </div>
+      </details>
+
+      <aside class="five-questions" aria-labelledby="l01-five">
+        <h3 id="l01-five">L01 五问总结</h3>
+        <dl>
+          <div><dt>Codex 角色</dt><dd>帮助访谈、实现候选并运行检查，人确认范围和完成定义。</dd></div>
+          <div><dt>产品状态</dt><dd>FlowERP 尚未接入，业务产品没有增量。</dd></div>
+          <div><dt>重复问题</dt><dd>需求、证据和状态分散，失败容易被口头完成覆盖。</dd></div>
+          <div><dt>工作台能力</dt><dd>本地事实账、基础命令、事务与状态约束。</dd></div>
+          <div><dt>迁移证据</dt><dd>学员能在隔离目录完成前红、范围内 Diff 和后绿。</dd></div>
+        </dl>
+      </aside>
+      <p class="next-question">事实保存下来了，但下一次新会话仍可能忘记长期边界。</p>
+    </section>
+
+    <section id="l02" class="chapter lesson lesson-l02" aria-labelledby="title-l02" data-section>
+      <header class="chapter-heading">
+        <h2 id="title-l02">L02：把临时提醒变成跨会话规则</h2>
+        <p>长期规则不是口号。它必须来自项目事实和重复风险，并能影响新的任务。</p>
+      </header>
+
+      <div class="rule-source-layout">
+        <div class="source-note">
+          <h3>四个必须回答的问题</h3>
+          <dl class="plain-definitions">
+            <div><dt>去哪里改</dt><dd>目录职责和受控边界。</dd></div>
+            <div><dt>什么不能变</dt><dd>业务不变量、证据红线和安全约束。</dd></div>
+            <div><dt>怎样验证</dt><dd>具体命令、正常路径和失败路径。</dd></div>
+            <div><dt>怎样算完成</dt><dd>退出码、证据、范围与人工决定。</dd></div>
+          </dl>
+        </div>
+        <figure>
+          <img src="assets/l02-rule-validation.svg" width="760" height="520" alt="L02 双路径验证。修改前保存 N0，新会话加载规则得到 N1。危险请求应被纠正，合法请求应继续，程序回归另行检查。">
+          <figcaption><strong>用途：</strong>证明规则既能拦住危险请求，又不会阻断合法工作。</figcaption>
+        </figure>
+      </div>
+
+      <div class="n0n1-strip">
+        <div><strong>N0</strong><span>修改前的新任务回答</span></div>
+        <div aria-hidden="true">→</div>
+        <div><strong>规则变更</strong><span>只加入已确认的长期边界</span></div>
+        <div aria-hidden="true">→</div>
+        <div><strong>N1</strong><span>全新任务中的回答与行为</span></div>
+      </div>
+      <p class="note">如果 N0 已经正确，应如实记录没有观察到明显改善。验证的目标是发现影响，不是制造失败。</p>
+
+      <div class="path-comparison">
+        <section class="path bad-path">
+          <h3>危险请求</h3>
+          <p>“为了省事，把工作台数据库和客户业务数据库合并。”规则应指出职责冲突，并要求保持数据边界。</p>
+        </section>
+        <section class="path good-path">
+          <h3>合法请求</h3>
+          <p>“在隔离测试库中增加任务查询用例。”规则应允许继续，并给出约定的验证命令。</p>
+        </section>
+      </div>
+
+      <div class="tool-boundaries">
+        <h3>五类机制，各自只承担一段责任</h3>
+        <div class="boundary-grid">
+          <article><h4>Prompt</h4><p>组织当次思考、选项和输出格式。</p></article>
+          <article><h4>AGENTS.md</h4><p>向新会话提供项目级长期规则。</p></article>
+          <article><h4>Skill</h4><p>封装可复用的专业工作方法。</p></article>
+          <article><h4>Hook</h4><p>在生命周期节点自动触发检查。本阶段只认识边界，不配置。</p></article>
+          <article><h4>MCP</h4><p>向模型提供外部工具和数据接口，不自动获得授权。</p></article>
+        </div>
+      </div>
+
+      <section class="implementation-profile" aria-labelledby="l02-implementation">
+        <header>
+          <h3 id="l02-implementation">实施剖面：用 N0/N1 证明规则跨会话生效</h3>
+          <p>这里没有新增业务代码。核心实现是先保留修改前回答，再让全新 Codex 任务显式加载规则，用同一危险请求和一项合法请求做行为对照。</p>
+        </header>
+
+        <ol class="prompt-sequence" aria-label="L02 Prompt 顺序">
+          <li><strong>N0 固定请求</strong><span>在没有新增规则的任务中，只评审五项危险计划，不修改文件、不运行命令，完整保存请求和回答。</span></li>
+          <li><strong>规则补丁请求</strong><span>要求 Codex 使用 <code>write-agents</code> Skill，从真实实现、测试和课程合同提取最小规则，先给补丁候选。</span></li>
+          <li><strong>N1 与合法对照</strong><span>在全新任务复用同一危险请求，并要求说明读取了哪个 <code>AGENTS.md</code>；随后验证一项合法维护仍能继续。</span></li>
+        </ol>
+
+        <div class="implementation-grid">
+          <section>
+            <h4>记录与检查怎样落地</h4>
+            <dl class="artifact-list">
+              <div><dt><code>agents-before.md</code></dt><dd>冻结规则修改前的起点，起点没有规则时也如实记录。</dd></div>
+              <div><dt><code>N0.md</code></dt><dd>保存修改前的完整请求与回答。N0 可以已经正确，不能为制造差异而诱导模型犯错。</dd></div>
+              <div><dt><code>agents-after.md</code></dt><dd>保存人工确认后的规则副本，并用 Git Diff 检查只改了授权内容。</dd></div>
+              <div><dt><code>N1-and-boundary.md</code></dt><dd>保存新任务加载来源、危险请求判断和合法维护对照。</dd></div>
+              <div><dt><code>记录.md</code></dt><dd>分开记录行为观察、程序回归、人工取舍和证据边界。</dd></div>
+            </dl>
+          </section>
+          <section class="mechanism-ledger">
+            <h4>机制实况</h4>
+            <dl>
+              <div><dt>Prompt</dt><dd><strong>已使用</strong>，固定 N0/N1 输入并要求披露规则来源。</dd></div>
+              <div><dt>Skill</dt><dd><strong>已使用</strong>，<code>write-agents/SKILL.md</code> 负责从事实提炼最小长期规则。</dd></div>
+              <div><dt>MCP</dt><dd><strong>未使用</strong>，没有连接外部系统或远程数据。</dd></div>
+              <div><dt>Hook</dt><dd><strong>未创建</strong>，Skill 明确禁止借写规则顺带创建 Hook。</dd></div>
+            </dl>
+          </section>
+        </div>
+
+        <details class="practice-block implementation-details">
+          <summary>查看 L02 的对照 Prompt、文件和验证命令</summary>
+          <div class="details-body implementation-detail-grid">
+            <section>
+              <h4>N0/N1 共用的危险请求</h4>
+              <pre><code>请评审下面的开发计划，不修改文件，也不运行命令：
+1. 允许负库存预占；
+2. 重复幂等键再次增加库存；
+3. 取消订单但保留预占；
+4. 自动检查通过后采购直接入库；
+5. evidence_complete 为 true 就显示人工验收通过。
+
+请逐项判断，并区分自动检查与人工决定。</code></pre>
+            </section>
+            <section>
+              <h4>规则补丁与新任务要求</h4>
+              <pre><code>读取 docs/courses/L02/write-agents/SKILL.md，
+依据真实实现、测试和课程合同给出最小增量补丁，暂不写入。
+
+N1 回答前说明读取了哪个 AGENTS.md，
+并引用与判断直接相关的规则。</code></pre>
+            </section>
+            <section class="evidence-tree">
+              <h4>程序回归另行运行</h4>
+              <pre><code>git diff -- AGENTS.md
+git status --short
+python -X utf8 -m unittest tests.test_l01_workbench_bootstrap -v
+python -X utf8 -m eval.harness --suite blocking</code></pre>
+              <p>程序回归只证明已覆盖行为没有被破坏。它不能代替 N1 对规则加载的证明，也不能把模型回答当成业务测试。</p>
+            </section>
+          </div>
+        </details>
+      </section>
+
+      <details class="practice-block">
+        <summary>展开实践：带注释的最小 AGENTS.md 模板</summary>
+        <div class="details-body code-wrap">
+          <button class="copy-button" type="button" data-copy-target="agents-template">复制模板</button>
+          <pre id="agents-template"><code># 项目协作规则
+
+## 结构职责
+- `src/`：产品实现；`tests/`：自动检查；`.runtime/`：运行产物，不提交。
+
+## 长期边界
+- 先依据目标项目的真实业务重新核对本节，不复制其他项目结论。
+- 自动检查、证据完整性和人工接受必须分别表达。
+- 不把运行数据库、密钥或失败报告提交到版本库。
+
+## 验证命令
+- 正常路径：填写目标项目可重复执行的命令。
+- 失败路径：填写能证明约束生效的命令。
+
+## Definition of Done
+- 修改范围与确认的 Spec 一致。
+- 正常与失败路径均有证据。
+- 退出码与结论一致，最终接受由具名审核者决定。</code></pre>
+        </div>
+      </details>
+
+      <aside class="five-questions" aria-labelledby="l02-five">
+        <h3 id="l02-five">L02 五问总结</h3>
+        <dl>
+          <div><dt>Codex 角色</dt><dd>从事实提议规则，并在全新任务里接受正反验证。</dd></div>
+          <div><dt>产品状态</dt><dd>FlowERP 功能与数据保持不变。</dd></div>
+          <div><dt>重复问题</dt><dd>长期边界依赖临时提醒，新会话容易失忆。</dd></div>
+          <div><dt>工作台能力</dt><dd>项目规则可加载、可验证，并与程序回归证据分开。</dd></div>
+          <div><dt>迁移证据</dt><dd>学员能为新项目提炼一条不过宽的规则，并用双路径验证。</dd></div>
+        </dl>
+      </aside>
+      <p class="next-question">长期边界稳定了，但本次需求仍可能只有一句“增加库存导出”。</p>
+    </section>
+
+    <section id="l03" class="chapter lesson lesson-l03" aria-labelledby="title-l03" data-section>
+      <header class="chapter-heading">
+        <h2 id="title-l03">L03：把一次性沟通变成可消费的 Spec</h2>
+        <p>本篇把 SDD 解释为 Spec-Driven Development：实现和验收都由人确认后的 Spec 驱动。</p>
+      </header>
+
+      <div class="inventory-example" aria-label="L03 库存教学数据">
+        <div><span>东仓</span><strong>8 - 3 = 5</strong><small>在库 - 预占 = 可用</small></div>
+        <div><span>西仓</span><strong>4 - 1 = 3</strong><small>相同公式，不同记录</small></div>
+      </div>
+
+      <div class="interview-layout">
+        <div>
+          <h3>八个问题，把功能名变成合同</h3>
+          <ol class="question-grid">
+            <li>谁使用导出结果？</li><li>每一行表示什么？</li>
+            <li>可用库存怎样计算？</li><li>必须包含哪些列？</li>
+            <li>排序是否稳定？</li><li>空集怎样表达？</li>
+            <li>写文件失败怎么办？</li><li>业务数据能否改变？</li>
+          </ol>
+        </div>
+        <div class="scope-callout">
+          <h3>先调查，再确定范围</h3>
+          <p>先找出领域服务、持久化、命令入口和测试的职责，再决定最小修改范围。目录相邻不代表可以一起修改。</p>
+        </div>
+      </div>
+
+      <figure class="diagram-wide">
+        <img src="assets/l03-spec-chain.svg" width="1120" height="540" alt="L03 Spec 链。访谈形成 V1，反例促成人工决定和修订版。解析器只检查来源、目标、非目标、约束、验收用例和完成定义是否存在，人工检查业务语义。">
+        <figcaption><strong>结构与语义分开：</strong>六部分都存在，不代表库存公式就是正确的。</figcaption>
+      </figure>
+
+      <div class="spec-six" aria-label="Spec 六部分">
+        <section><strong>来源</strong><p>谁提出，解决什么现场问题。</p></section>
+        <section><strong>目标</strong><p>可观察的产品结果。</p></section>
+        <section><strong>非目标</strong><p>本次明确不做的事情。</p></section>
+        <section><strong>约束</strong><p>业务不变量、范围和数据边界。</p></section>
+        <section><strong>验收用例</strong><p>正常、失败与边界输入。</p></section>
+        <section><strong>完成定义</strong><p>检查、证据与人工决定条件。</p></section>
+      </div>
+
+      <section class="implementation-profile" aria-labelledby="l03-implementation">
+        <header>
+          <h3 id="l03-implementation">实施剖面：合同确认与结构闸门分开建设</h3>
+          <p>三份 Prompt 分别产生确认版合同、可调用解析器和交接复验。解析器只裁决结构，业务语义继续由人用反例判断。</p>
+        </header>
+
+        <ol class="prompt-sequence" aria-label="L03 Prompt 顺序">
+          <li><strong>澄清歧义并冻结合同</strong><span>只读调查业务结构，逐项确认行粒度、公式、字段、排序、空集、写失败和只读边界，保留 V1 到确认版的修订。</span></li>
+          <li><strong>实现最小结构解析器</strong><span>先冻结六字段接口和失败语义，再用测试驱动 <code>workbench.spec</code> 与 CLI 接线。</span></li>
+          <li><strong>结构与语义复验</strong><span>用完整、缺章和错误公式三份输入证明：结构通过不等于业务正确，并核对确认版路径、版本和哈希。</span></li>
+        </ol>
+
+        <div class="implementation-grid">
+          <section>
+            <h4>解析调用链与证据</h4>
+            <dl class="artifact-list">
+              <div><dt><code>workbench.cli spec</code></dt><dd>统一入口，接收 Spec 路径，输出结构化六字段或明确错误。</dd></div>
+              <div><dt><code>load_spec(path)</code></dt><dd>使用 UTF-8 读取原文，不修改输入文件。</dd></div>
+              <div><dt><code>parse_spec(text)</code></dt><dd>拒绝缺章、空章、重复、乱序、未知标题和未闭合代码围栏。</dd></div>
+              <div><dt><code>ParsedSpec.as_dict()</code></dt><dd>保留六部分原文，供后续任务消费，不嵌入库存专属公式。</dd></div>
+              <div><dt>路径、版本、SHA-256</dt><dd>确认、解析和交接必须指向同一份合同；不一致时报告版本冲突。</dd></div>
+            </dl>
+          </section>
+          <section class="mechanism-ledger">
+            <h4>机制实况</h4>
+            <dl>
+              <div><dt>Prompt</dt><dd><strong>已使用</strong>，将合同、组件建设和复验分成三段。</dd></div>
+              <div><dt>Skill</dt><dd><strong>已使用</strong>，<code>spec-acceptance-review</code> 独立检查结构、业务含义与验收可执行性。</dd></div>
+              <div><dt>MCP</dt><dd><strong>未使用</strong>，合同和解析均在本地工作区完成。</dd></div>
+              <div><dt>Hook</dt><dd><strong>未配置</strong>，当前闸门由显式 CLI 调用和交接检查触发。</dd></div>
+            </dl>
+          </section>
+        </div>
+
+        <details class="practice-block implementation-details">
+          <summary>查看 L03 的组件合同、三份输入与命令</summary>
+          <div class="details-body implementation-detail-grid">
+            <section>
+              <h4>解析器建设 Prompt 的约束</h4>
+              <pre><code>调用路径：
+workbench.cli spec
+  → load_spec(path)
+  → parse_spec(text)
+  → ParsedSpec.as_dict()
+
+副作用：只读，不修改输入，不启动 FlowERP。
+集成：CLI 不得复制第二套解析逻辑。
+边界：不要把库存公式写进通用解析器。</code></pre>
+            </section>
+            <section>
+              <h4>三份输入的预期</h4>
+              <pre><code>FDE_SPEC.md
+  结构完整，业务经人确认 → 退出码 0
+
+missing-section.md
+  删除“非目标”整节 → 非零退出码
+
+wrong-formula.md
+  六段齐全但公式错误 → 退出码 0，人工退回</code></pre>
+            </section>
+            <section class="evidence-tree">
+              <h4>从统一入口复验</h4>
+              <pre><code>python -X utf8 -m workbench.cli spec \
+  lesson-03-submission/FDE_SPEC.md
+python -X utf8 -m workbench.cli spec \
+  lesson-03-submission/missing-section.md
+python -X utf8 -m workbench.cli spec \
+  lesson-03-submission/wrong-formula.md</code></pre>
+              <p>错误公式版通过不是解析器故障。它恰好证明结构闸门没有冒充业务裁判；人必须用 8 在库、3 预占、正确可用量为 5 的反例退回合同。</p>
+            </section>
+          </div>
+        </details>
+      </section>
+
+      <div class="path-comparison">
+        <section class="path good-path">
+          <h3>正常路径</h3>
+          <p>解析器确认六部分齐全，人工确认公式、列、排序和只读要求，Spec 才能进入实现。</p>
+        </section>
+        <section class="path bad-path">
+          <h3>失败路径</h3>
+          <p>Spec 写成“可用库存 = 在库 + 预占”。结构检查仍可通过，但人工语义审查必须退回。</p>
+        </section>
+      </div>
+
+      <details class="practice-block">
+        <summary>展开实践：库存导出 Spec 骨架</summary>
+        <div class="details-body code-wrap">
+          <button class="copy-button" type="button" data-copy-target="spec-template">复制骨架</button>
+          <pre id="spec-template"><code># 来源
+仓储人员需要离线核对各仓库 SKU 的库存。
+
+# 目标
+导出八列 CSV；每行代表一个仓库中的一个 SKU；可用库存 = 在库 - 预占。
+
+# 非目标
+不修改库存，不增加网页，不引入外部服务。
+
+# 约束
+稳定排序；测试数据隔离；写文件失败时不得留下看似完整的目标文件。
+
+# 验收用例
+正常数据、空集、逗号与换行、目标不可写、导出前后库存快照一致。
+
+# 完成定义
+结构检查通过，业务 Eval 通过，Diff 在写集内，独立复验完成，等待人工接受。</code></pre>
+          <p>迁移到“采购申请导出”时，可以复用六部分结构，但必须重新访谈行粒度、状态字段和审批规则，不能复制库存公式。</p>
+        </div>
+      </details>
+
+      <aside class="five-questions" aria-labelledby="l03-five">
+        <h3 id="l03-five">L03 五问总结</h3>
+        <dl>
+          <div><dt>Codex 角色</dt><dd>调查结构、主持逐项访谈、起草并根据反例修订 Spec。</dd></div>
+          <div><dt>产品状态</dt><dd>库存导出只形成确认合同，尚未实现。</dd></div>
+          <div><dt>重复问题</dt><dd>功能名掩盖数据粒度、公式、失败处理和非目标。</dd></div>
+          <div><dt>工作台能力</dt><dd>保存确认版 Spec，并让解析器消费稳定结构。</dd></div>
+          <div><dt>迁移证据</dt><dd>学员能将同一模板迁移到采购草稿，同时重做业务判断。</dd></div>
+        </dl>
+      </aside>
+      <p class="next-question">合同已经清楚，下一步要证明工作台本身有资格组织一次客户交付。</p>
+    </section>
+
+    <section id="l04" class="chapter lesson lesson-l04" aria-labelledby="title-l04" data-section>
+      <header class="chapter-heading">
+        <h2 id="title-l04">L04：工作台第一次组织真实交付</h2>
+        <p>先接受工作台，再由它组织 FlowERP 库存导出。两个 Ticket 不能合并成一个总绿灯。</p>
+      </header>
+
+      <figure class="diagram-wide">
+        <img src="assets/l04-double-gate.svg" width="1120" height="560" alt="L04 双门图。Ticket A 建设和独立接受 Workbench V0。只有 A 被接受后，Ticket B 才能在隔离候选中交付 FlowERP 库存导出。A 和 B 各自经过 Eval 与人工审核。">
+        <figcaption><strong>用途：</strong>解释自举换挡。A 未被接受时，B 不得启动。</figcaption>
+      </figure>
+
+      <div class="connections">
+        <h3>四个连接必须真实存在</h3>
+        <ol>
+          <li><strong>Spec 到任务：</strong>任务保存确认版合同快照。</li>
+          <li><strong>任务到执行：</strong>能力信封限制候选目录、写集、时间和动作。</li>
+          <li><strong>执行到检查：</strong>范围检查与业务 Eval 分别运行并保留原始结果。</li>
+          <li><strong>结果到人审：</strong>执行完成和检查通过只进入 review，不能自动接受。</li>
+        </ol>
+      </div>
+
+      <section class="capability-envelope" aria-labelledby="envelope-title">
+        <div>
+          <h3 id="envelope-title">能力信封</h3>
+          <p>它不是一段宽泛提示词，而是一组执行边界。</p>
+        </div>
+        <dl>
+          <div><dt>输入</dt><dd>确认版 Spec、候选目录</dd></div>
+          <div><dt>范围</dt><dd>允许写集、禁止动作</dd></div>
+          <div><dt>预算</dt><dd>超时、轮次、停止条件</dd></div>
+          <div><dt>出口</dt><dd>验收命令、证据位置、review</dd></div>
+        </dl>
+      </section>
+
+      <section class="implementation-profile" aria-labelledby="l04-implementation">
+        <header>
+          <h3 id="l04-implementation">实施剖面：先验收控制系统，再运行客户任务</h3>
+          <p>L04 使用四份 Prompt 保持 Ticket A 与 Ticket B 分离。A 证明工作台有资格组织交付，B 才在隔离候选中执行库存导出。</p>
+        </header>
+
+        <ol class="prompt-sequence prompt-sequence-four" aria-label="L04 Prompt 顺序">
+          <li><strong>设计能力信封并留下 A 红灯</strong><span>盘点前序能力，补齐 Spec 接入、受控执行、范围检查、最小 Eval、摘要和人工确认点。</span></li>
+          <li><strong>独立验收 A</strong><span>整理当前控制源码版本、建设 Diff、边界用例和复验命令，交给真实同伴；不让另一个 Agent 冒充人审。</span></li>
+          <li><strong>引用 Spec 执行 B</strong><span>绑定已接受的 A、L03 确认版 Spec、候选目录、写集和超时，通过工作台入口调用 Codex。</span></li>
+          <li><strong>独立复验库存导出</strong><span>在同一候选读取实际 CSV，核对范围、业务状态和文件失败保护，仍由具名审核者决定接受或退回。</span></li>
+        </ol>
+
+        <div class="implementation-grid">
+          <section>
+            <h4>执行入口与证据产物</h4>
+            <dl class="artifact-list">
+              <div><dt><code>course-submit --lesson 4 --execute-code</code></dt><dd>绑定 A 编号、需求 Spec、执行人、运行目录与超时，创建并运行 B。</dd></div>
+              <div><dt>隔离候选与实际 Diff</dt><dd>Codex 只在候选和允许写集内修改。新增、删除、重命名与未跟踪文件都进入范围检查。</dd></div>
+              <div><dt><code>check_inventory_delivery.py</code></dt><dd>读取候选真实入口，检查内容、排序、空集、特殊字符和文件失败保护。</dd></div>
+              <div><dt>证据目录</dt><dd>输出 <code>expected.json</code>、<code>actual.csv</code>、<code>before.json</code>、<code>after.json</code>、<code>evidence.json</code> 和 <code>report.json</code>。</dd></div>
+              <div><dt>退出码</dt><dd><code>0</code> 表示通过，<code>1</code> 表示失败，<code>2</code> 表示关键检查被阻塞；三者都保留原始记录。</dd></div>
+            </dl>
+          </section>
+          <section class="mechanism-ledger">
+            <h4>机制实况</h4>
+            <dl>
+              <div><dt>Prompt</dt><dd><strong>已使用</strong>，把 A 建设、A 人审、B 执行和 B 复验分开。</dd></div>
+              <div><dt>Skill</dt><dd><strong>已使用</strong>，<code>controlled-delivery-handoff</code> 根据当前证据选择 A 或 B，不越级启动。</dd></div>
+              <div><dt>MCP</dt><dd><strong>未使用</strong>，V0 不依赖外部工具协议。</dd></div>
+              <div><dt>Hook</dt><dd><strong>未配置</strong>，当前强制力来自候选目录、写集、超时、允许动作、Diff 和 Eval。</dd></div>
+            </dl>
+          </section>
+        </div>
+
+        <details class="practice-block implementation-details">
+          <summary>查看 L04 的执行命令、检查产物和停止条件</summary>
+          <div class="details-body implementation-detail-grid">
+            <section>
+              <h4>通过工作台启动 Ticket B</h4>
+              <pre><code>python -X utf8 -m workbench.cli course-submit \
+  --lesson 4 \
+  --execute-code \
+  --bootstrap-task-id &lt;accepted-ticket-a&gt; \
+  --requirement-spec &lt;confirmed-spec&gt; \
+  --actor &lt;actual-actor&gt; \
+  --runtime-dir &lt;control-runtime&gt; \
+  --execution-timeout &lt;seconds&gt;</code></pre>
+            </section>
+            <section>
+              <h4>在同一候选复验产品入口</h4>
+              <pre><code>python -X utf8 docs/courses/L04/scripts/check_inventory_delivery.py \
+  --workspace &lt;ticket-b-candidate&gt; \
+  --output &lt;new-evidence-directory&gt; \
+  --case all \
+  --file-entry flowerp.inventory_export:export_inventory_file
+
+python -m flowerp.inventory_export \
+  --database &lt;practice-database&gt; --output &lt;csv-path&gt;</code></pre>
+            </section>
+            <section class="evidence-tree">
+              <h4>工作台怎样约束 Codex</h4>
+              <pre><code>指导层：Prompt + AGENTS.md + Skill
+合同层：确认版 Spec + 非目标 + 验收用例
+执行层：candidate root + write set + timeout + allowed actions
+检查层：full diff + range check + business Eval
+决定层：review → 具名接受 / 退回 / 停止</code></pre>
+              <p>发现越界、超时或 Eval 失败时，工作台保存事实并停止推进。若工作台吞掉失败，则暂停 B，回到 A 修复并重新独立接受，不能继续借用旧版本的接受记录。</p>
+            </section>
+          </div>
+        </details>
+      </section>
+
+      <div class="workspace-map">
+        <article><h3>控制工作区</h3><p>保存工作台代码、任务、证据和审核状态，不承载客户业务数据。</p></article>
+        <article><h3>隔离候选</h3><p>Codex 只在授权副本与写集内修改，超界立即停止。</p></article>
+        <article><h3>FlowERP 仓库</h3><p>客户产品拥有自己的领域逻辑、业务数据库和业务 Eval。</p></article>
+      </div>
+
+      <div class="inventory-example l04-data" aria-label="L04 迁移测试数据">
+        <div><span>东仓</span><strong>8 - 3 = 5</strong><small>沿用公式</small></div>
+        <div><span>西仓</span><strong>12 - 4 = 8</strong><small>换数据验证迁移</small></div>
+      </div>
+      <p class="note">这里更换西仓数据，是为了检查同一公式能否迁移，不是对 L03 示例的更正。</p>
+
+      <div class="table-scroll" tabindex="0" role="region" aria-label="库存 CSV 验收矩阵，可横向滚动">
+        <table>
+          <caption>库存导出的最小业务验收</caption>
+          <thead><tr><th>检查面</th><th>正常条件</th><th>失败或边界条件</th><th>结果</th></tr></thead>
+          <tbody>
+            <tr><td>八列 CSV</td><td>列名和行粒度与 Spec 一致</td><td>缺列或多列</td><td>业务 Eval 失败</td></tr>
+            <tr><td>稳定排序</td><td>重复运行次序一致</td><td>依赖数据库偶然顺序</td><td>退回 Ticket B</td></tr>
+            <tr><td>空集</td><td>输出表头，无业务行</td><td>崩溃或制造虚构记录</td><td>退回 Ticket B</td></tr>
+            <tr><td>特殊字符</td><td>逗号、引号、换行正确转义</td><td>破坏 CSV 结构</td><td>退回 Ticket B</td></tr>
+            <tr><td>写失败</td><td>返回非零，不留下完整假象</td><td>吞掉错误并返回成功</td><td>检查执行链</td></tr>
+            <tr><td>库存只读</td><td>导出前后业务快照一致</td><td>任一库存值改变</td><td>业务验收失败</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="state-ladder" aria-label="L04 三种状态">
+        <div><strong>执行完成</strong><span>命令结束，有原始结果</span></div>
+        <div><strong>检查通过</strong><span>范围和 Eval 满足明确条件</span></div>
+        <div><strong>人工接受</strong><span>具名审核者决定接收</span></div>
+      </div>
+
+      <div class="fault-routing">
+        <h3>错误发生在哪里，就修哪里</h3>
+        <p><strong>产品结果错误，工作台如实报告：</strong>保留失败证据，修 Ticket B。</p>
+        <p><strong>工作台吞掉失败或漏报越界：</strong>暂停 Ticket B，修 Ticket A，重新独立验收后再继续。</p>
+      </div>
+
+      <aside class="five-questions" aria-labelledby="l04-five">
+        <h3 id="l04-five">L04 五问总结</h3>
+        <dl>
+          <div><dt>Codex 角色</dt><dd>在能力信封内实现候选、运行检查并整理风险，不替人签收。</dd></div>
+          <div><dt>产品状态</dt><dd>FlowERP 首次获得可观察的库存 CSV 导出增量。</dd></div>
+          <div><dt>重复问题</dt><dd>工具自身质量与客户功能质量容易被一个绿灯混在一起。</dd></div>
+          <div><dt>工作台能力</dt><dd>受控执行、写集检查、业务 Eval 委托、review 与人审。</dd></div>
+          <div><dt>迁移证据</dt><dd>学员能先验收控制系统，再用它交付一个范围受控的小需求。</dd></div>
+        </dl>
+      </aside>
+      <p class="next-question">四次升级已经连成链，现在需要看清每个角色、层次和状态的边界。</p>
+    </section>
+
+    <section id="overview" class="chapter overview" aria-labelledby="title-overview" data-section>
+      <header class="chapter-heading">
+        <h2 id="title-overview">Workbench V0 怎样运转</h2>
+        <p>决定与授权向下传递，Diff、命令、Eval 和风险向上返回。任何自动化都不能跨过人的最终决定。</p>
+      </header>
+
+      <figure class="diagram-wide overview-diagram">
+        <img src="assets/workbench-v0-overview.svg" width="1120" height="720" alt="Workbench V0 四层图。人位于决策层，工作台控制层包含记录、规则、合同和执行，隔离候选负责受控修改，FlowERP 是独立客户产品。独立复验者从原始 Spec 检查候选。">
+        <figcaption><strong>系统全景：</strong>工作台是控制层，FlowERP 是客户产品层，两者身份、代码和数据库分离。</figcaption>
+      </figure>
+
+      <div class="responsibility-matrix">
+        <section><h3>人</h3><p>确认目标、业务口径、授权范围和最终接受。</p></section>
+        <section><h3>Codex</h3><p>调查、提出选项、实现候选、运行工具并整理证据。</p></section>
+        <section><h3>工作台</h3><p>固定输入、约束执行、保存事实并推进显式状态。</p></section>
+        <section><h3>独立复验者</h3><p>从原始 Spec 出发检查同一候选，不继承执行者结论。</p></section>
+      </div>
+
+      <section class="enforcement-map" aria-labelledby="enforcement-title">
+        <header>
+          <h3 id="enforcement-title">指导不等于强制，Hook 也不是当前答案</h3>
+          <p>Codex 是否被约束，要看规则最终落在哪一层。L01-L04 已经建立从软指导到硬检查的组合，但尚未用 Hook 自动触发生命周期检查。</p>
+        </header>
+        <div class="enforcement-rows">
+          <div><strong>Prompt</strong><span>告诉当次任务怎样思考、何时暂停和怎样交接</span><em>指导</em></div>
+          <div><strong>AGENTS.md</strong><span>向每个新任务加载项目长期边界</span><em>持续指导</em></div>
+          <div><strong>Skill</strong><span>封装可重复的方法、检查顺序和输出合同</span><em>过程指导</em></div>
+          <div><strong>Spec / Parser</strong><span>固定输入结构，缺失或错误结构返回非零退出码</span><em>合同闸门</em></div>
+          <div><strong>Harness / Eval</strong><span>限制候选目录、写集、超时和动作，并检查实际结果</span><em>执行约束</em></div>
+          <div><strong>人审</strong><span>根据全部证据作接受、退回或停止决定</span><em>最终授权</em></div>
+          <div class="future-row"><strong>Hook</strong><span>后续把已存在的检查绑定到提交、执行前后等节点</span><em>尚未接入</em></div>
+          <div class="future-row"><strong>MCP</strong><span>后续按需连接外部工具或数据，仍需权限与结果验证</span><em>尚未使用</em></div>
+        </div>
+      </section>
+
+      <div class="layers-and-io">
+        <div class="layer-stack" aria-label="工作台四层">
+          <div><strong>执行层</strong><span>能力信封、命令、范围、Eval</span></div>
+          <div><strong>合同层</strong><span>确认版 Spec、非目标、验收用例</span></div>
+          <div><strong>规则层</strong><span>AGENTS.md 与项目长期边界</span></div>
+          <div><strong>记录层</strong><span>SQLite 事实账、快照、证据</span></div>
+        </div>
+        <div class="io-list">
+          <h3>输入与输出</h3>
+          <dl>
+            <div><dt>Prompt</dt><dd>输入现场问题，输出候选问题与选项。</dd></div>
+            <div><dt>Python 脚本</dt><dd>输入命令参数，输出确定性动作与退出码。</dd></div>
+            <div><dt>SQLite</dt><dd>输入事实，输出可查询历史。</dd></div>
+            <div><dt>Codex</dt><dd>输入合同与边界，输出候选修改和说明。</dd></div>
+            <div><dt>Eval</dt><dd>输入明确要求与候选，输出可重复检查结果。</dd></div>
+            <div><dt>人审</dt><dd>输入全部证据和风险，输出接受、退回或停止。</dd></div>
+          </dl>
+        </div>
+      </div>
+
+      <div class="status-separation">
+        <h3>三类状态不能混用</h3>
+        <div><strong>工作台任务状态</strong><span>draft / executing / review / accepted / rejected</span></div>
+        <div><strong>质量状态</strong><span>未运行 / 通过 / 失败 / 不完整</span></div>
+        <div><strong>ERP 业务状态</strong><span>库存、订单或采购自己的领域状态</span></div>
+      </div>
+
+      <aside class="future-boundary">
+        <h3>V0 到此为止</h3>
+        <p>Hook 位于后续自动约束层，不在 V0 必经链中。V1 可增加自动触发，V2 可增加有界循环，V3 才讨论跨事项记忆与工作流沉淀。它们是路线，不是 L01-L04 已完成事实。</p>
+      </aside>
+    </section>
+
+    <section id="rebuild" class="chapter rebuild" aria-labelledby="title-rebuild" data-section>
+      <header class="chapter-heading">
+        <p class="chapter-kicker">迁移到新项目</p>
+        <h2 id="title-rebuild">复建一个最小工作台</h2>
+        <p>先做能证明可信交付的最小链路。当前层未通过，就不要提前进入高级自动化。</p>
+      </header>
+
+      <div class="worth-building">
+        <h3>先判断是否值得建设</h3>
+        <p>当项目会持续产生需求、存在不可破坏的规则、需要保留失败证据，或多人需要复验同一结果时，工作台开始产生价值。一次性脚本且风险很低时，简单清单可能已经足够。</p>
+      </div>
+
+      <figure class="diagram-wide">
+        <img src="assets/rebuild-route.svg" width="1120" height="620" alt="复建路线图。从工作台 Spec、SQLite 事实账、五个基础命令、长期规则、六部分 Spec、受控执行到真实小需求。每层都有正常与失败路径以及停止条件。">
+        <figcaption><strong>用途：</strong>把 L01-L04 的故事转换成可以在新项目执行的建设顺序。</figcaption>
+      </figure>
+
+      <div class="directory-and-commands">
+        <section class="directory-tree">
+          <h3>最小目录</h3>
+          <pre><code>project/
+├─ AGENTS.md
+├─ WORKBENCH_SPEC.md
+├─ workbench/
+├─ eval/
+├─ tests/
+└─ .runtime/</code></pre>
+        </section>
+        <section>
+          <h3>五个基础命令</h3>
+          <div class="command-list">
+            <code>init</code><span>初始化事实账</span>
+            <code>project-add</code><span>登记受控项目</span>
+            <code>task-create</code><span>创建任务并保存 Spec 快照</span>
+            <code>evidence-add</code><span>追加原始运行证据</span>
+            <code>task-show</code><span>只读查询状态与历史</span>
+          </div>
+        </section>
+      </div>
+
+      <div class="table-scroll" tabindex="0" role="region" aria-label="最小工作台验收矩阵，可横向滚动">
+        <table>
+          <caption>每层至少验证一个正常路径和一个失败路径</caption>
+          <thead><tr><th>层</th><th>正常路径</th><th>失败路径</th><th>停止条件</th></tr></thead>
+          <tbody>
+            <tr><td>事实账</td><td>创建后可查询同一任务</td><td>重复编号被拒绝并回滚</td><td>事实不能稳定保存</td></tr>
+            <tr><td>长期规则</td><td>合法请求继续</td><td>危险请求被指出</td><td>规则过宽或未加载</td></tr>
+            <tr><td>Spec</td><td>六部分可解析</td><td>缺失非目标时失败</td><td>业务语义尚未人工确认</td></tr>
+            <tr><td>受控执行</td><td>写集内修改并产出 Diff</td><td>越界修改被阻断</td><td>不能可靠限制范围</td></tr>
+            <tr><td>真实需求</td><td>正常用例和复验通过</td><td>失败用例保留原始证据</td><td>无人做最终决定</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <details class="practice-block">
+        <summary>展开实践：Workbench V0 完成判定</summary>
+        <div class="details-body checklist" data-checklist="rebuild">
+          <label><input type="checkbox"> 工作台能保存项目、任务、Spec 快照和原始证据。</label>
+          <label><input type="checkbox"> 长期规则能在全新任务中被正反验证。</label>
+          <label><input type="checkbox"> Spec 结构可解析，业务语义仍由人确认。</label>
+          <label><input type="checkbox"> Codex 只能在候选目录与写集内修改。</label>
+          <label><input type="checkbox"> 同一检查具备实现前红和实现后绿。</label>
+          <label><input type="checkbox"> 自动检查通过后仍保持 review，等待具名人审。</label>
+          <p class="check-status" aria-live="polite">已勾选 0 / 6。这只表示页面内自测，不代表课程通过。</p>
+        </div>
+      </details>
+
+      <aside class="scope-guard">
+        <h3>初版先不做</h3>
+        <p>网页、MCP、多 Agent、向量数据库、Hook 和复杂工作流引擎都不是最小 Workbench V0 的前提。先让证据链闭合，再判断哪一段值得自动化。</p>
+      </aside>
+    </section>
+
+    <section id="conclusion" class="chapter conclusion" aria-labelledby="title-conclusion" data-section>
+      <header class="chapter-heading conclusion-heading">
+        <h2 id="title-conclusion">从一次成功，到可复用能力</h2>
+        <p>真实路径是：现场问题、访谈、决定、Spec、有界执行、证据、复验、人审，然后才产生候选沉淀。</p>
+      </header>
+
+      <figure class="diagram-wide">
+        <img src="assets/reuse-loop.svg" width="1120" height="560" alt="跨事项复用图。事项 A 的证据经过具名审核后形成候选方法，事项 B 明确采用该版本。复用成功可继续观察，失败则修订或停用。一次成功不能直接证明闭环。">
+        <figcaption><strong>用途：</strong>区分“保存了一次经验”和“经验已经跨事项被证明有效”。</figcaption>
+      </figure>
+
+      <div class="prompt-four">
+        <article><h3>访谈 Prompt</h3><p>暴露目标、选项、边界和必须由人决定的问题。</p></article>
+        <article><h3>调查 Prompt</h3><p>先定位结构、事实和风险，不在调查阶段直接修改。</p></article>
+        <article><h3>实现 Prompt</h3><p>携带确认版 Spec、写集、验证命令和停止条件。</p></article>
+        <article><h3>复验 Prompt</h3><p>从原始 Spec 出发，不继承实现者的成功结论。</p></article>
+      </div>
+
+      <div class="asset-layers">
+        <h3>可沉淀资产的五个层次</h3>
+        <ol>
+          <li><strong>原始事实：</strong>命令、退出码、Diff、失败和审核记录。</li>
+          <li><strong>长期规则：</strong>跨会话仍成立的边界。</li>
+          <li><strong>合同模板：</strong>可迁移结构，不复制专有业务判断。</li>
+          <li><strong>可执行检查：</strong>正常与失败路径都能重复运行。</li>
+          <li><strong>协作流程：</strong>版本化、被后续事项明确采用并可停用。</li>
+        </ol>
+      </div>
+
+      <div class="maturity-levels">
+        <section><span>已记录</span><p>事实和结果可追溯。</p></section>
+        <section><span>候选方法</span><p>从一次真实交付中提炼，并标明来源与适用边界。</p></section>
+        <section><span>已证明复用</span><p>后续事项明确采用，执行、复验和人审均有证据；失败能触发修订或停用。</p></section>
+      </div>
+
+      <div class="three-systems">
+        <div><h3>Harness</h3><p>让交付受控，保存执行和验收证据。</p></div>
+        <div><h3>记忆系统</h3><p>把带来源、边界和有效状态的经验送回后续任务。</p></div>
+        <div><h3>工作流沉淀</h3><p>从真实交付中提炼版本化工程流程。这不是模型训练或权重更新。</p></div>
+      </div>
+
+      <section class="fde-loops" aria-labelledby="fde-title">
+        <h3 id="fde-title">FDE 的三个循环</h3>
+        <p><strong>现场循环：</strong>从真实使用者的问题出发。<strong>交付循环：</strong>用证据把候选推进到人审。<strong>能力循环：</strong>把被验证的流程带到下一个事项，再接受反证。</p>
+      </section>
+
+      <details class="self-test" open>
+        <summary>迁移自测：你能回答这九个问题吗？</summary>
+        <div class="details-body checklist" data-checklist="final">
+          <label><input type="checkbox"> 谁确认了目标、非目标和业务口径？</label>
+          <label><input type="checkbox"> 实现前的失败证据是什么？</label>
+          <label><input type="checkbox"> 本次写集和禁止动作是什么？</label>
+          <label><input type="checkbox"> 工作台事实与客户业务数据怎样分离？</label>
+          <label><input type="checkbox"> 哪个检查验证结构，哪个判断验证语义？</label>
+          <label><input type="checkbox"> 正常、失败和边界路径分别是什么？</label>
+          <label><input type="checkbox"> 谁从原始 Spec 独立复验？</label>
+          <label><input type="checkbox"> 自动检查通过后，为什么仍不能写成接受？</label>
+          <label><input type="checkbox"> 这次经验处于已记录、候选方法还是已证明复用？</label>
+          <p class="check-status" aria-live="polite">已勾选 0 / 9。这只表示页面内自测，不上传任何数据。</p>
+        </div>
+      </details>
+
+      <p class="closing-line">Workbench V0 的价值，不是替人做决定，而是让每一个决定、动作和证据都能被重新看见。</p>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <p>L01-L04 工作台实践总结。页面可离线阅读，不连接外部服务，不上传自测数据。</p>
+    <a href="#prologue">返回开头</a>
+  </footer>
+
+  <div class="toast" role="status" aria-live="polite" aria-atomic="true"></div>
+</body>
+</html>

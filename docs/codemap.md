@@ -314,6 +314,9 @@
 - `docs/analysis/l01-workbench-practice/`
   - 《L01 实践故事：造好档案柜，再记录自己的建设》独立交互页面，构建后入口为 `/analysis/l01-workbench-practice/index.html`。
 
+- `docs/analysis/l01-l04-workbench-story/`
+  - 《从一次绿灯，到可信交付》L01-L04 工作台实践专题，包含独立样式、交互脚本和 SVG 图解，构建后入口为 `/analysis/l01-l04-workbench-story/index.html`。
+
 - `docs/task.md`
   - 当前任务拆解、优先级、状态。
 

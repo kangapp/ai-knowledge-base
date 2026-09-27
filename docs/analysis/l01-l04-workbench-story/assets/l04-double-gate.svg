@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1120 560" role="img" aria-labelledby="title desc">
+  <title id="title">L04 双门验收</title>
+  <desc id="desc">Ticket A 先建设并独立接受工作台，之后 Ticket B 才能由工作台组织 FlowERP 库存导出。两门各自保留检查和人审。</desc>
+  <defs><marker id="a" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0 0L9 4.5L0 9Z" fill="#2457d6"/></marker></defs>
+  <rect width="1120" height="560" rx="12" fill="#f8faff"/>
+  <text x="54" y="56" fill="#172033" font-family="system-ui,sans-serif" font-size="25" font-weight="700">先证明控制系统可信，再让它组织客户交付</text>
+  <rect x="54" y="102" width="448" height="354" rx="12" fill="#eef2f8" stroke="#9eabc0"/>
+  <text x="86" y="143" fill="#172033" font-family="system-ui,sans-serif" font-size="20" font-weight="700">Ticket A：Workbench V0</text>
+  <g font-family="system-ui,sans-serif" font-size="15" text-anchor="middle">
+    <rect x="86" y="190" width="148" height="70" rx="10" fill="#e7edff" stroke="#2457d6"/><text x="160" y="232" fill="#172033">建设候选</text>
+    <rect x="278" y="190" width="148" height="70" rx="10" fill="#f8ecd7" stroke="#8a5718"/><text x="352" y="220" fill="#172033">独立复验</text><text x="352" y="242" fill="#536078" font-size="13">不继承自述</text>
+    <rect x="182" y="324" width="148" height="70" rx="10" fill="#e2f2e9" stroke="#1f6b4c"/><text x="256" y="354" fill="#172033">人工接受 A</text><text x="256" y="376" fill="#536078" font-size="13">获得组织资格</text>
+  </g>
+  <path d="M234 225H273M352 260V292H256V319" fill="none" stroke="#2457d6" stroke-width="3" marker-end="url(#a)"/>
+  <rect x="618" y="102" width="448" height="354" rx="12" fill="#e7edff" stroke="#2457d6"/>
+  <text x="650" y="143" fill="#172033" font-family="system-ui,sans-serif" font-size="20" font-weight="700">Ticket B：FlowERP 库存导出</text>
+  <g font-family="system-ui,sans-serif" font-size="15" text-anchor="middle">
+    <rect x="650" y="190" width="148" height="70" rx="10" fill="#f8faff" stroke="#9eabc0"/><text x="724" y="220" fill="#172033">隔离候选</text><text x="724" y="242" fill="#536078" font-size="13">能力信封内</text>
+    <rect x="842" y="190" width="148" height="70" rx="10" fill="#f8ecd7" stroke="#8a5718"/><text x="916" y="220" fill="#172033">范围 + Eval</text><text x="916" y="242" fill="#536078" font-size="13">两类检查</text>
+    <rect x="746" y="324" width="148" height="70" rx="10" fill="#e2f2e9" stroke="#1f6b4c"/><text x="820" y="354" fill="#172033">人工接受 B</text><text x="820" y="376" fill="#536078" font-size="13">客户增量完成</text>
+  </g>
+  <path d="M798 225H837M916 260V292H820V319" fill="none" stroke="#2457d6" stroke-width="3" marker-end="url(#a)"/>
+  <path d="M330 359H568V225H645" fill="none" stroke="#2457d6" stroke-width="4" marker-end="url(#a)"/>
+  <rect x="504" y="298" width="128" height="54" rx="10" fill="#2457d6"/>
+  <text x="568" y="321" text-anchor="middle" fill="#f8faff" font-family="system-ui,sans-serif" font-size="13" font-weight="700">A 接受后</text>
+  <text x="568" y="340" text-anchor="middle" fill="#f8faff" font-family="system-ui,sans-serif" font-size="13">才能启动 B</text>
+  <text x="560" y="500" text-anchor="middle" fill="#a2393f" font-family="system-ui,sans-serif" font-size="15" font-weight="700">A 未接受，不得用 B 的业务结果反向证明 A 合格。</text>
+  <text x="560" y="529" text-anchor="middle" fill="#536078" font-family="system-ui,sans-serif" font-size="14">执行完成、检查通过、人工接受是三个不同状态。</text>
+</svg>
