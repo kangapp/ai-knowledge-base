@@ -81,6 +81,28 @@
             }
         });
     });
+    document.querySelectorAll('[data-spec-demo]').forEach((demo) => {
+        function updatePreview() {
+            const refresh = demo.querySelector('input:checked').value === 'refresh';
+            demo.querySelector('[data-demo-order]').textContent = refresh
+                ? '文章 A（11:00） → 文章 B（10:00）'
+                : '文章 B（10:00） → 文章 A（09:00）';
+            demo.querySelector('[data-demo-rule]').textContent = refresh
+                ? '候选规则：再次主动收藏更新时间，同一文章仍保留一条关系。'
+                : '规则：重复收藏保留原关系与时间。';
+            demo.querySelector('[data-demo-check]').textContent = refresh
+                ? '候选验收：新操作后 A 的时间变为 11:00，关系数量不变，A 排在 B 前面。'
+                : '验收：再次收藏 A 后，关系数量、时间和排序均不变。';
+            demo.querySelector('[data-demo-impact]').textContent = refresh
+                ? '需要同步：重复操作正文、时间写入、接口处理、图示、排序示例和验收；排序依据仍是收藏时间倒序。'
+                : '关联检查：正文、排序说明、接口处理、图示与验收均沿用原规则。';
+            demo.querySelector('[data-demo-open]').textContent = refresh
+                ? '待决定：同一操作的重试要保留首次时间，还是每次请求都更新时间？候选尚不能定稿。'
+                : '重试：相同请求再次执行，也不改变时间。';
+        }
+        demo.addEventListener('change', updatePreview);
+        updatePreview();
+    });
     enhanceDetailSections();
     renderMermaid();
 })();
