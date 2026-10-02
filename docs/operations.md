@@ -27,8 +27,8 @@ VPS (1C2G)
 GitHub Actions (push master):
   pytest -m "not integration and not e2e" (仅单元测试，LLM mock，<30s)
     → 构建并推送 commit SHA + latest 双标签镜像
-      → VPS 记录当前 pipeline 镜像作为回滚版本
-        → 拉取本次 commit SHA 镜像
+      → 发布 runner 拉取本次 commit SHA 镜像，通过 SSH 压缩流导入 VPS
+        → VPS 记录当前 pipeline 镜像作为回滚版本并核实目标镜像已导入
           → docker compose up -d --wait
             → POST /api/pipeline/build 强制重建静态站
               → 验证 VPS 内部和公网健康接口、关键页面
@@ -43,8 +43,9 @@ GitHub Actions (push master):
 - 部署任务仅在 pipeline 健康后构建静态站；健康检查、构建请求、关键静态页面或公网验收失败时，恢复部署前镜像和静态输出，deploy job 仍保持失败以便追查。
 - 日常 pipeline 完成后，静态构建默认等待 5 分钟去抖。等待期间新的 pipeline 完成会把旧任务标记为 `superseded`，由最新 run 统一构建；这属于正常合并，不是失败。
 - pipeline 镜像必须包含 `curl`（健康/构建请求）和 `git`（Deep Reports 临时 clone GitHub 仓库）。
-- Dockerfile 先安装稳定系统依赖，再复制业务源码；普通代码发布只生成较小的源码层，减少 VPS 从 GHCR 拉取的数据量。
-- SSH 建连上限为 30 秒，远程命令上限为 10 分钟；只拉取 pipeline 镜像，单次最多 3 分钟并重试 2 次，持续网络故障会快速失败。
+- Dockerfile 先安装稳定系统依赖，再复制业务源码；依赖未变化时可以复用已有构建缓存。
+- 发布 runner 使用只读 packages 权限拉取 pipeline 的 commit SHA 镜像，再通过 `docker save | gzip | ssh` 导入 VPS；传输步骤最多 10 分钟，失败不会开始替换运行中的容器。SSH 临时私钥权限为 600，步骤结束时清理，不写入日志。
+- SSH 建连上限为 30 秒，远程部署命令上限为 10 分钟；VPS 核实目标镜像已导入后再启动容器，不从 GHCR 下载镜像层。
 - GitHub 仓库 Secret `PUBLIC_BASE_URL` 保存公网根地址，例如 `http://8.134.176.187:8090`；部署最后验证 `/api/health`、`/deep.html` 和 `/deep-report.html`。
 - Actions 与镜像内 uv 使用固定主版本/精确版本，降低运行时升级导致的不可复现风险。
 
@@ -94,7 +95,8 @@ GitHub Actions (push master):
 - **数据源自动治理**：预算阻断不计入源质量；自动动作只会候选试跑、上线、降权、隔离、禁用或拒绝，不会删除。`trial` 源最多采集 3 条且不写入正式文章；人工禁用会设置覆盖标记，不会被自动恢复。
 - **历史分析失败补跑**：修复后手动触发对应来源或全源 pipeline。未分析条目没有写入 `articles`，会重新进入 Collector；用 `analyzed > 0`、`cost > 0`、最新 source status 为 healthy 验证恢复。
 - **RSS 地址失效**：优先切换到来源官方 Feed；不存在稳定官方 Feed 时在 `config/sources.yaml` 设为 `enabled: false`，不要用不稳定代理伪装成可用源。
-- **部署在 6-10 分钟内失败**：查看 `2/6 Pull immutable image` 阶段。GHCR 拉取单次 3 分钟、最多 2 次；网络持续过慢时快速失败，不继续占用 runner。
+- **镜像传输失败**：查看 `Transfer release image to VPS`，区分 runner 拉取 GHCR、SSH 建连与流式导入失败；此时尚未替换线上容器。
+- **镜像预检失败**：查看 `2/6 Verify transferred immutable image`，确认已导入的镜像标签与本次 commit SHA 一致。
 - **部署后自动回滚**：查看 `Deployment failed; collecting diagnostics` 和 `Restoring previous pipeline image`。CI 仍显示失败是预期行为，线上应继续运行旧镜像。
 - **回滚也失败**：按日志中的镜像 ID 登录 VPS，执行 `PIPELINE_IMAGE=<旧镜像标签> docker compose up -d --wait --wait-timeout 90`，并检查数据库迁移是否需要单独恢复。
 

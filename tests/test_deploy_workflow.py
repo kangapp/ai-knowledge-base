@@ -27,14 +27,15 @@ def test_deploy_waits_for_pipeline_health_then_builds_static_site():
     assert 'curl -fsS "${PUBLIC_BASE_URL%/}/api/health"' in workflow
 
 
-def test_deploy_fails_fast_and_retries_image_pull_twice():
+def test_deploy_transfers_image_before_changing_running_containers():
     workflow = (ROOT / ".github/workflows/deploy.yml").read_text()
 
     assert "timeout: 30s" in workflow
     assert "command_timeout: 10m" in workflow
-    assert "for pull_attempt in 1 2" in workflow
-    assert "timeout 3m docker compose pull pipeline" in workflow
-    assert 'if [ "$pull_attempt" -eq 2 ]' in workflow
+    assert "timeout-minutes: 10" in workflow
+    assert workflow.index("Transfer release image to VPS") < workflow.index("- name: Deploy to VPS")
+    assert 'docker image inspect "$DEPLOY_IMAGE" >/dev/null' in workflow
+    assert "docker compose pull pipeline" not in workflow
 
 
 def test_deploy_uses_commit_image_and_rolls_back_on_failure():
@@ -54,7 +55,7 @@ def test_deploy_uses_commit_image_and_rolls_back_on_failure():
     assert 'docker compose up -d --wait --wait-timeout 90' in workflow
     assert 'output_backup=".deploy-output-backup-${ROLLBACK_SUFFIX}"' in workflow
     assert 'mv "$output_backup" output' in workflow
-    assert "docker compose pull failed after 2 attempts\"\n                false" in workflow
+    assert 'docker image inspect "$DEPLOY_IMAGE" >/dev/null' in workflow
 
 
 def test_pipeline_defaults_to_info_logging_in_compose():

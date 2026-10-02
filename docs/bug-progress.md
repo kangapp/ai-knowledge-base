@@ -6,9 +6,23 @@
 - Analyzer / Reviewer / 重试成本：Bug 2、Bug 3、Bug 30、Bug 34、Bug 38、Bug 42。
 - Pipeline / 调度 / 健康状态：Bug 22、Bug 29、Bug 36、Bug 43。
 - API / 静态站 / 前端展示：Bug 7、Bug 9、Bug 12、Bug 13、Bug 14、Bug 25、Bug 27、Bug 35。
-- CI/CD / Docker / VPS 部署：部署远程命令超时、Bug 6、Bug 10、Bug 11、Bug 15、Bug 16、Bug 17、Bug 18、Bug 19、Bug 20、Bug 21、Bug 23、Bug 24、Bug 28、Bug 41 setup-uv。
+- CI/CD / Docker / VPS 部署：发布镜像下载超时（2026-10-02）、部署远程命令超时、Bug 6、Bug 10、Bug 11、Bug 15、Bug 16、Bug 17、Bug 18、Bug 19、Bug 20、Bug 21、Bug 23、Bug 24、Bug 28、Bug 41 setup-uv。
 - Deep Reports：Bug 39、Bug 40、Bug 41 Deep Reports 候选选择器误杀全部新项目。
 - 环境与配置踩坑：环境变量加载顺序、GitHub API token、LangGraph async 节点、Reviewer prompt fallback。
+
+## 发布镜像下载超时（2026-10-02）
+
+**现象**：Spec 指南修改的自动检查与镜像构建成功，VPS 连续两次下载各 3 分钟后超时，发布失败并自动恢复旧镜像，公开页面仍是旧内容。
+
+**证据**：Actions run `36992654630` 的 test 与 build-image 成功，deploy 失败；下载日志持续增长但仅完成部分镜像层，随后记录 `docker compose pull failed after 2 attempts` 和 `Rollback completed successfully`。此前 run `36322029733` 也出现相同问题。
+
+**根因**：VPS 到 GHCR 镜像层下载路径过慢，固定短超时与重新拉取无法完成下载；不是本次文档或测试失败。
+
+**处理**：发布 runner 拉取确切 commit SHA 镜像，通过压缩 SSH 流导入 VPS。传输发生在容器替换之前；VPS 预检镜像标签后执行原有健康检查、静态构建和自动回滚。临时私钥在成功或失败后清理，传输任一环节失败均返回失败。
+
+**验证**：`uv run pytest tests/test_deploy_image_transfer.py tests/test_deploy_workflow.py` 检查传输数据完整、拉取/导出/SSH 失败传播与密钥清理；最终验收需确认 Actions 发布成功，并在公开指南中检查新流程、演示和静态资源。
+
+---
 
 ## Bug 41: Deep Reports 候选选择器误杀全部新项目（2026-06-21）
 
